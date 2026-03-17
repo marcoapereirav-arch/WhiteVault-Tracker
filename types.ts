@@ -77,5 +77,6 @@ export interface AppState {
     darkMode: boolean;
     language: 'ES' | 'EN';
     timezone: string; // New: Timezone support
+    avatarUrl?: string;
   };
 }

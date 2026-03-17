@@ -9,6 +9,7 @@ CREATE TABLE profiles (
   dark_mode BOOLEAN DEFAULT false,
   language TEXT DEFAULT 'ES',
   timezone TEXT DEFAULT 'UTC',
+  avatar_url TEXT,
   contexts JSONB DEFAULT '[]'::jsonb,
   subscriptions JSONB DEFAULT '[]'::jsonb,
   categories JSONB DEFAULT '[]'::jsonb,

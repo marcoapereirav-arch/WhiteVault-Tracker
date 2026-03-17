@@ -8,11 +8,20 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
   const [password, setPassword] = useState('');
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const isMissingKeys = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isMissingKeys) {
+      setError('Faltan las variables de entorno de Supabase (VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY). Por favor, configúralas en Google AI Studio.');
+      return;
+    }
+    
     setLoading(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       if (isRegister) {
@@ -21,7 +30,7 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
           password,
         });
         if (error) throw error;
-        alert('Registro exitoso. Por favor, revisa tu correo para verificar la cuenta o inicia sesión si la verificación automática está habilitada.');
+        setSuccessMessage('Registro exitoso. Por favor, revisa tu correo para verificar la cuenta o inicia sesión si la verificación automática está habilitada.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -32,6 +41,27 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
       }
     } catch (err: any) {
       setError(err.message || 'Ocurrió un error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      setError('Por favor, ingresa tu correo electrónico para recuperar la contraseña.');
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+      setSuccessMessage('Se ha enviado un correo con las instrucciones para recuperar tu contraseña.');
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error al intentar recuperar la contraseña');
     } finally {
       setLoading(false);
     }
@@ -49,9 +79,22 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
           {isRegister ? 'Crear Cuenta' : 'Iniciar Sesión'}
         </h2>
         
+        {isMissingKeys && (
+          <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm border border-yellow-200">
+            <strong>Atención:</strong> Faltan las variables de entorno de Supabase. 
+            Por favor, añade <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en la configuración.
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-md mb-4 text-sm">
             {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="bg-green-50 text-green-600 p-3 rounded-md mb-4 text-sm">
+            {successMessage}
           </div>
         )}
 
@@ -79,6 +122,18 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
               className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
               required
             />
+            {!isRegister && (
+              <div className="mt-2 text-right">
+                <button
+                  type="button"
+                  onClick={handleResetPassword}
+                  disabled={loading}
+                  className="text-xs text-graphite hover:text-onyx transition-colors disabled:opacity-50"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            )}
           </div>
           <button
             type="submit"

@@ -7,6 +7,7 @@ import { AccountsView } from './components/AccountsView';
 import { TransactionForm, TransferForm, CategoryForm, SubAccountForm, SubscriptionForm, NewContextForm, Input as DateInput } from './components/ActionModals';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
+import { Onboarding } from './components/Onboarding';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -122,6 +123,11 @@ function App() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
+  
+  // Name Edit State
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState('');
+  const nameInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -180,6 +186,7 @@ function App() {
             darkMode: p.dark_mode || INITIAL_STATE.user.darkMode,
             language: p.language || INITIAL_STATE.user.language,
             timezone: p.timezone || INITIAL_STATE.user.timezone,
+            avatarUrl: p.avatar_url,
           },
           contexts: p.contexts || INITIAL_STATE.contexts,
           subscriptions: p.subscriptions || INITIAL_STATE.subscriptions,
@@ -208,6 +215,7 @@ function App() {
         dark_mode: state.user.darkMode,
         language: state.user.language,
         timezone: state.user.timezone,
+        avatar_url: state.user.avatarUrl,
         contexts: state.contexts,
         subscriptions: state.subscriptions,
         categories: state.categories,
@@ -664,6 +672,8 @@ function App() {
       }
   };
 
+  const [showDemoOnboarding, setShowDemoOnboarding] = useState(false);
+
   // --- Render ---
 
   if (!isLoaded) {
@@ -677,8 +687,47 @@ function App() {
     );
   }
 
+  if (showDemoOnboarding) {
+    return (
+        <Onboarding 
+            onComplete={(name, avatarUrl, personalContext, addBusiness) => {
+                setShowDemoOnboarding(false);
+            }}
+        />
+    );
+  }
+
   if (!session) {
-    return <Auth onLogin={() => {}} />;
+    return <Auth onLogin={() => {}} onDemoOnboarding={() => setShowDemoOnboarding(true)} />;
+  }
+
+  if (state.contexts.length === 0) {
+    return (
+        <Onboarding 
+            onComplete={(name, avatarUrl, personalContext, addBusiness) => {
+                const newContexts = [personalContext];
+                if (addBusiness) {
+                    newContexts.push({
+                        id: 'ctx_biz_' + Date.now(),
+                        name: 'Mi Negocio',
+                        type: 'BUSINESS',
+                        accounts: [
+                            { id: 'b_income', name: 'Income (Entrada)', type: 'INCOME', balance: 0, subAccounts: [] },
+                            { id: 'b_profit', name: 'Profit', type: 'HOLDING', balance: 0, percentageTarget: 5, subAccounts: [] },
+                            { id: 'b_owner', name: 'Owner Pay', type: 'HOLDING', balance: 0, percentageTarget: 50, subAccounts: [] },
+                            { id: 'b_tax', name: 'Tax', type: 'HOLDING', balance: 0, percentageTarget: 15, subAccounts: [] },
+                            { id: 'b_opex', name: 'Opex', type: 'EXPENSE', balance: 0, percentageTarget: 30, subAccounts: [] },
+                        ]
+                    });
+                }
+                setState(s => ({
+                    ...s,
+                    user: { ...s.user, name, avatarUrl },
+                    contexts: newContexts
+                }));
+            }}
+        />
+    );
   }
 
   return (
@@ -706,11 +755,50 @@ function App() {
 
             <div className="p-8 border-t border-black/5 bg-stone">
                 <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-onyx flex items-center justify-center text-white font-display font-bold text-lg">
-                        {state.user.name.charAt(0)}
+                    <div className="w-10 h-10 bg-onyx flex items-center justify-center text-white font-display font-bold text-lg overflow-hidden rounded-full">
+                        {state.user.avatarUrl ? (
+                            <img src={state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            state.user.name.charAt(0)
+                        )}
                     </div>
                     <div>
-                        <p className="text-sm font-bold text-onyx font-display">{state.user.name}</p>
+                        {isEditingName ? (
+                            <input
+                                ref={nameInputRef}
+                                type="text"
+                                value={tempName}
+                                onChange={(e) => setTempName(e.target.value)}
+                                onBlur={() => {
+                                    setIsEditingName(false);
+                                    if (tempName.trim() && tempName !== state.user.name) {
+                                        setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        setIsEditingName(false);
+                                        if (tempName.trim() && tempName !== state.user.name) {
+                                            setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
+                                        }
+                                    } else if (e.key === 'Escape') {
+                                        setIsEditingName(false);
+                                    }
+                                }}
+                                className="text-sm font-bold text-onyx font-display bg-transparent border-b border-alloy outline-none w-full"
+                                autoFocus
+                            />
+                        ) : (
+                            <p 
+                                className="text-sm font-bold text-onyx font-display cursor-pointer hover:text-alloy transition-colors"
+                                onClick={() => {
+                                    setTempName(state.user.name);
+                                    setIsEditingName(true);
+                                }}
+                            >
+                                {state.user.name}
+                            </p>
+                        )}
                         <p className="text-[10px] text-graphite uppercase tracking-widest">Premium Tier</p>
                     </div>
                 </div>
