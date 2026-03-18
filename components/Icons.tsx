@@ -23,7 +23,8 @@ import {
   X,
   Building,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Upload
 } from 'lucide-react';
 
 export const Icons = {
@@ -50,5 +51,6 @@ export const Icons = {
   Close: X,
   Building,
   Check: CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Upload
 };

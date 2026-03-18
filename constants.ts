@@ -63,42 +63,13 @@ const generateDates = (daysBack: number) => {
 };
 
 export const INITIAL_STATE: AppState = {
-  contexts: MOCK_CONTEXTS,
-  transactions: [
-    // Income Biz
-    { id: 't1', type: 'INCOME', amount: 4500, date: generateDates(0), contextId: 'ctx_biz1', accountId: 'b1_income', notes: 'Factura Cliente A' },
-    { id: 't2', type: 'INCOME', amount: 3200, date: generateDates(2), contextId: 'ctx_biz1', accountId: 'b1_income', notes: 'Proyecto Web B' },
-    { id: 't3', type: 'INCOME', amount: 1500, date: generateDates(5), contextId: 'ctx_biz1', accountId: 'b1_income', notes: 'Consultoría' },
-    { id: 't4', type: 'INCOME', amount: 2800, date: generateDates(8), contextId: 'ctx_biz1', accountId: 'b1_income', notes: 'Retainer Mensual' },
-    
-    // Expenses Biz
-    { id: 't5', type: 'EXPENSE', amount: 500, date: generateDates(1), contextId: 'ctx_biz1', accountId: 'b1_opex', subAccountId: 'b1_sub_ads', categoryId: 'c5', notes: 'Campaña Meta Ads' },
-    { id: 't6', type: 'EXPENSE', amount: 120, date: generateDates(3), contextId: 'ctx_biz1', accountId: 'b1_opex', subAccountId: 'b1_sub_tools', categoryId: 'c4', notes: 'Suscripción Figma' },
-    { id: 't7', type: 'EXPENSE', amount: 1200, date: generateDates(6), contextId: 'ctx_biz1', accountId: 'b1_opex', categoryId: 'c6', notes: 'Pago Freelance Dev' },
-    
-    // Transfers (Distributions)
-    { id: 't8', type: 'TRANSFER', amount: 2000, date: generateDates(1), contextId: 'ctx_biz1', accountId: 'b1_income', toContextId: 'ctx_biz1', toAccountId: 'b1_owner', notes: 'Distribución Owner Pay' },
-    
-    // Personal Income
-    { id: 't9', type: 'INCOME', amount: 2000, date: generateDates(1), contextId: 'ctx_personal', accountId: 'p_income', notes: 'Sueldo Mensual' },
-    
-    // Personal Expenses
-    { id: 't10', type: 'EXPENSE', amount: 85, date: generateDates(0), contextId: 'ctx_personal', accountId: 'p_play', categoryId: 'c1', notes: 'Cena Restaurante' },
-    { id: 't11', type: 'EXPENSE', amount: 45, date: generateDates(2), contextId: 'ctx_personal', accountId: 'p_transport', categoryId: 'c2', notes: 'Gasolina' },
-    { id: 't12', type: 'EXPENSE', amount: 1200, date: generateDates(4), contextId: 'ctx_personal', accountId: 'p_needs', categoryId: 'c3', notes: 'Renta Apartamento' },
-    { id: 't13', type: 'EXPENSE', amount: 15, date: generateDates(7), contextId: 'ctx_personal', accountId: 'p_play', categoryId: 'c8', notes: 'Netflix' },
-  ],
-  subscriptions: [
-    { id: 's1', name: 'Netflix', amount: 15, frequency: 'MONTHLY', nextRenewal: generateDates(-5), contextId: 'ctx_personal', accountId: 'p_play', active: true, paymentMethod: 'Tarjeta', categoryId: 'c8' },
-    { id: 's2', name: 'Adobe CC', amount: 60, frequency: 'MONTHLY', nextRenewal: generateDates(-10), contextId: 'ctx_biz1', accountId: 'b1_opex', subAccountId: 'b1_sub_tools', active: true, paymentMethod: 'Tarjeta Corp', categoryId: 'c4' },
-    { id: 's3', name: 'Google Workspace', amount: 25, frequency: 'MONTHLY', nextRenewal: generateDates(-2), contextId: 'ctx_biz1', accountId: 'b1_opex', subAccountId: 'b1_sub_tools', active: true, paymentMethod: 'Tarjeta Corp', categoryId: 'c4' },
-    { id: 's4', name: 'Hosting Vercel', amount: 20, frequency: 'MONTHLY', nextRenewal: generateDates(-15), contextId: 'ctx_biz1', accountId: 'b1_opex', subAccountId: 'b1_sub_tools', active: true, paymentMethod: 'Paypal', categoryId: 'c4' },
-    { id: 's5', name: 'Gimnasio', amount: 45, frequency: 'MONTHLY', nextRenewal: generateDates(-20), contextId: 'ctx_personal', accountId: 'p_needs', active: true, paymentMethod: 'Tarjeta', categoryId: 'c3' },
-  ],
-  categories: INITIAL_CATEGORIES,
+  contexts: [],
+  transactions: [],
+  subscriptions: [],
+  categories: [],
   user: {
-    name: 'Alex Builder',
-    email: 'alex@whitevault.com',
+    name: 'Usuario',
+    email: '',
     currency: 'USD',
     darkMode: false,
     language: 'ES',
