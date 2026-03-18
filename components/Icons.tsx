@@ -24,6 +24,8 @@ import {
   Building,
   CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Upload
 } from 'lucide-react';
 
@@ -52,5 +54,7 @@ export const Icons = {
   Building,
   Check: CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Upload
 };

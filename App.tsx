@@ -724,6 +724,12 @@ function App() {
       
       {/* Desktop Sidebar (Collapsible) */}
       <aside className={`${isDesktopSidebarExpanded ? 'w-72' : 'w-20'} bg-white border-r border-black/5 hidden md:flex flex-col relative z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300`}>
+          <button 
+              onClick={toggleNavigation}
+              className="absolute -right-3 top-10 bg-white border border-black/10 rounded-full p-1 shadow-sm hover:bg-stone transition-colors z-50 flex items-center justify-center"
+          >
+              {isDesktopSidebarExpanded ? <Icons.ChevronLeft className="w-4 h-4 text-graphite" /> : <Icons.ChevronRight className="w-4 h-4 text-graphite" />}
+          </button>
           <div className="h-20 border-b border-black/5 flex items-center justify-center shrink-0">
               {isDesktopSidebarExpanded ? (
                   <h1 className="text-3xl font-display font-bold text-onyx tracking-tight">WhiteVault<span className="text-lg align-top text-alloy">™</span></h1>
