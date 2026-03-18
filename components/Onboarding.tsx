@@ -42,6 +42,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
     const [addBusiness, setAddBusiness] = useState(false);
 
+    // New States for Initial Balances
+    const [personalInitialBalance, setPersonalInitialBalance] = useState<number | ''>('');
+    const [distributePersonalBalance, setDistributePersonalBalance] = useState(true);
+
+    const [businessInitialBalance, setBusinessInitialBalance] = useState<number | ''>('');
+    const [distributeBusinessBalance, setDistributeBusinessBalance] = useState(true);
+
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
@@ -69,34 +76,68 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const totalBusinessPercentage = businessPockets.reduce((sum, p) => sum + (p.percentageTarget || 0), 0);
 
     const handleFinish = () => {
+        let remainingPersonal = Number(personalInitialBalance) || 0;
+        const personalAccounts = [...pockets, cashPocket].map(p => {
+            let balance = 0;
+            if (Number(personalInitialBalance) > 0 && distributePersonalBalance && p.type !== 'INCOME' && p.percentageTarget > 0) {
+                balance = Number(personalInitialBalance) * (p.percentageTarget / 100);
+                remainingPersonal -= balance;
+            }
+            return {
+                id: p.id,
+                name: p.name,
+                type: p.type,
+                balance: balance,
+                percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
+                subAccounts: []
+            };
+        });
+        
+        if (Number(personalInitialBalance) > 0) {
+            const incomeAcc = personalAccounts.find(a => a.type === 'INCOME');
+            if (incomeAcc) {
+                incomeAcc.balance = distributePersonalBalance ? remainingPersonal : Number(personalInitialBalance);
+            }
+        }
+
         const personalContext: FinancialContext = {
             id: 'ctx_personal_' + Date.now(),
             name: 'Finanzas Personales',
             type: 'PERSONAL',
-            accounts: [...pockets, cashPocket].map(p => ({
-                id: p.id,
-                name: p.name,
-                type: p.type,
-                balance: 0,
-                percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
-                subAccounts: []
-            }))
+            accounts: personalAccounts
         };
 
         let businessContext: FinancialContext | undefined;
         if (addBusiness) {
+            let remainingBusiness = Number(businessInitialBalance) || 0;
+            const businessAccounts = businessPockets.map(p => {
+                let balance = 0;
+                if (Number(businessInitialBalance) > 0 && distributeBusinessBalance && p.type !== 'INCOME' && p.percentageTarget > 0) {
+                    balance = Number(businessInitialBalance) * (p.percentageTarget / 100);
+                    remainingBusiness -= balance;
+                }
+                return {
+                    id: p.id,
+                    name: p.name,
+                    type: p.type,
+                    balance: balance,
+                    percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
+                    subAccounts: []
+                };
+            });
+            
+            if (Number(businessInitialBalance) > 0) {
+                const incomeAcc = businessAccounts.find(a => a.type === 'INCOME');
+                if (incomeAcc) {
+                    incomeAcc.balance = distributeBusinessBalance ? remainingBusiness : Number(businessInitialBalance);
+                }
+            }
+
             businessContext = {
                 id: 'ctx_biz_' + Date.now(),
                 name: businessName,
                 type: 'BUSINESS',
-                accounts: businessPockets.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    type: p.type,
-                    balance: 0,
-                    percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
-                    subAccounts: []
-                }))
+                accounts: businessAccounts
             };
         }
 
@@ -104,7 +145,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     };
 
     useEffect(() => {
-        if (step === 5) {
+        if (step === 7) {
             const timer = setTimeout(() => {
                 handleFinish();
             }, 4000);
@@ -112,12 +153,23 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         }
     }, [step]);
 
+    const totalSteps = 7;
+    const progressPercentage = (step / totalSteps) * 100;
+
     return (
         <div className="fixed inset-0 z-50 bg-stone flex flex-col items-center justify-center p-4">
-            {step === 5 && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} />}
+            {step === 7 && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} />}
             
-            <div className="w-full max-w-2xl bg-white border border-black/5 shadow-2xl p-8 md:p-12 relative z-10">
-                <div className="flex items-center justify-center mb-8">
+            <div className="w-full max-w-2xl bg-white border border-black/5 shadow-2xl p-8 md:p-12 relative z-10 overflow-hidden">
+                {/* Progress Bar */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-stone">
+                    <div 
+                        className="h-full bg-alloy transition-all duration-700 ease-out shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+                        style={{ width: `${progressPercentage}%` }}
+                    />
+                </div>
+
+                <div className="flex items-center justify-center mb-8 mt-2">
                     <h1 className="text-3xl font-display font-bold text-onyx">WhiteVault<span className="text-sm text-alloy">™</span></h1>
                 </div>
 
@@ -251,6 +303,61 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
                 {step === 3 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Balance Inicial Personal</h2>
+                        <p className="text-graphite text-center mb-6">¿Cuánto dinero tienes actualmente en tus cuentas personales? (Opcional)</p>
+                        
+                        <div className="mb-6">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Actual</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-graphite font-bold">$</span>
+                                <input 
+                                    type="number" 
+                                    value={personalInitialBalance}
+                                    onChange={(e) => setPersonalInitialBalance(e.target.value ? Number(e.target.value) : '')}
+                                    placeholder="0.00"
+                                    className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                />
+                            </div>
+                        </div>
+
+                        {Number(personalInitialBalance) > 0 && (
+                            <div className="mb-8 p-4 bg-stone border border-black/5">
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={distributePersonalBalance}
+                                        onChange={(e) => setDistributePersonalBalance(e.target.checked)}
+                                        className="mt-1 w-4 h-4 text-alloy border-black/20 rounded focus:ring-alloy"
+                                    />
+                                    <div>
+                                        <span className="block text-sm font-bold text-onyx mb-1">Distribuir automáticamente</span>
+                                        <span className="block text-xs text-graphite">
+                                            Repartir este dinero entre tus pockets según los porcentajes definidos. Si no lo marcas, el dinero irá al pocket de Ingresos para que lo distribuyas luego.
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
+                        )}
+
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setStep(2)}
+                                className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
+                            >
+                                Atrás
+                            </button>
+                            <button 
+                                onClick={() => setStep(4)}
+                                className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 4 && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">¿Tienes un Negocio?</h2>
                         <p className="text-graphite text-center mb-8">Puedes añadir un tracker profesional ahora o hacerlo más tarde desde Configuración.</p>
                         
@@ -258,7 +365,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             <button 
                                 onClick={() => {
                                     setAddBusiness(true);
-                                    setStep(4);
+                                    setStep(5);
                                 }}
                                 className="w-full py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
@@ -267,7 +374,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             <button 
                                 onClick={() => {
                                     setAddBusiness(false);
-                                    setStep(5);
+                                    setStep(7);
                                 }}
                                 className="w-full py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
@@ -277,7 +384,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         
                         <div className="mt-6">
                             <button 
-                                onClick={() => setStep(2)}
+                                onClick={() => setStep(3)}
                                 className="w-full py-4 bg-transparent text-graphite font-display font-bold tracking-wide hover:text-onyx transition-colors"
                             >
                                 Atrás
@@ -286,7 +393,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 4 && (
+                {step === 5 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Configura tu Negocio</h2>
                         <p className="text-graphite text-center mb-6">Define el nombre y las cuentas de tu negocio.</p>
@@ -337,13 +444,68 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(3)}
+                                onClick={() => setStep(4)}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Atrás
                             </button>
                             <button 
+                                onClick={() => setStep(6)}
+                                className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 6 && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Balance Inicial del Negocio</h2>
+                        <p className="text-graphite text-center mb-6">¿Cuánto dinero tiene actualmente tu negocio? (Opcional)</p>
+                        
+                        <div className="mb-6">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Actual</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-graphite font-bold">$</span>
+                                <input 
+                                    type="number" 
+                                    value={businessInitialBalance}
+                                    onChange={(e) => setBusinessInitialBalance(e.target.value ? Number(e.target.value) : '')}
+                                    placeholder="0.00"
+                                    className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                />
+                            </div>
+                        </div>
+
+                        {Number(businessInitialBalance) > 0 && (
+                            <div className="mb-8 p-4 bg-stone border border-black/5">
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={distributeBusinessBalance}
+                                        onChange={(e) => setDistributeBusinessBalance(e.target.checked)}
+                                        className="mt-1 w-4 h-4 text-alloy border-black/20 rounded focus:ring-alloy"
+                                    />
+                                    <div>
+                                        <span className="block text-sm font-bold text-onyx mb-1">Distribuir automáticamente</span>
+                                        <span className="block text-xs text-graphite">
+                                            Repartir este dinero entre los pockets del negocio según los porcentajes definidos. Si no lo marcas, el dinero irá al pocket de Ingresos.
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
+                        )}
+
+                        <div className="flex gap-4">
+                            <button 
                                 onClick={() => setStep(5)}
+                                className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
+                            >
+                                Atrás
+                            </button>
+                            <button 
+                                onClick={() => setStep(7)}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Finalizar
@@ -352,7 +514,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 5 && (
+                {step === 7 && (
                     <div className="animate-in zoom-in duration-500 flex flex-col items-center justify-center py-12">
                         <h2 className="text-4xl font-display font-bold text-onyx mb-4 text-center">¡Bienvenido a WhiteVault™!</h2>
                         <p className="text-graphite text-center text-lg">Tu bóveda financiera está lista.</p>
