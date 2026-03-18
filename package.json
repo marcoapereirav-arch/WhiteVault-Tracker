@@ -12,7 +12,9 @@
     "@supabase/supabase-js": "^2.99.2",
     "lucide-react": "^0.561.0",
     "react": "^19.2.3",
+    "react-confetti": "^6.4.0",
     "react-dom": "^19.2.3",
+    "react-use": "^17.6.0",
     "recharts": "^3.6.0"
   },
   "devDependencies": {

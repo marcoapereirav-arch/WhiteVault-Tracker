@@ -98,7 +98,7 @@ function App() {
   
   // Sidebar States
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+  const [isDesktopSidebarExpanded, setIsDesktopSidebarExpanded] = useState(false);
 
   const [tzSearch, setTzSearch] = useState('');
   
@@ -668,7 +668,7 @@ function App() {
       if (window.innerWidth < 768) {
           setIsMobileMenuOpen(!isMobileMenuOpen);
       } else {
-          setIsDesktopSidebarOpen(!isDesktopSidebarOpen);
+          setIsDesktopSidebarExpanded(!isDesktopSidebarExpanded);
       }
   };
 
@@ -690,7 +690,7 @@ function App() {
   if (showDemoOnboarding) {
     return (
         <Onboarding 
-            onComplete={(name, avatarUrl, personalContext, addBusiness) => {
+            onComplete={(name, avatarUrl, personalContext, addBusiness, businessContext) => {
                 setShowDemoOnboarding(false);
             }}
         />
@@ -704,21 +704,10 @@ function App() {
   if (state.contexts.length === 0) {
     return (
         <Onboarding 
-            onComplete={(name, avatarUrl, personalContext, addBusiness) => {
+            onComplete={(name, avatarUrl, personalContext, addBusiness, businessContext) => {
                 const newContexts = [personalContext];
-                if (addBusiness) {
-                    newContexts.push({
-                        id: 'ctx_biz_' + Date.now(),
-                        name: 'Mi Negocio',
-                        type: 'BUSINESS',
-                        accounts: [
-                            { id: 'b_income', name: 'Income (Entrada)', type: 'INCOME', balance: 0, subAccounts: [] },
-                            { id: 'b_profit', name: 'Profit', type: 'HOLDING', balance: 0, percentageTarget: 5, subAccounts: [] },
-                            { id: 'b_owner', name: 'Owner Pay', type: 'HOLDING', balance: 0, percentageTarget: 50, subAccounts: [] },
-                            { id: 'b_tax', name: 'Tax', type: 'HOLDING', balance: 0, percentageTarget: 15, subAccounts: [] },
-                            { id: 'b_opex', name: 'Opex', type: 'EXPENSE', balance: 0, percentageTarget: 30, subAccounts: [] },
-                        ]
-                    });
+                if (addBusiness && businessContext) {
+                    newContexts.push(businessContext);
                 }
                 setState(s => ({
                     ...s,
@@ -734,77 +723,79 @@ function App() {
     <div className="flex h-screen overflow-hidden font-sans">
       
       {/* Desktop Sidebar (Collapsible) */}
-      {isDesktopSidebarOpen && (
-        <aside className="w-72 bg-white border-r border-black/5 hidden md:flex flex-col relative z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] animate-in slide-in-from-left-4 duration-300">
-            <div className="p-10 border-b border-black/5">
-                <h1 className="text-3xl font-display font-bold text-onyx tracking-tight">WhiteVault<span className="text-lg align-top text-alloy">™</span></h1>
-            </div>
-            
-            <nav className="flex-1 px-6 py-8 space-y-1">
-                {navItems.map((item) => (
-                    <button 
-                        key={item.id}
-                        onClick={() => setCurrentView(item.id as View)}
-                        className={`w-full flex items-center space-x-4 px-4 py-4 border-l-2 transition-all group ${currentView === item.id ? 'border-alloy bg-stone text-onyx' : 'border-transparent text-graphite hover:bg-stone hover:text-onyx'}`}
-                    >
-                        <item.icon className={`w-5 h-5 ${currentView === item.id ? 'text-alloy' : 'text-gray-400 group-hover:text-onyx'}`} />
-                        <span className="font-display font-medium tracking-wide text-sm">{item.label}</span>
-                    </button>
-                ))}
-            </nav>
+      <aside className={`${isDesktopSidebarExpanded ? 'w-72' : 'w-20'} bg-white border-r border-black/5 hidden md:flex flex-col relative z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)] transition-all duration-300`}>
+          <div className="h-20 border-b border-black/5 flex items-center justify-center shrink-0">
+              {isDesktopSidebarExpanded ? (
+                  <h1 className="text-3xl font-display font-bold text-onyx tracking-tight">WhiteVault<span className="text-lg align-top text-alloy">™</span></h1>
+              ) : (
+                  <h1 className="text-3xl font-display font-bold text-onyx tracking-tight">W<span className="text-lg align-top text-alloy">™</span></h1>
+              )}
+          </div>
+          
+          <nav className="flex-1 px-4 py-8 space-y-1 overflow-y-auto">
+              {navItems.map((item) => (
+                  <button 
+                      key={item.id}
+                      onClick={() => setCurrentView(item.id as View)}
+                      className={`w-full flex items-center ${isDesktopSidebarExpanded ? 'justify-start space-x-4 px-4' : 'justify-center'} py-4 border-l-2 transition-all group ${currentView === item.id ? 'border-alloy bg-stone text-onyx' : 'border-transparent text-graphite hover:bg-stone hover:text-onyx'}`}
+                      title={!isDesktopSidebarExpanded ? item.label : undefined}
+                  >
+                      <item.icon className={`w-5 h-5 ${currentView === item.id ? 'text-alloy' : 'text-gray-400 group-hover:text-onyx'}`} />
+                      {isDesktopSidebarExpanded && <span className="font-display font-medium tracking-wide text-sm">{item.label}</span>}
+                  </button>
+              ))}
+          </nav>
 
-            <div className="p-8 border-t border-black/5 bg-stone">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-onyx flex items-center justify-center text-white font-display font-bold text-lg overflow-hidden rounded-full">
-                        {state.user.avatarUrl ? (
-                            <img src={state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            state.user.name.charAt(0)
-                        )}
-                    </div>
-                    <div>
-                        {isEditingName ? (
-                            <input
-                                ref={nameInputRef}
-                                type="text"
-                                value={tempName}
-                                onChange={(e) => setTempName(e.target.value)}
-                                onBlur={() => {
-                                    setIsEditingName(false);
-                                    if (tempName.trim() && tempName !== state.user.name) {
-                                        setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
-                                    }
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        setIsEditingName(false);
-                                        if (tempName.trim() && tempName !== state.user.name) {
-                                            setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
-                                        }
-                                    } else if (e.key === 'Escape') {
-                                        setIsEditingName(false);
-                                    }
-                                }}
-                                className="text-sm font-bold text-onyx font-display bg-transparent border-b border-alloy outline-none w-full"
-                                autoFocus
-                            />
-                        ) : (
-                            <p 
-                                className="text-sm font-bold text-onyx font-display cursor-pointer hover:text-alloy transition-colors"
-                                onClick={() => {
-                                    setTempName(state.user.name);
-                                    setIsEditingName(true);
-                                }}
-                            >
-                                {state.user.name}
-                            </p>
-                        )}
-                        <p className="text-[10px] text-graphite uppercase tracking-widest">Premium Tier</p>
-                    </div>
-                </div>
-            </div>
-        </aside>
-      )}
+          <div className={`p-6 border-t border-black/5 bg-stone flex ${isDesktopSidebarExpanded ? 'items-center gap-4' : 'flex-col items-center justify-center'} shrink-0`}>
+              <div className="w-10 h-10 bg-onyx flex items-center justify-center text-white font-display font-bold text-lg overflow-hidden rounded-full shrink-0">
+                  {state.user.avatarUrl ? (
+                      <img src={state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                      state.user.name.charAt(0)
+                  )}
+              </div>
+              {isDesktopSidebarExpanded && (
+                  <div className="overflow-hidden">
+                      {isEditingName ? (
+                          <input
+                              ref={nameInputRef}
+                              type="text"
+                              value={tempName}
+                              onChange={(e) => setTempName(e.target.value)}
+                              onBlur={() => {
+                                  setIsEditingName(false);
+                                  if (tempName.trim() && tempName !== state.user.name) {
+                                      setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
+                                  }
+                              }}
+                              onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                      setIsEditingName(false);
+                                      if (tempName.trim() && tempName !== state.user.name) {
+                                          setState(s => ({ ...s, user: { ...s.user, name: tempName.trim() } }));
+                                      }
+                                  } else if (e.key === 'Escape') {
+                                      setIsEditingName(false);
+                                  }
+                              }}
+                              className="text-sm font-bold text-onyx font-display bg-transparent border-b border-alloy outline-none w-full"
+                              autoFocus
+                          />
+                      ) : (
+                          <p 
+                              className="text-sm font-bold text-onyx font-display cursor-pointer hover:text-alloy transition-colors truncate"
+                              onClick={() => {
+                                  setTempName(state.user.name);
+                                  setIsEditingName(true);
+                              }}
+                          >
+                              {state.user.name}
+                          </p>
+                      )}
+                  </div>
+              )}
+          </div>
+      </aside>
 
       {/* Mobile Sidebar (Drawer) */}
       {isMobileMenuOpen && (
@@ -1175,6 +1166,119 @@ function App() {
                 {currentView === 'SETTINGS' && (
                     <div className="max-w-2xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500 pb-20">
                         
+                        {/* Profile Settings */}
+                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-alloy"></div>
+                            <h2 className="text-2xl font-display font-bold text-onyx mb-6">{t.profile}</h2>
+                            
+                            <div className="space-y-6">
+                                <div className="flex flex-col items-start gap-4 mb-6">
+                                    <div className="flex items-center gap-6">
+                                        <div 
+                                            className="w-20 h-20 bg-stone border-2 border-dashed border-black/20 rounded-full flex items-center justify-center overflow-hidden cursor-pointer hover:border-alloy transition-colors"
+                                            onClick={() => document.getElementById('settings-avatar-upload')?.click()}
+                                        >
+                                            {state.user.avatarUrl ? (
+                                                <img src={state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Icons.Upload className="w-6 h-6 text-graphite" />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-onyx mb-1">Foto de Perfil</p>
+                                            <p className="text-xs text-graphite mb-2">Haz clic para cambiar tu imagen</p>
+                                            <input 
+                                                id="settings-avatar-upload"
+                                                type="file" 
+                                                accept="image/*" 
+                                                className="hidden" 
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        const reader = new FileReader();
+                                                        reader.onloadend = () => {
+                                                            setState({...state, user: {...state.user, avatarUrl: reader.result as string}});
+                                                        };
+                                                        reader.readAsDataURL(file);
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Nombre</label>
+                                    <input type="text" value={state.user.name} onChange={(e) => setState({...state, user: {...state.user, name: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{t.email}</label>
+                                    <input type="email" value={session?.user?.email || state.user.email} readOnly className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans opacity-70" />
+                                </div>
+                                <div className="pt-4 border-t border-black/5">
+                                    <button 
+                                        onClick={() => supabase.auth.signOut()}
+                                        className="bg-red-50 text-red-600 px-6 py-3 rounded-md font-bold uppercase tracking-widest text-xs hover:bg-red-100 transition-colors"
+                                    >
+                                        Cerrar Sesión
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Percentage Configuration */}
+                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-onyx"></div>
+                            <h2 className="text-2xl font-display font-bold text-onyx mb-2">Configuración de Distribución (Profit First)</h2>
+                            <p className="text-sm text-graphite mb-6">Ajusta los porcentajes de distribución automática para cada cuenta. La cuenta 'Income' siempre será el origen (100%).</p>
+                            
+                            <div className="space-y-8">
+                                {state.contexts.map(context => (
+                                    <div key={context.id} className="border-t border-black/5 pt-6 first:border-0 first:pt-0">
+                                        <h3 className="font-display font-bold text-lg text-alloy uppercase tracking-widest mb-4">{context.name} ({context.type === 'BUSINESS' ? 'Negocio' : 'Personal'})</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {context.accounts.filter(a => a.type !== 'INCOME').map(account => (
+                                                <div key={account.id} className="flex items-center justify-between p-3 bg-stone border border-black/5">
+                                                    <span className="font-bold text-sm text-onyx">{account.name}</span>
+                                                    <div className="flex items-center">
+                                                        <input 
+                                                            type="number" 
+                                                            min="0" 
+                                                            max="100"
+                                                            value={account.percentageTarget || 0} 
+                                                            onChange={(e) => handleUpdateAccountPercentage(context.id, account.id, Number(e.target.value))}
+                                                            className="w-16 p-2 text-right bg-white border border-black/10 font-mono font-bold text-onyx outline-none focus:border-alloy"
+                                                        />
+                                                        <span className="ml-2 text-graphite font-bold">%</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {/* Show Total Allocation */}
+                                            <div className="col-span-full flex justify-end mt-2">
+                                                <span className="text-xs uppercase tracking-wider font-bold text-graphite mr-2">Total Asignado:</span>
+                                                <span className={`text-sm font-mono font-bold ${context.accounts.reduce((sum, a) => sum + (a.percentageTarget || 0), 0) === 100 ? 'text-green-600' : 'text-onyx'}`}>
+                                                    {context.accounts.reduce((sum, a) => sum + (a.percentageTarget || 0), 0)}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 left-0 w-1 h-full bg-gold"></div>
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 className="text-xl font-display font-bold text-onyx">{t.businessExp}</h3>
+                                    <p className="text-sm text-graphite mt-2 max-w-md">Inicializar una nueva estructura de negocio Profit First. Esto creará un espacio de trabajo dedicado con cuentas separadas para Ingresos, Ganancias, Impuestos, Pago del Propietario y Operaciones.</p>
+                                </div>
+                                <Icons.Building className="w-8 h-8 text-gold opacity-50" />
+                            </div>
+                            <button onClick={() => setActiveModal('NEW_BIZ')} className="mt-4 px-6 py-3 border border-gold text-gold hover:bg-gold hover:text-white font-display font-bold text-xs uppercase tracking-widest transition-all">
+                                {t.initializeBiz}
+                            </button>
+                        </div>
+
                         {/* Localization Settings */}
                         <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
                              <div className="absolute top-0 left-0 w-1 h-full bg-graphite"></div>
@@ -1219,84 +1323,6 @@ function App() {
                                     </div>
                                  </div>
                              </div>
-                        </div>
-
-                        {/* Percentage Configuration */}
-                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-onyx"></div>
-                            <h2 className="text-2xl font-display font-bold text-onyx mb-2">Configuración de Distribución (Profit First)</h2>
-                            <p className="text-sm text-graphite mb-6">Ajusta los porcentajes de distribución automática para cada cuenta. La cuenta 'Income' siempre será el origen (100%).</p>
-                            
-                            <div className="space-y-8">
-                                {state.contexts.map(context => (
-                                    <div key={context.id} className="border-t border-black/5 pt-6 first:border-0 first:pt-0">
-                                        <h3 className="font-display font-bold text-lg text-alloy uppercase tracking-widest mb-4">{context.name} ({context.type === 'BUSINESS' ? 'Negocio' : 'Personal'})</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {context.accounts.filter(a => a.type !== 'INCOME').map(account => (
-                                                <div key={account.id} className="flex items-center justify-between p-3 bg-stone border border-black/5">
-                                                    <span className="font-bold text-sm text-onyx">{account.name}</span>
-                                                    <div className="flex items-center">
-                                                        <input 
-                                                            type="number" 
-                                                            min="0" 
-                                                            max="100"
-                                                            value={account.percentageTarget || 0} 
-                                                            onChange={(e) => handleUpdateAccountPercentage(context.id, account.id, Number(e.target.value))}
-                                                            className="w-16 p-2 text-right bg-white border border-black/10 font-mono font-bold text-onyx outline-none focus:border-alloy"
-                                                        />
-                                                        <span className="ml-2 text-graphite font-bold">%</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {/* Show Total Allocation */}
-                                            <div className="col-span-full flex justify-end mt-2">
-                                                <span className="text-xs uppercase tracking-wider font-bold text-graphite mr-2">Total Asignado:</span>
-                                                <span className={`text-sm font-mono font-bold ${context.accounts.reduce((sum, a) => sum + (a.percentageTarget || 0), 0) === 100 ? 'text-green-600' : 'text-onyx'}`}>
-                                                    {context.accounts.reduce((sum, a) => sum + (a.percentageTarget || 0), 0)}%
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-alloy"></div>
-                            <h2 className="text-2xl font-display font-bold text-onyx mb-6">{t.profile}</h2>
-                            
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Nombre</label>
-                                    <input type="text" value={state.user.name} onChange={(e) => setState({...state, user: {...state.user, name: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{t.email}</label>
-                                    <input type="email" value={session?.user?.email || state.user.email} readOnly className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans opacity-70" />
-                                </div>
-                                <div className="pt-4 border-t border-black/5">
-                                    <button 
-                                        onClick={() => supabase.auth.signOut()}
-                                        className="bg-red-50 text-red-600 px-6 py-3 rounded-md font-bold uppercase tracking-widest text-xs hover:bg-red-100 transition-colors"
-                                    >
-                                        Cerrar Sesión
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden group">
-                            <div className="absolute top-0 left-0 w-1 h-full bg-gold"></div>
-                            <div className="flex items-start justify-between mb-4">
-                                <div>
-                                    <h3 className="text-xl font-display font-bold text-onyx">{t.businessExp}</h3>
-                                    <p className="text-sm text-graphite mt-2 max-w-md">Inicializar una nueva estructura de negocio Profit First. Esto creará un espacio de trabajo dedicado con cuentas separadas para Ingresos, Ganancias, Impuestos, Pago del Propietario y Operaciones.</p>
-                                </div>
-                                <Icons.Building className="w-8 h-8 text-gold opacity-50" />
-                            </div>
-                            <button onClick={() => setActiveModal('NEW_BIZ')} className="mt-4 px-6 py-3 border border-gold text-gold hover:bg-gold hover:text-white font-display font-bold text-xs uppercase tracking-widest transition-all">
-                                {t.initializeBiz}
-                            </button>
                         </div>
                     </div>
                 )}
