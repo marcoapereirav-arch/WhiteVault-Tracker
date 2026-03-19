@@ -3,6 +3,7 @@ import { Icons } from './Icons';
 import { AppState, FinancialContext } from '../types';
 import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
+import { CURRENCIES } from '../constants';
 
 interface OnboardingProps {
     onComplete: (name: string, avatarUrl: string | undefined, currency: string, personalContext: FinancialContext, addBusiness: boolean, businessContext?: FinancialContext) => void;
