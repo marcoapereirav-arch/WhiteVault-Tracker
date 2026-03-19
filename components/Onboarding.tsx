@@ -5,7 +5,7 @@ import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 
 interface OnboardingProps {
-    onComplete: (name: string, avatarUrl: string | undefined, personalContext: FinancialContext, addBusiness: boolean, businessContext?: FinancialContext) => void;
+    onComplete: (name: string, avatarUrl: string | undefined, currency: string, personalContext: FinancialContext, addBusiness: boolean, businessContext?: FinancialContext) => void;
 }
 
 export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
@@ -17,7 +17,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Step 2 State (Personal Pockets)
+    const [currency, setCurrency] = useState('USD');
+    const [currencySearch, setCurrencySearch] = useState('');
+
+    // Step 3 State (Personal Pockets)
     const [personalName, setPersonalName] = useState('Finanzas Personales');
     const [pockets, setPockets] = useState([
         { id: 'p_income', name: 'Ingresos', type: 'INCOME' as const, percentageTarget: 0 },
@@ -31,7 +34,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
     const [cashPocket, setCashPocket] = useState({ id: 'p_cash', name: 'Efectivo / Cash', type: 'HOLDING' as const, percentageTarget: 0 });
 
-    // Step 4 State (Business Pockets)
+    // Step 5 State (Business Pockets)
     const [businessName, setBusinessName] = useState('Mi Negocio');
     const [businessPockets, setBusinessPockets] = useState([
         { id: 'b_income', name: 'Income (Entrada)', type: 'INCOME' as const, percentageTarget: 0 },
@@ -142,11 +145,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             };
         }
 
-        onComplete(name || 'Usuario', avatarUrl, personalContext, addBusiness, businessContext);
+        onComplete(name || 'Usuario', avatarUrl, currency, personalContext, addBusiness, businessContext);
     };
 
     useEffect(() => {
-        if (step === 5) {
+        if (step === 6) {
             const timer = setTimeout(() => {
                 handleFinish();
             }, 4000);
@@ -154,12 +157,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         }
     }, [step]);
 
-    const totalSteps = 5;
+    const totalSteps = 6;
     const progressPercentage = (step / totalSteps) * 100;
 
     return (
         <div className="fixed inset-0 z-50 bg-stone flex flex-col items-center justify-center p-4">
-            {step === 5 && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} />}
+            {step === 6 && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} />}
             
             <div className="w-full max-w-2xl bg-white border border-black/5 shadow-2xl p-8 md:p-12 relative z-10 overflow-y-auto max-h-[95vh]">
                 {/* Progress Bar */}
@@ -225,6 +228,60 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 )}
 
                 {step === 2 && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Selecciona tu Moneda</h2>
+                        <p className="text-graphite text-center mb-6">Elige la divisa principal para tus finanzas.</p>
+                        
+                        <div className="mb-6">
+                            <div className="relative mb-4">
+                                <Icons.Menu className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-graphite" />
+                                <input 
+                                    type="text" 
+                                    value={currencySearch}
+                                    onChange={(e) => setCurrencySearch(e.target.value)}
+                                    placeholder="Buscar moneda (ej. USD, Euro, Peso...)"
+                                    className="w-full p-4 pl-10 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="max-h-64 overflow-y-auto border border-black/5 bg-white">
+                                {CURRENCIES.filter(c => 
+                                    c.code.toLowerCase().includes(currencySearch.toLowerCase()) || 
+                                    c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                                ).map(c => (
+                                    <button
+                                        key={c.code}
+                                        onClick={() => setCurrency(c.code)}
+                                        className={`w-full flex items-center justify-between p-4 border-b border-black/5 last:border-0 hover:bg-stone transition-colors ${currency === c.code ? 'bg-stone border-l-4 border-l-alloy' : ''}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-mono font-bold text-onyx">{c.code}</span>
+                                            <span className="text-graphite text-sm">{c.name}</span>
+                                        </div>
+                                        <span className="font-bold text-alloy">{c.symbol}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setStep(1)}
+                                className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
+                            >
+                                Atrás
+                            </button>
+                            <button 
+                                onClick={() => setStep(3)}
+                                className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
+                            >
+                                Continuar
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {step === 3 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Configura tu Tracker Personal</h2>
                         <p className="text-graphite text-center mb-6">Define tus cuentas principales y sus porcentajes objetivo.</p>
@@ -341,13 +398,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(1)}
+                                onClick={() => setStep(2)}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Atrás
                             </button>
                             <button 
-                                onClick={() => setStep(3)}
+                                onClick={() => setStep(4)}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Continuar
@@ -356,7 +413,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 3 && (
+                {step === 4 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">¿Tienes un Negocio?</h2>
                         <p className="text-graphite text-center mb-8">Puedes añadir un tracker profesional ahora o hacerlo más tarde desde Configuración.</p>
@@ -365,7 +422,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             <button 
                                 onClick={() => {
                                     setAddBusiness(true);
-                                    setStep(4);
+                                    setStep(5);
                                 }}
                                 className="w-full py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
@@ -374,7 +431,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                             <button 
                                 onClick={() => {
                                     setAddBusiness(false);
-                                    setStep(5);
+                                    setStep(6);
                                 }}
                                 className="w-full py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
@@ -384,7 +441,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         
                         <div className="mt-6">
                             <button 
-                                onClick={() => setStep(2)}
+                                onClick={() => setStep(3)}
                                 className="w-full py-4 bg-transparent text-graphite font-display font-bold tracking-wide hover:text-onyx transition-colors"
                             >
                                 Atrás
@@ -393,7 +450,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 4 && (
+                {step === 5 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         <h2 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Configura tu Negocio</h2>
                         <p className="text-graphite text-center mb-6">Define el nombre y las cuentas de tu negocio.</p>
@@ -484,13 +541,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(3)}
+                                onClick={() => setStep(4)}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Atrás
                             </button>
                             <button 
-                                onClick={() => setStep(5)}
+                                onClick={() => setStep(6)}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Continuar
@@ -499,7 +556,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                     </div>
                 )}
 
-                {step === 5 && (
+                {step === 6 && (
                     <div className="animate-in zoom-in duration-500 flex flex-col items-center justify-center py-12">
                         <h2 className="text-4xl font-display font-bold text-onyx mb-4 text-center">¡Bienvenido a WhiteVault™!</h2>
                         <p className="text-graphite text-center text-lg">Tu bóveda financiera está lista.</p>

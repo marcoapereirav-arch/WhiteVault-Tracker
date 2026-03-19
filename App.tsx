@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FinancialContext, Transaction, Subscription, Category, Account } from './types';
-import { INITIAL_STATE } from './constants';
+import { INITIAL_STATE, CURRENCIES } from './constants';
 import { Icons } from './components/Icons';
 import { CashFlowChart, ExpenseBreakdown, IncomeVsExpenseChart, FinancialCalendar } from './components/Charts';
 import { AccountsView } from './components/AccountsView';
@@ -124,6 +124,17 @@ function App() {
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
   const [contextToDelete, setContextToDelete] = useState<string | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  
+  // Password Change State
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  
+  // Settings Search State
+  const [currencySearch, setCurrencySearch] = useState('');
   
   // Name Edit State
   const [isEditingName, setIsEditingName] = useState(false);
@@ -726,7 +737,7 @@ function App() {
   if (showDemoOnboarding) {
     return (
         <Onboarding 
-            onComplete={(name, avatarUrl, personalContext, addBusiness, businessContext) => {
+            onComplete={(name, avatarUrl, currency, personalContext, addBusiness, businessContext) => {
                 setShowDemoOnboarding(false);
             }}
         />
@@ -740,16 +751,17 @@ function App() {
   if (state.contexts.length === 0) {
     return (
         <Onboarding 
-            onComplete={(name, avatarUrl, personalContext, addBusiness, businessContext) => {
+            onComplete={(name, avatarUrl, currency, personalContext, addBusiness, businessContext) => {
                 const newContexts = [personalContext];
                 if (addBusiness && businessContext) {
                     newContexts.push(businessContext);
                 }
                 setState(s => ({
                     ...s,
-                    user: { ...s.user, name, avatarUrl },
+                    user: { ...s.user, name, avatarUrl, currency },
                     contexts: newContexts
                 }));
+                setShowPasswordModal(true);
             }}
         />
     );
@@ -1347,15 +1359,39 @@ function App() {
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                  <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Divisa Principal</label>
-                                    <select 
-                                        value={state.user.currency} 
-                                        onChange={(e) => setState({...state, user: {...state.user, currency: e.target.value}})}
-                                        className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
-                                    >
-                                        <option value="USD">USD - Dólar Estadounidense</option>
-                                        <option value="EUR">EUR - Euro</option>
-                                        <option value="MXN">MXN - Peso Mexicano</option>
-                                    </select>
+                                    <div className="relative">
+                                        <div className="relative mb-2">
+                                            <Icons.Menu className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-graphite" />
+                                            <input 
+                                                type="text" 
+                                                value={currencySearch}
+                                                onChange={(e) => setCurrencySearch(e.target.value)}
+                                                placeholder="Buscar moneda..."
+                                                className="w-full p-3 pl-9 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy text-sm"
+                                            />
+                                        </div>
+                                        <div className="max-h-48 overflow-y-auto border border-black/5 bg-white">
+                                            {CURRENCIES.filter(c => 
+                                                c.code.toLowerCase().includes(currencySearch.toLowerCase()) || 
+                                                c.name.toLowerCase().includes(currencySearch.toLowerCase())
+                                            ).map(c => (
+                                                <button
+                                                    key={c.code}
+                                                    onClick={() => setState({...state, user: {...state.user, currency: c.code}})}
+                                                    className={`w-full flex items-center justify-between p-3 border-b border-black/5 last:border-0 hover:bg-stone transition-colors ${state.user.currency === c.code ? 'bg-stone border-l-4 border-l-alloy' : ''}`}
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-mono font-bold text-onyx text-sm">{c.code}</span>
+                                                        <span className="text-graphite text-xs text-left truncate max-w-[120px]">{c.name}</span>
+                                                    </div>
+                                                    <span className="font-bold text-alloy text-sm">{c.symbol}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-graphite mt-2 italic">
+                                            Seleccionada: {state.user.currency}
+                                        </p>
+                                    </div>
                                  </div>
                                  <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Zona Horaria (Buscador)</label>
@@ -1383,6 +1419,61 @@ function App() {
                                         </p>
                                     </div>
                                  </div>
+                             </div>
+                        </div>
+
+                        {/* Security Settings */}
+                        <div className="bg-white border border-black/5 p-8 shadow-sm relative overflow-hidden">
+                             <div className="absolute top-0 left-0 w-1 h-full bg-red-500"></div>
+                             <h2 className="text-2xl font-display font-bold text-onyx mb-6">Seguridad</h2>
+                             <div className="max-w-md">
+                                <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Cambiar Contraseña</label>
+                                <div className="space-y-4">
+                                    <input 
+                                        type="password" 
+                                        placeholder="Nueva contraseña"
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                    />
+                                    <input 
+                                        type="password" 
+                                        placeholder="Confirmar contraseña"
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                    />
+                                    {passwordError && <p className="text-red-500 text-xs font-bold">{passwordError}</p>}
+                                    {passwordSuccess && <p className="text-green-600 text-xs font-bold">{passwordSuccess}</p>}
+                                    <button 
+                                        onClick={async () => {
+                                            if (newPassword !== confirmPassword) {
+                                                setPasswordError('Las contraseñas no coinciden');
+                                                return;
+                                            }
+                                            if (newPassword.length < 6) {
+                                                setPasswordError('La contraseña debe tener al menos 6 caracteres');
+                                                return;
+                                            }
+                                            setIsUpdatingPassword(true);
+                                            setPasswordError('');
+                                            setPasswordSuccess('');
+                                            const { error } = await supabase.auth.updateUser({ password: newPassword });
+                                            setIsUpdatingPassword(false);
+                                            if (error) {
+                                                setPasswordError(error.message);
+                                            } else {
+                                                setPasswordSuccess('Contraseña actualizada correctamente');
+                                                setNewPassword('');
+                                                setConfirmPassword('');
+                                            }
+                                        }}
+                                        disabled={isUpdatingPassword || !newPassword || !confirmPassword}
+                                        className="px-6 py-3 bg-onyx text-white font-display font-bold text-xs uppercase tracking-widest hover:bg-alloy transition-colors disabled:opacity-50"
+                                    >
+                                        {isUpdatingPassword ? 'Actualizando...' : 'Guardar Contraseña'}
+                                    </button>
+                                </div>
                              </div>
                         </div>
                     </div>
@@ -1459,6 +1550,61 @@ function App() {
                         className="flex-1 py-3 bg-red-500 text-white font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors"
                     >
                         Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full p-8 shadow-2xl border border-black/10 animate-in zoom-in-95 duration-200">
+                <h3 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Crea tu contraseña de acceso</h3>
+                <p className="text-graphite mb-6 text-sm text-center">
+                    Para asegurar tu cuenta, por favor establece una contraseña.
+                </p>
+                <div className="space-y-4">
+                    <input 
+                        type="password" 
+                        placeholder="Nueva contraseña"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                    />
+                    <input 
+                        type="password" 
+                        placeholder="Confirmar contraseña"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                    />
+                    {passwordError && <p className="text-red-500 text-xs font-bold text-center">{passwordError}</p>}
+                    <button 
+                        onClick={async () => {
+                            if (newPassword !== confirmPassword) {
+                                setPasswordError('Las contraseñas no coinciden');
+                                return;
+                            }
+                            if (newPassword.length < 6) {
+                                setPasswordError('La contraseña debe tener al menos 6 caracteres');
+                                return;
+                            }
+                            setIsUpdatingPassword(true);
+                            setPasswordError('');
+                            const { error } = await supabase.auth.updateUser({ password: newPassword });
+                            setIsUpdatingPassword(false);
+                            if (error) {
+                                setPasswordError(error.message);
+                            } else {
+                                setShowPasswordModal(false);
+                                setNewPassword('');
+                                setConfirmPassword('');
+                            }
+                        }}
+                        disabled={isUpdatingPassword || !newPassword || !confirmPassword}
+                        className="w-full py-4 bg-onyx text-white font-display font-bold text-sm uppercase tracking-widest hover:bg-alloy transition-colors disabled:opacity-50"
+                    >
+                        {isUpdatingPassword ? 'Guardando...' : 'Guardar Contraseña'}
                     </button>
                 </div>
             </div>
