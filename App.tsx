@@ -535,6 +535,14 @@ function App() {
       setState({ ...state, contexts: newContexts });
   }
 
+  const handleUpdateContextName = (contextId: string, newName: string) => {
+      const newContexts = state.contexts.map(c => {
+          if (c.id !== contextId) return c;
+          return { ...c, name: newName };
+      });
+      setState({ ...state, contexts: newContexts });
+  }
+
   const handleTransaction = (data: any) => {
     const newTx: Transaction = { id: `tx_${Date.now()}`, ...data };
     const newContexts = [...state.contexts];
@@ -613,17 +621,35 @@ function App() {
   };
 
   const handleNewBusiness = (data: any) => {
+    let remainingBalance = Number(data.initialBalance) || 0;
+    
+    const accounts: Account[] = [
+      { id: `biz_${Date.now()}_inc`, name: 'Income', type: 'INCOME', balance: 0, subAccounts: [] },
+      { id: `biz_${Date.now()}_prof`, name: 'Profit', type: 'HOLDING', balance: 0, percentageTarget: 5, subAccounts: [] },
+      { id: `biz_${Date.now()}_ownr`, name: 'Owner Pay', type: 'HOLDING', balance: 0, percentageTarget: 50, subAccounts: [] },
+      { id: `biz_${Date.now()}_tax`, name: 'Tax', type: 'HOLDING', balance: 0, percentageTarget: 15, subAccounts: [] },
+      { id: `biz_${Date.now()}_opex`, name: 'Opex', type: 'EXPENSE', balance: 0, percentageTarget: 30, subAccounts: [] },
+    ];
+
+    if (data.distributed && remainingBalance > 0) {
+        accounts.forEach(acc => {
+            if (acc.type !== 'INCOME' && acc.percentageTarget) {
+                const amount = remainingBalance * (acc.percentageTarget / 100);
+                acc.balance = amount;
+            }
+        });
+    } else if (remainingBalance > 0) {
+        const incomeAcc = accounts.find(a => a.type === 'INCOME');
+        if (incomeAcc) {
+            incomeAcc.balance = remainingBalance;
+        }
+    }
+
     const newContext: FinancialContext = {
       id: `ctx_biz_${Date.now()}`,
       name: data.name,
       type: 'BUSINESS',
-      accounts: [
-        { id: `biz_${Date.now()}_inc`, name: 'Income', type: 'INCOME', balance: 0, subAccounts: [] },
-        { id: `biz_${Date.now()}_prof`, name: 'Profit', type: 'HOLDING', balance: 0, percentageTarget: 5, subAccounts: [] },
-        { id: `biz_${Date.now()}_ownr`, name: 'Owner Pay', type: 'HOLDING', balance: 0, percentageTarget: 50, subAccounts: [] },
-        { id: `biz_${Date.now()}_tax`, name: 'Tax', type: 'HOLDING', balance: 0, percentageTarget: 15, subAccounts: [] },
-        { id: `biz_${Date.now()}_opex`, name: 'Opex', type: 'EXPENSE', balance: 0, percentageTarget: 30, subAccounts: [] },
-      ]
+      accounts
     };
     setState({ ...state, contexts: [...state.contexts, newContext] });
   };
@@ -1240,7 +1266,17 @@ function App() {
                             <div className="space-y-8">
                                 {state.contexts.map(context => (
                                     <div key={context.id} className="border-t border-black/5 pt-6 first:border-0 first:pt-0">
-                                        <h3 className="font-display font-bold text-lg text-alloy uppercase tracking-widest mb-4">{context.name} ({context.type === 'BUSINESS' ? 'Negocio' : 'Personal'})</h3>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex-1 mr-4">
+                                                <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">Nombre del Dashboard ({context.type === 'BUSINESS' ? 'Negocio' : 'Personal'})</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={context.name}
+                                                    onChange={(e) => handleUpdateContextName(context.id, e.target.value)}
+                                                    className="w-full p-2 bg-stone border border-black/5 text-onyx font-display font-bold text-lg outline-none focus:border-alloy"
+                                                />
+                                            </div>
+                                        </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {context.accounts.filter(a => a.type !== 'INCOME').map(account => (
                                                 <div key={account.id} className="flex items-center justify-between p-3 bg-stone border border-black/5">

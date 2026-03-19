@@ -18,6 +18,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Step 2 State (Personal Pockets)
+    const [personalName, setPersonalName] = useState('Finanzas Personales');
     const [pockets, setPockets] = useState([
         { id: 'p_income', name: 'Ingresos', type: 'INCOME' as const, percentageTarget: 0 },
         { id: 'p_needs', name: 'Necesidades Básicas', type: 'EXPENSE' as const, percentageTarget: 50 },
@@ -102,7 +103,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
         const personalContext: FinancialContext = {
             id: 'ctx_personal_' + Date.now(),
-            name: 'Finanzas Personales',
+            name: personalName || 'Finanzas Personales',
             type: 'PERSONAL',
             accounts: personalAccounts
         };
@@ -229,6 +230,15 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         <p className="text-graphite text-center mb-6">Define tus cuentas principales y sus porcentajes objetivo.</p>
                         
                         <div className="mb-6">
+                            <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Nombre de tu Dashboard Personal</label>
+                            <input 
+                                type="text" 
+                                value={personalName}
+                                onChange={(e) => setPersonalName(e.target.value)}
+                                placeholder="Finanzas Personales"
+                                className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy mb-6"
+                            />
+
                             <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>
                             <div className="flex gap-4">
                                 <div className="relative flex-1">

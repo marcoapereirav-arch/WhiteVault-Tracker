@@ -683,16 +683,78 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
 
 export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
     const [name, setName] = useState('');
+    const [initialBalance, setInitialBalance] = useState<number | ''>('');
+    const [distributed, setDistributed] = useState(false);
+
+    const defaultPockets = [
+        { id: 'b_income', name: 'Income', type: 'INCOME', percentageTarget: 0 },
+        { id: 'b_profit', name: 'Profit', type: 'HOLDING', percentageTarget: 5 },
+        { id: 'b_owner', name: 'Owner Pay', type: 'HOLDING', percentageTarget: 50 },
+        { id: 'b_tax', name: 'Tax', type: 'HOLDING', percentageTarget: 15 },
+        { id: 'b_opex', name: 'Opex', type: 'EXPENSE', percentageTarget: 30 },
+    ];
 
     return (
         <Modal isOpen={true} onClose={onClose} title="Iniciar Nuevo Negocio">
-            <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name }); onClose(); }}>
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, initialBalance, distributed }); onClose(); }}>
                 <div className="bg-stone p-4 border border-black/5 mb-6">
                      <p className="text-sm text-graphite font-sans">
                          Esto creará un nuevo espacio de negocio con la estructura de cuentas estándar <strong>Profit First</strong> (Income, Profit, Owner Pay, Tax, Opex).
                      </p>
                 </div>
                 <Input type="text" label="Nombre del Negocio" required placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
+                
+                <div className="mb-6">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>
+                    <div className="flex gap-4">
+                        <div className="relative flex-1">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-graphite font-bold">$</span>
+                            <input 
+                                type="number" 
+                                value={initialBalance}
+                                onChange={(e) => {
+                                    setInitialBalance(e.target.value ? Number(e.target.value) : '');
+                                    setDistributed(false);
+                                }}
+                                placeholder="0.00"
+                                className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                            />
+                        </div>
+                        {Number(initialBalance) > 0 && !distributed && (
+                            <button 
+                                type="button"
+                                onClick={() => setDistributed(true)}
+                                className="px-6 py-4 bg-alloy text-white font-display font-bold tracking-wide hover:bg-onyx transition-colors"
+                            >
+                                Distribuir
+                            </button>
+                        )}
+                        {Number(initialBalance) > 0 && distributed && (
+                            <button 
+                                type="button"
+                                onClick={() => setDistributed(false)}
+                                className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
+                            >
+                                Deshacer
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {distributed && Number(initialBalance) > 0 && (
+                    <div className="space-y-2 mb-6 p-4 bg-stone border border-black/5">
+                        <h4 className="text-xs font-bold uppercase tracking-widest text-graphite mb-3">Distribución Estimada</h4>
+                        {defaultPockets.filter(p => p.type !== 'INCOME').map(pocket => (
+                            <div key={pocket.id} className="flex justify-between items-center text-sm">
+                                <span className="text-onyx">{pocket.name} ({pocket.percentageTarget}%)</span>
+                                <span className="font-mono font-bold text-alloy">
+                                    + ${(Number(initialBalance) * (pocket.percentageTarget / 100)).toFixed(2)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 <button type="submit" className="w-full py-4 bg-gold hover:bg-alloy text-white font-display font-bold uppercase tracking-widest text-sm transition-colors">Lanzar Espacio de Negocio</button>
             </form>
         </Modal>
