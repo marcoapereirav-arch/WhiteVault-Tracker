@@ -123,6 +123,7 @@ function App() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
+  const [contextToDelete, setContextToDelete] = useState<string | null>(null);
   
   // Name Edit State
   const [isEditingName, setIsEditingName] = useState(false);
@@ -541,6 +542,15 @@ function App() {
           return { ...c, name: newName };
       });
       setState({ ...state, contexts: newContexts });
+  }
+
+  const handleDeleteContext = (contextId: string) => {
+      const newContexts = state.contexts.filter(c => c.id !== contextId);
+      setState({ ...state, contexts: newContexts });
+      setContextToDelete(null);
+      if (contextFilter === contextId) {
+          setContextFilter('ALL');
+      }
   }
 
   const handleTransaction = (data: any) => {
@@ -1276,6 +1286,15 @@ function App() {
                                                     className="w-full p-2 bg-stone border border-black/5 text-onyx font-display font-bold text-lg outline-none focus:border-alloy"
                                                 />
                                             </div>
+                                            {context.type === 'BUSINESS' && (
+                                                <button
+                                                    onClick={() => setContextToDelete(context.id)}
+                                                    className="p-2 text-red-500 hover:bg-red-50 rounded transition-colors self-end mb-1"
+                                                    title="Eliminar Negocio"
+                                                >
+                                                    <Icons.Trash className="w-5 h-5" />
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {context.accounts.filter(a => a.type !== 'INCOME').map(account => (
@@ -1420,6 +1439,31 @@ function App() {
       {activeModal === 'SUBSCRIPTION' && <SubscriptionForm state={state} onSubmit={handleNewSubscription} onClose={() => setActiveModal(null)} />}
       {activeModal === 'EDIT_SUBSCRIPTION' && selectedSubscription && <SubscriptionForm state={state} initialData={selectedSubscription} onSubmit={handleUpdateSubscription} onClose={() => setActiveModal(null)} />}
       {activeModal === 'NEW_BIZ' && <NewContextForm onSubmit={handleNewBusiness} onClose={() => setActiveModal(null)} />}
+
+      {contextToDelete && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white max-w-md w-full p-6 shadow-xl border border-black/10">
+                <h3 className="text-xl font-display font-bold text-onyx mb-2">¿Eliminar Negocio?</h3>
+                <p className="text-graphite mb-6 text-sm">
+                    ¿Estás seguro de que quieres eliminar este tracker de negocio? Esta acción no se puede deshacer y perderás la configuración de estas cuentas.
+                </p>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => setContextToDelete(null)}
+                        className="flex-1 py-3 bg-stone text-onyx font-bold uppercase tracking-widest text-xs hover:bg-black/5 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                        onClick={() => handleDeleteContext(contextToDelete)}
+                        className="flex-1 py-3 bg-red-500 text-white font-bold uppercase tracking-widest text-xs hover:bg-red-600 transition-colors"
+                    >
+                        Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
 
     </div>
   );
