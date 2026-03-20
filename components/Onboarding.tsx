@@ -81,27 +81,29 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
     const totalBusinessPercentage = businessPockets.reduce((sum, p) => sum + (p.percentageTarget || 0), 0);
 
     const handleFinish = () => {
+        const cur = currency;
         let remainingPersonal = Number(personalInitialBalance) || 0;
         const personalAccounts = [...pockets, cashPocket].map(p => {
-            let balance = 0;
+            let amount = 0;
             if (Number(personalInitialBalance) > 0 && personalDistributed && p.type !== 'INCOME' && p.percentageTarget > 0) {
-                balance = Number(personalInitialBalance) * (p.percentageTarget / 100);
-                remainingPersonal -= balance;
+                amount = Number(personalInitialBalance) * (p.percentageTarget / 100);
+                remainingPersonal -= amount;
             }
             return {
                 id: p.id,
                 name: p.name,
                 type: p.type,
-                balance: balance,
+                balances: amount > 0 ? { [cur]: amount } : {},
                 percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
                 subAccounts: []
             };
         });
-        
+
         if (Number(personalInitialBalance) > 0) {
             const incomeAcc = personalAccounts.find(a => a.type === 'INCOME');
             if (incomeAcc) {
-                incomeAcc.balance = personalDistributed ? remainingPersonal : Number(personalInitialBalance);
+                const incAmount = personalDistributed ? remainingPersonal : Number(personalInitialBalance);
+                incomeAcc.balances = incAmount > 0 ? { [cur]: incAmount } : {};
             }
         }
 
@@ -116,25 +118,26 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         if (addBusiness) {
             let remainingBusiness = Number(businessInitialBalance) || 0;
             const businessAccounts = businessPockets.map(p => {
-                let balance = 0;
+                let amount = 0;
                 if (Number(businessInitialBalance) > 0 && businessDistributed && p.type !== 'INCOME' && p.percentageTarget > 0) {
-                    balance = Number(businessInitialBalance) * (p.percentageTarget / 100);
-                    remainingBusiness -= balance;
+                    amount = Number(businessInitialBalance) * (p.percentageTarget / 100);
+                    remainingBusiness -= amount;
                 }
                 return {
                     id: p.id,
                     name: p.name,
                     type: p.type,
-                    balance: balance,
+                    balances: amount > 0 ? { [cur]: amount } : {},
                     percentageTarget: p.percentageTarget > 0 ? p.percentageTarget : undefined,
                     subAccounts: []
                 };
             });
-            
+
             if (Number(businessInitialBalance) > 0) {
                 const incomeAcc = businessAccounts.find(a => a.type === 'INCOME');
                 if (incomeAcc) {
-                    incomeAcc.balance = businessDistributed ? remainingBusiness : Number(businessInitialBalance);
+                    const incAmount = businessDistributed ? remainingBusiness : Number(businessInitialBalance);
+                    incomeAcc.balances = incAmount > 0 ? { [cur]: incAmount } : {};
                 }
             }
 

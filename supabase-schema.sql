@@ -47,6 +47,7 @@ CREATE TABLE transactions (
   to_context_id TEXT,
   to_account_id TEXT,
   to_sub_account_id TEXT,
+  currency TEXT DEFAULT 'USD',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 

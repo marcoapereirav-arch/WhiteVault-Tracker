@@ -3,7 +3,7 @@ export type ContextType = 'PERSONAL' | 'BUSINESS';
 export interface SubAccount {
   id: string;
   name: string;
-  balance: number;
+  balances: Record<string, number>;
   target?: number; // If set, it's a goal
   startDate: string;
 }
@@ -12,7 +12,7 @@ export interface Account {
   id: string;
   name: string; // e.g., Income, Profit, Owner Pay, Needs, etc.
   type: 'INCOME' | 'EXPENSE' | 'HOLDING'; // Holding is for distribution accounts
-  balance: number;
+  balances: Record<string, number>;
   percentageTarget?: number; // For Profit First logic (e.g., 5, 50, 15, 30)
   subAccounts: SubAccount[];
 }
@@ -45,6 +45,7 @@ export interface Transaction {
   accountId: string;
   subAccountId?: string;
   categoryId?: string;
+  currency: string;
   // For transfers
   toContextId?: string;
   toAccountId?: string;
@@ -55,6 +56,7 @@ export interface Subscription {
   id: string;
   name: string;
   amount: number;
+  currency: string;
   frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   nextRenewal: string;
   contextId: string;

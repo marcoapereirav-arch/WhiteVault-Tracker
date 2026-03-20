@@ -8,6 +8,8 @@ import { TransactionForm, TransferForm, CategoryForm, SubAccountForm, Subscripti
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
+import { getBalance, addToBalance, subtractFromBalance, getTotalsByCurrency, balanceEntries } from './utils/balances';
+import { migrateState } from './utils/migration';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -60,17 +62,25 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                 <div className="space-y-3">
                                     {ctx.accounts.map(acc => (
                                         <div key={acc.id}>
-                                            <div className="flex justify-between items-center mb-1">
+                                            <div className="flex justify-between items-start mb-1">
                                                 <span className="text-xs font-bold text-onyx">{acc.name}</span>
-                                                <span className="text-xs font-mono font-bold text-onyx">{format(acc.balance)}</span>
+                                                <div className="text-right">
+                                                    {balanceEntries(acc.balances).length > 0 ? balanceEntries(acc.balances).map(e => (
+                                                        <span key={e.currency} className="text-xs font-mono font-bold text-onyx block">{format(e.amount)} <span className="text-[9px] text-graphite">{e.currency}</span></span>
+                                                    )) : <span className="text-xs font-mono font-bold text-onyx">{format(0)}</span>}
+                                                </div>
                                             </div>
                                             {/* Sub Accounts */}
                                             {acc.subAccounts.length > 0 && (
                                                 <div className="pl-2 border-l-2 border-black/5 ml-1 space-y-1 mt-1">
                                                     {acc.subAccounts.map(sub => (
-                                                        <div key={sub.id} className="flex justify-between items-center">
+                                                        <div key={sub.id} className="flex justify-between items-start">
                                                             <span className="text-[10px] text-graphite">{sub.name}</span>
-                                                            <span className="text-[10px] font-mono text-graphite">{format(sub.balance)}</span>
+                                                            <div className="text-right">
+                                                                {balanceEntries(sub.balances).length > 0 ? balanceEntries(sub.balances).map(e => (
+                                                                    <span key={e.currency} className="text-[10px] font-mono text-graphite block">{format(e.amount)} {e.currency}</span>
+                                                                )) : <span className="text-[10px] font-mono text-graphite">{format(0)}</span>}
+                                                            </div>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -116,7 +126,7 @@ function App() {
   const [isActionsOpen, setIsActionsOpen] = useState(false);
 
   // Undo & Feedback State
-  const [lastDistribution, setLastDistribution] = useState<{ txIds: string[], contextId: string, amounts: {[id:string]:number} } | null>(null);
+  const [lastDistribution, setLastDistribution] = useState<{ txIds: string[], contextId: string, currency: string, amounts: {[id:string]:number} } | null>(null);
   const [recentDistributions, setRecentDistributions] = useState<{ [accountId: string]: number }>({});
 
   // Modal States
@@ -175,12 +185,14 @@ function App() {
 
       if (profileRes.data) {
         const p = profileRes.data;
+        const userCurrency = p.currency || INITIAL_STATE.user.currency;
         const transactions = (txRes.data || []).map((t: any) => ({
           id: t.id,
           type: t.type,
           amount: t.amount,
           date: t.date,
           notes: t.notes,
+          currency: t.currency || userCurrency,
           contextId: t.context_id,
           accountId: t.account_id,
           subAccountId: t.sub_account_id,
@@ -190,11 +202,11 @@ function App() {
           toSubAccountId: t.to_sub_account_id
         }));
 
-        setState({
+        setState(migrateState({
           user: {
             name: p.name || INITIAL_STATE.user.name,
             email: p.email || INITIAL_STATE.user.email,
-            currency: p.currency || INITIAL_STATE.user.currency,
+            currency: userCurrency,
             darkMode: p.dark_mode || INITIAL_STATE.user.darkMode,
             language: p.language || INITIAL_STATE.user.language,
             timezone: p.timezone || INITIAL_STATE.user.timezone,
@@ -204,7 +216,7 @@ function App() {
           subscriptions: p.subscriptions || INITIAL_STATE.subscriptions,
           categories: p.categories || INITIAL_STATE.categories,
           transactions
-        });
+        }));
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -250,6 +262,7 @@ function App() {
         amount: t.amount,
         date: t.date,
         notes: t.notes,
+        currency: t.currency,
         context_id: t.contextId,
         account_id: t.accountId,
         sub_account_id: t.subAccountId,
@@ -301,13 +314,23 @@ function App() {
 
   // --- Helpers ---
   
-  const formatCurrency = (amount: number) => {
-      const symbol = currencyCode === 'USD' ? '$' : (currencyCode === 'EUR' ? '€' : '$');
-      const formatted = new Intl.NumberFormat('es-ES', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-      }).format(amount);
-      return currencyCode === 'EUR' ? `${formatted} ${symbol}` : `${symbol} ${formatted}`;
+  const formatCurrency = (amount: number, currency?: string) => {
+      const cur = currency || currencyCode;
+      try {
+          return new Intl.NumberFormat('es-ES', {
+              style: 'currency',
+              currency: cur,
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          }).format(amount);
+      } catch {
+          const symbol = cur === 'USD' ? '$' : (cur === 'EUR' ? '\u20ac' : '$');
+          const formatted = new Intl.NumberFormat('es-ES', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+          }).format(amount);
+          return `${symbol} ${formatted}`;
+      }
   };
 
   const formatDateTime = (isoString: string) => {
@@ -402,9 +425,7 @@ function App() {
 
   const filteredContexts = state.contexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter);
   
-  const totalBalance = filteredContexts.reduce((acc, ctx) => {
-        return acc + ctx.accounts.reduce((a, acc) => a + acc.balance + acc.subAccounts.reduce((s, sub) => s + sub.balance, 0), 0);
-    }, 0);
+  const totalsByCurrency = getTotalsByCurrency(filteredContexts);
 
   const monthlyIncome = filteredTransactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
   const monthlyExpense = filteredTransactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
@@ -413,15 +434,15 @@ function App() {
   // --- Actions ---
 
   // Profit First Logic with Undo Support
-  const distributeIncome = (contextId: string, specificAmount?: number) => {
+  const distributeIncome = (contextId: string, currency: string, specificAmount?: number) => {
       const ctx = state.contexts.find(c => c.id === contextId);
       if (!ctx) return;
 
       const incomeAcc = ctx.accounts.find(a => a.type === 'INCOME');
       if (!incomeAcc) return;
 
-      const amountToDistribute = specificAmount !== undefined ? specificAmount : incomeAcc.balance;
-      if (amountToDistribute <= 0) return; 
+      const amountToDistribute = specificAmount !== undefined ? specificAmount : getBalance(incomeAcc.balances, currency);
+      if (amountToDistribute <= 0) return;
 
       const newTransactions: Transaction[] = [];
       const distributionAmounts: { [accId: string]: number } = {};
@@ -429,18 +450,18 @@ function App() {
       const date = new Date().toISOString();
 
       const targets = ctx.accounts.filter(a => a.percentageTarget !== undefined && a.percentageTarget > 0 && a.id !== incomeAcc.id);
-      
+
       let distributedTotal = 0;
-      
+
       const newContexts = state.contexts.map(c => {
           if (c.id !== contextId) return c;
-          
+
           const updatedAccounts = c.accounts.map(acc => {
               const target = targets.find(t => t.id === acc.id);
               if (target && target.percentageTarget) {
                   const splitAmount = amountToDistribute * (target.percentageTarget / 100);
                   distributedTotal += splitAmount;
-                  
+
                   const txId = `tr_dist_${Date.now()}_${acc.id}`;
                   txIds.push(txId);
                   distributionAmounts[acc.id] = splitAmount;
@@ -449,6 +470,7 @@ function App() {
                       id: txId,
                       type: 'TRANSFER',
                       amount: splitAmount,
+                      currency,
                       date,
                       notes: `Distribución Automática (${target.percentageTarget}%)`,
                       contextId: contextId,
@@ -456,12 +478,12 @@ function App() {
                       toContextId: contextId,
                       toAccountId: acc.id
                   });
-                  
-                  return { ...acc, balance: acc.balance + splitAmount };
+
+                  return { ...acc, balances: addToBalance(acc.balances, currency, splitAmount) };
               }
               return acc;
           });
-          
+
           return { ...c, accounts: updatedAccounts };
       });
 
@@ -469,8 +491,8 @@ function App() {
           if (c.id !== contextId) return c;
           return {
               ...c,
-              accounts: c.accounts.map(a => 
-                  a.id === incomeAcc.id ? { ...a, balance: a.balance - distributedTotal } : a
+              accounts: c.accounts.map(a =>
+                  a.id === incomeAcc.id ? { ...a, balances: subtractFromBalance(a.balances, currency, distributedTotal) } : a
               )
           };
       });
@@ -482,7 +504,7 @@ function App() {
       }));
 
       // Store undo data
-      setLastDistribution({ txIds, contextId, amounts: distributionAmounts });
+      setLastDistribution({ txIds, contextId, currency, amounts: distributionAmounts });
       
       // Visual feedback
       setRecentDistributions(distributionAmounts);
@@ -492,7 +514,7 @@ function App() {
   const undoLastDistribution = () => {
       if (!lastDistribution) return;
 
-      const { txIds, contextId, amounts } = lastDistribution;
+      const { txIds, contextId, currency, amounts } = lastDistribution;
       const ctx = state.contexts.find(c => c.id === contextId);
       if (!ctx) return;
       const incomeAcc = ctx.accounts.find(a => a.type === 'INCOME');
@@ -503,20 +525,20 @@ function App() {
       // Revert balances
       const newContexts = state.contexts.map(c => {
           if (c.id !== contextId) return c;
-          
+
           const updatedAccounts = c.accounts.map(acc => {
               if (amounts[acc.id]) {
                   totalRestored += amounts[acc.id];
-                  return { ...acc, balance: acc.balance - amounts[acc.id] };
+                  return { ...acc, balances: subtractFromBalance(acc.balances, currency, amounts[acc.id]) };
               }
               return acc;
           });
-          
+
           // Add back to income
           return {
               ...c,
-              accounts: updatedAccounts.map(a => 
-                  a.id === incomeAcc.id ? { ...a, balance: a.balance + totalRestored } : a
+              accounts: updatedAccounts.map(a =>
+                  a.id === incomeAcc.id ? { ...a, balances: addToBalance(a.balances, currency, totalRestored) } : a
               )
           };
       });
@@ -565,19 +587,21 @@ function App() {
   }
 
   const handleTransaction = (data: any) => {
-    const newTx: Transaction = { id: `tx_${Date.now()}`, ...data };
+    const cur = data.currency || currencyCode;
+    const newTx: Transaction = { id: `tx_${Date.now()}`, ...data, currency: cur };
     const newContexts = [...state.contexts];
     const ctxIdx = newContexts.findIndex(c => c.id === data.contextId);
-    
+
     if (ctxIdx > -1) {
         const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === data.accountId);
         if (accIdx > -1) {
             const acc = newContexts[ctxIdx].accounts[accIdx];
+            const delta = data.type === 'INCOME' ? data.amount : -data.amount;
             if (data.subAccountId) {
                 const subIdx = acc.subAccounts.findIndex(s => s.id === data.subAccountId);
-                if (subIdx > -1) acc.subAccounts[subIdx].balance += (data.type === 'INCOME' ? data.amount : -data.amount);
+                if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, cur, delta);
             } else {
-                acc.balance += (data.type === 'INCOME' ? data.amount : -data.amount);
+                acc.balances = addToBalance(acc.balances, cur, delta);
             }
         }
     }
@@ -589,27 +613,28 @@ function App() {
     }));
 
     if (data.type === 'INCOME' && data.distribute) {
-        setTimeout(() => distributeIncome(data.contextId, data.amount), 50);
+        setTimeout(() => distributeIncome(data.contextId, cur, data.amount), 50);
     }
   };
 
   const handleTransfer = (data: any) => {
+      const cur = data.currency || currencyCode;
       const newContexts = [...state.contexts];
-      const updateBalance = (ctxId: string, accId: string, subId: string | undefined, amount: number) => {
+      const updateBal = (ctxId: string, accId: string, subId: string | undefined, amount: number) => {
           const c = newContexts.find(c => c.id === ctxId);
           const a = c?.accounts.find(a => a.id === accId);
           if (a) {
               if (subId) {
                   const s = a.subAccounts.find(s => s.id === subId);
-                  if (s) s.balance += amount;
+                  if (s) s.balances = addToBalance(s.balances, cur, amount);
               } else {
-                  a.balance += amount;
+                  a.balances = addToBalance(a.balances, cur, amount);
               }
           }
       };
-      updateBalance(data.contextId, data.accountId, data.subAccountId, -data.amount);
-      updateBalance(data.toContextId, data.toAccountId, data.toSubAccountId, data.amount);
-      const newTx: Transaction = { id: `tr_${Date.now()}`, ...data };
+      updateBal(data.contextId, data.accountId, data.subAccountId, -data.amount);
+      updateBal(data.toContextId, data.toAccountId, data.toSubAccountId, data.amount);
+      const newTx: Transaction = { id: `tr_${Date.now()}`, ...data, currency: cur };
       setState({ ...state, contexts: newContexts, transactions: [newTx, ...state.transactions] });
   };
 
@@ -618,7 +643,7 @@ function App() {
       const ctx = newContexts.find(c => c.id === data.contextId);
       const acc = ctx?.accounts.find(a => a.id === data.accountId);
       if (acc) {
-          acc.subAccounts.push({ id: `sub_${Date.now()}`, name: data.name, balance: 0, target: data.target, startDate: data.startDate });
+          acc.subAccounts.push({ id: `sub_${Date.now()}`, name: data.name, balances: {}, target: data.target, startDate: data.startDate });
           setState({ ...state, contexts: newContexts });
       }
   };
@@ -643,26 +668,27 @@ function App() {
 
   const handleNewBusiness = (data: any) => {
     let remainingBalance = Number(data.initialBalance) || 0;
-    
+    const cur = data.currency || currencyCode;
+
     const accounts: Account[] = [
-      { id: `biz_${Date.now()}_inc`, name: 'Income', type: 'INCOME', balance: 0, subAccounts: [] },
-      { id: `biz_${Date.now()}_prof`, name: 'Profit', type: 'HOLDING', balance: 0, percentageTarget: 5, subAccounts: [] },
-      { id: `biz_${Date.now()}_ownr`, name: 'Owner Pay', type: 'HOLDING', balance: 0, percentageTarget: 50, subAccounts: [] },
-      { id: `biz_${Date.now()}_tax`, name: 'Tax', type: 'HOLDING', balance: 0, percentageTarget: 15, subAccounts: [] },
-      { id: `biz_${Date.now()}_opex`, name: 'Opex', type: 'EXPENSE', balance: 0, percentageTarget: 30, subAccounts: [] },
+      { id: `biz_${Date.now()}_inc`, name: 'Income', type: 'INCOME', balances: {}, subAccounts: [] },
+      { id: `biz_${Date.now()}_prof`, name: 'Profit', type: 'HOLDING', balances: {}, percentageTarget: 5, subAccounts: [] },
+      { id: `biz_${Date.now()}_ownr`, name: 'Owner Pay', type: 'HOLDING', balances: {}, percentageTarget: 50, subAccounts: [] },
+      { id: `biz_${Date.now()}_tax`, name: 'Tax', type: 'HOLDING', balances: {}, percentageTarget: 15, subAccounts: [] },
+      { id: `biz_${Date.now()}_opex`, name: 'Opex', type: 'EXPENSE', balances: {}, percentageTarget: 30, subAccounts: [] },
     ];
 
     if (data.distributed && remainingBalance > 0) {
         accounts.forEach(acc => {
             if (acc.type !== 'INCOME' && acc.percentageTarget) {
                 const amount = remainingBalance * (acc.percentageTarget / 100);
-                acc.balance = amount;
+                acc.balances = { [cur]: amount };
             }
         });
     } else if (remainingBalance > 0) {
         const incomeAcc = accounts.find(a => a.type === 'INCOME');
         if (incomeAcc) {
-            incomeAcc.balance = remainingBalance;
+            incomeAcc.balances = { [cur]: remainingBalance };
         }
     }
 
@@ -1015,7 +1041,7 @@ function App() {
                         {/* Top Stats Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {[
-                                { label: t.totalBalance, val: totalBalance, color: 'text-onyx' },
+                                { label: t.totalBalance, multiCurrency: totalsByCurrency, color: 'text-onyx' },
                                 { label: t.monthlyIn, val: monthlyIncome, color: 'text-green-600' },
                                 { label: t.monthlyOut, val: monthlyExpense, color: 'text-red-600' },
                                 { label: t.activeSubs, val: activeSubsCount, isCount: true, color: 'text-alloy' },
@@ -1023,7 +1049,13 @@ function App() {
                                 <div key={i} className="bg-white p-6 border border-black/5 shadow-sm hover:border-alloy transition-colors">
                                     <p className="text-[10px] text-graphite uppercase tracking-widest mb-2">{stat.label}</p>
                                     <p className={`font-display font-bold text-2xl ${stat.color}`}>
-                                        {stat.isCount ? stat.val : formatCurrency(stat.val)}
+                                        {stat.multiCurrency ? (
+                                            Object.entries(stat.multiCurrency).length > 0
+                                                ? Object.entries(stat.multiCurrency).map(([cur, amt]) => (
+                                                    <span key={cur} className="block">{formatCurrency(amt as number, cur)}</span>
+                                                  ))
+                                                : formatCurrency(0)
+                                        ) : stat.isCount ? stat.val : formatCurrency(stat.val as number)}
                                     </p>
                                 </div>
                             ))}
@@ -1053,13 +1085,14 @@ function App() {
                 )}
 
                 {currentView === 'ACCOUNTS' && (
-                    <AccountsView 
-                        contexts={filteredContexts} 
+                    <AccountsView
+                        contexts={filteredContexts}
                         formatCurrency={formatCurrency}
-                        onDistributeIncome={(ctxId) => distributeIncome(ctxId)}
+                        baseCurrency={currencyCode}
+                        onDistributeIncome={(ctxId, cur) => distributeIncome(ctxId, cur)}
                         recentDistributions={recentDistributions}
                         onUndoDistribution={undoLastDistribution}
-                        canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id} 
+                        canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
                     />
                 )}
 
@@ -1152,7 +1185,7 @@ function App() {
                                                 {t.categoryId && state.categories.find(c => c.id === t.categoryId)?.name}
                                             </td>
                                             <td className={`p-5 text-right font-mono font-bold ${t.type === 'INCOME' ? 'text-onyx' : 'text-graphite'}`}>
-                                                {formatCurrency(t.amount)}
+                                                {formatCurrency(t.amount, t.currency)}
                                             </td>
                                         </tr>
                                     ))}
@@ -1205,7 +1238,7 @@ function App() {
                                             <p className="text-[10px] text-gray-400 uppercase tracking-wider">{t.nextBilling}</p>
                                             <p className="text-sm font-medium text-onyx">{s.nextRenewal || '-'}</p>
                                         </div>
-                                        <span className="text-xl font-display font-bold text-onyx">{formatCurrency(s.amount)}</span>
+                                        <span className="text-xl font-display font-bold text-onyx">{formatCurrency(s.amount, s.currency)}</span>
                                     </div>
                                 </div>
                             ))}

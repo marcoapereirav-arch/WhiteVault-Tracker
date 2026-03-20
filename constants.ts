@@ -20,14 +20,14 @@ export const MOCK_CONTEXTS: FinancialContext[] = [
     name: 'Finanzas Personales',
     type: 'PERSONAL',
     accounts: [
-      { id: 'p_income', name: 'Income (Ingresos)', type: 'INCOME', balance: 2450, subAccounts: [] },
-      { id: 'p_needs', name: 'Necesidades Básicas', type: 'EXPENSE', balance: 800, percentageTarget: 50, subAccounts: [] },
-      { id: 'p_freedom', name: 'Libertad Financiera', type: 'HOLDING', balance: 12500, percentageTarget: 10, subAccounts: [] },
-      { id: 'p_edu', name: 'Educación', type: 'EXPENSE', balance: 150, percentageTarget: 5, subAccounts: [] },
-      { id: 'p_lt_save', name: 'Ahorro Largo Plazo', type: 'HOLDING', balance: 4500, percentageTarget: 10, subAccounts: [] },
-      { id: 'p_play', name: 'Ocio y Lujos', type: 'EXPENSE', balance: 320, percentageTarget: 10, subAccounts: [] },
-      { id: 'p_give', name: 'Donaciones', type: 'EXPENSE', balance: 50, percentageTarget: 5, subAccounts: [] },
-      { id: 'p_cash', name: 'Efectivo / Cash', type: 'HOLDING', balance: 120, percentageTarget: 10, subAccounts: [] },
+      { id: 'p_income', name: 'Income (Ingresos)', type: 'INCOME', balances: { EUR: 2450 }, subAccounts: [] },
+      { id: 'p_needs', name: 'Necesidades Básicas', type: 'EXPENSE', balances: { EUR: 800 }, percentageTarget: 50, subAccounts: [] },
+      { id: 'p_freedom', name: 'Libertad Financiera', type: 'HOLDING', balances: { EUR: 12500 }, percentageTarget: 10, subAccounts: [] },
+      { id: 'p_edu', name: 'Educación', type: 'EXPENSE', balances: { EUR: 150 }, percentageTarget: 5, subAccounts: [] },
+      { id: 'p_lt_save', name: 'Ahorro Largo Plazo', type: 'HOLDING', balances: { EUR: 4500 }, percentageTarget: 10, subAccounts: [] },
+      { id: 'p_play', name: 'Ocio y Lujos', type: 'EXPENSE', balances: { EUR: 320 }, percentageTarget: 10, subAccounts: [] },
+      { id: 'p_give', name: 'Donaciones', type: 'EXPENSE', balances: { EUR: 50 }, percentageTarget: 5, subAccounts: [] },
+      { id: 'p_cash', name: 'Efectivo / Cash', type: 'HOLDING', balances: { EUR: 120 }, percentageTarget: 10, subAccounts: [] },
     ]
   },
   {
@@ -35,21 +35,21 @@ export const MOCK_CONTEXTS: FinancialContext[] = [
     name: 'Agencia Digital SL',
     type: 'BUSINESS',
     accounts: [
-      { id: 'b1_income', name: 'Income (Entrada)', type: 'INCOME', balance: 8500, subAccounts: [] },
-      { id: 'b1_profit', name: 'Profit', type: 'HOLDING', balance: 4200, percentageTarget: 5, subAccounts: [] },
-      { id: 'b1_owner', name: 'Owner Pay', type: 'HOLDING', balance: 1500, percentageTarget: 50, subAccounts: [] },
-      { id: 'b1_tax', name: 'Tax', type: 'HOLDING', balance: 9500, percentageTarget: 15, subAccounts: [] },
-      { 
-        id: 'b1_opex', 
-        name: 'Opex', 
-        type: 'EXPENSE', 
-        balance: 2300, 
-        percentageTarget: 30, 
+      { id: 'b1_income', name: 'Income (Entrada)', type: 'INCOME', balances: { EUR: 8500 }, subAccounts: [] },
+      { id: 'b1_profit', name: 'Profit', type: 'HOLDING', balances: { EUR: 4200 }, percentageTarget: 5, subAccounts: [] },
+      { id: 'b1_owner', name: 'Owner Pay', type: 'HOLDING', balances: { EUR: 1500 }, percentageTarget: 50, subAccounts: [] },
+      { id: 'b1_tax', name: 'Tax', type: 'HOLDING', balances: { EUR: 9500 }, percentageTarget: 15, subAccounts: [] },
+      {
+        id: 'b1_opex',
+        name: 'Opex',
+        type: 'EXPENSE',
+        balances: { EUR: 2300 },
+        percentageTarget: 30,
         subAccounts: [
-          { id: 'b1_sub_ads', name: 'Google & Meta Ads', balance: 1200, startDate: '2023-01-01' },
-          { id: 'b1_sub_tools', name: 'Herramientas SaaS', balance: 450, startDate: '2023-01-01' },
-          { id: 'b1_sub_hiring', name: 'Fondo Contratación', balance: 3500, target: 10000, startDate: '2023-05-01' }
-        ] 
+          { id: 'b1_sub_ads', name: 'Google & Meta Ads', balances: { EUR: 1200 }, startDate: '2023-01-01' },
+          { id: 'b1_sub_tools', name: 'Herramientas SaaS', balances: { EUR: 450 }, startDate: '2023-01-01' },
+          { id: 'b1_sub_hiring', name: 'Fondo Contratación', balances: { EUR: 3500 }, target: 10000, startDate: '2023-05-01' }
+        ]
       },
     ]
   }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
+import { CURRENCIES } from '../constants';
 
 interface ModalProps {
   isOpen: boolean;
@@ -320,6 +321,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     const [accountId, setAccountId] = useState('');
     const [subAccountId, setSubAccountId] = useState('');
     const [amount, setAmount] = useState('');
+    const [currency, setCurrency] = useState(state.user.currency);
     const [categoryId, setCategoryId] = useState('');
     const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
     const [notes, setNotes] = useState('');
@@ -327,24 +329,23 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
-    
+
     useEffect(() => {
         if (type === 'INCOME' && activeContext) {
             const incAcc = activeContext.accounts.find(a => a.type === 'INCOME');
             if (incAcc) setAccountId(incAcc.id);
         }
     }, [type, activeContext]);
-    
+
     const availableCategories = state.categories.filter(c => c.contextId === contextId);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // dateTime is already maintained as ISO string by the custom picker input or default state
         const isoDate = new Date(dateTime).toISOString();
-        
-        onSubmit({ 
-            type, contextId, accountId, subAccountId, 
-            amount: Number(amount), categoryId, date: isoDate, notes,
+
+        onSubmit({
+            type, contextId, accountId, subAccountId,
+            amount: Number(amount), currency, categoryId, date: isoDate, notes,
             distribute
         });
         onClose();
@@ -360,7 +361,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                     <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
                 </div>
 
-                <Input type="number" label="Monto" required min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                        <Input type="number" label="Monto" required min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
+                    </div>
+                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
+                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                    </Select>
+                </div>
                 <Input type="text" label="Descripción" required placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
                 
                 <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
@@ -416,21 +424,22 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     const [fromContext, setFromContext] = useState(state.contexts[0]?.id || '');
     const [fromAccount, setFromAccount] = useState('');
     const [fromSub, setFromSub] = useState('');
-    
+
     const [toContext, setToContext] = useState(state.contexts[0]?.id || '');
     const [toAccount, setToAccount] = useState('');
     const [toSub, setToSub] = useState('');
 
     const [amount, setAmount] = useState('');
+    const [currency, setCurrency] = useState(state.user.currency);
     const [notes, setNotes] = useState('');
     const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const isoDate = new Date(dateTime).toISOString();
-        onSubmit({ 
-            type: 'TRANSFER', 
-            amount: Number(amount), date: isoDate, notes,
+        onSubmit({
+            type: 'TRANSFER',
+            amount: Number(amount), currency, date: isoDate, notes,
             contextId: fromContext, accountId: fromAccount, subAccountId: fromSub,
             toContextId: toContext, toAccountId: toAccount, toSubAccountId: toSub
         });
@@ -444,8 +453,15 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
         <Modal isOpen={true} onClose={onClose} title="Ejecutar Transferencia">
             <form onSubmit={handleSubmit} className="space-y-4">
                 <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
-                <Input type="number" label="Monto a Transferir" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
-                
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                        <Input type="number" label="Monto a Transferir" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                    </div>
+                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
+                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                    </Select>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone p-6 border border-black/5">
                     <div>
                         <h4 className="font-display font-bold text-red-900 mb-4 text-xs uppercase tracking-widest border-b border-red-900/20 pb-2">Origen (Sale)</h4>
@@ -602,6 +618,7 @@ interface SubscriptionFormProps {
 export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSubmit, onClose, initialData }) => {
     const [name, setName] = useState(initialData?.name || '');
     const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
+    const [currency, setCurrency] = useState(initialData?.currency || state.user.currency);
     const [frequency, setFrequency] = useState(initialData?.frequency || 'MONTHLY');
     // Ensure the date is in YYYY-MM-DD format for <input type="date">
     const [nextRenewal, setNextRenewal] = useState(initialData?.nextRenewal?.split('T')[0] || '');
@@ -614,27 +631,35 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault(); 
-        onSubmit({ 
+        e.preventDefault();
+        onSubmit({
             ...(initialData ? { id: initialData.id } : {}),
-            name, 
-            amount: Number(amount), 
-            frequency, 
-            nextRenewal, 
-            contextId, 
-            accountId, 
+            name,
+            amount: Number(amount),
+            currency,
+            frequency,
+            nextRenewal,
+            contextId,
+            accountId,
             subAccountId,
-            active, 
-            paymentMethod: 'Card' 
-        }); 
-        onClose(); 
+            active,
+            paymentMethod: 'Card'
+        });
+        onClose();
     };
 
     return (
         <Modal isOpen={true} onClose={onClose} title={initialData ? "Editar Suscripción" : "Nueva Suscripción"}>
              <form onSubmit={handleSubmit}>
                 <Input type="text" label="Nombre del Servicio" required value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Monto" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                        <Input type="number" label="Monto" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                    </div>
+                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
+                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                    </Select>
+                </div>
                 <Select label="Frecuencia" value={frequency} onChange={(e: any) => setFrequency(e.target.value)}>
                     <option value="WEEKLY">Semanal</option>
                     <option value="MONTHLY">Mensual</option>
@@ -683,6 +708,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
 
 export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
     const [name, setName] = useState('');
+    const [currency, setCurrency] = useState('USD');
     const [initialBalance, setInitialBalance] = useState<number | ''>('');
     const [distributed, setDistributed] = useState(false);
 
@@ -696,14 +722,18 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
 
     return (
         <Modal isOpen={true} onClose={onClose} title="Iniciar Nuevo Negocio">
-            <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, initialBalance, distributed }); onClose(); }}>
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit({ name, currency, initialBalance, distributed }); onClose(); }}>
                 <div className="bg-stone p-4 border border-black/5 mb-6">
                      <p className="text-sm text-graphite font-sans">
                          Esto creará un nuevo espacio de negocio con la estructura de cuentas estándar <strong>Profit First</strong> (Income, Profit, Owner Pay, Tax, Opex).
                      </p>
                 </div>
                 <Input type="text" label="Nombre del Negocio" required placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
-                
+
+                <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
+                    {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
+                </Select>
+
                 <div className="mb-6">
                     <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>
                     <div className="flex gap-4">
