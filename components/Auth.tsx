@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from './Icons';
 
-export const Auth = ({ onLogin }: { onLogin: () => void }) => {
+export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDemoOnboarding?: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

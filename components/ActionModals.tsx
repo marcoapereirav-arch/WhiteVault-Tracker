@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
+import { validateTransaction, validateTransfer, validateSubscription, ValidationError } from '../utils/helpers';
 
 interface ModalProps {
   isOpen: boolean;
@@ -324,26 +325,34 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
     const [notes, setNotes] = useState('');
     const [distribute, setDistribute] = useState(false);
+    const [errors, setErrors] = useState<ValidationError[]>([]);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
-    
+
     useEffect(() => {
         if (type === 'INCOME' && activeContext) {
             const incAcc = activeContext.accounts.find(a => a.type === 'INCOME');
             if (incAcc) setAccountId(incAcc.id);
         }
     }, [type, activeContext]);
-    
+
     const availableCategories = state.categories.filter(c => c.contextId === contextId);
+
+    const getFieldError = (field: string) => errors.find(e => e.field === field)?.message;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        // dateTime is already maintained as ISO string by the custom picker input or default state
+        const validationErrors = validateTransaction({ amount, contextId, accountId, notes });
+        if (validationErrors.length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+        setErrors([]);
         const isoDate = new Date(dateTime).toISOString();
-        
-        onSubmit({ 
-            type, contextId, accountId, subAccountId, 
+
+        onSubmit({
+            type, contextId, accountId, subAccountId,
             amount: Number(amount), categoryId, date: isoDate, notes,
             distribute
         });
@@ -398,6 +407,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                     </Select>
                 )}
 
+                {errors.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs space-y-1">
+                        {errors.map((err, i) => <p key={i}>{err.message}</p>)}
+                    </div>
+                )}
                 <button type="submit" className={`w-full py-4 mt-4 font-display font-bold uppercase tracking-widest text-sm text-white transition-all hover:opacity-90 ${type === 'EXPENSE' ? 'bg-red-900' : 'bg-green-900'}`}>
                     Confirmar {type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}
                 </button>
@@ -416,7 +430,7 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     const [fromContext, setFromContext] = useState(state.contexts[0]?.id || '');
     const [fromAccount, setFromAccount] = useState('');
     const [fromSub, setFromSub] = useState('');
-    
+
     const [toContext, setToContext] = useState(state.contexts[0]?.id || '');
     const [toAccount, setToAccount] = useState('');
     const [toSub, setToSub] = useState('');
@@ -424,12 +438,19 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
     const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
+    const [errors, setErrors] = useState<ValidationError[]>([]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const validationErrors = validateTransfer({ amount, fromAccount, toAccount });
+        if (validationErrors.length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+        setErrors([]);
         const isoDate = new Date(dateTime).toISOString();
-        onSubmit({ 
-            type: 'TRANSFER', 
+        onSubmit({
+            type: 'TRANSFER',
             amount: Number(amount), date: isoDate, notes,
             contextId: fromContext, accountId: fromAccount, subAccountId: fromSub,
             toContextId: toContext, toAccountId: toAccount, toSubAccountId: toSub
@@ -479,6 +500,11 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
                 </div>
 
                 <Input type="text" label="Nota de Referencia" value={notes} onChange={(e: any) => setNotes(e.target.value)} />
+                {errors.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs space-y-1">
+                        {errors.map((err, i) => <p key={i}>{err.message}</p>)}
+                    </div>
+                )}
                 <button type="submit" className="w-full py-4 bg-onyx hover:bg-graphite text-white font-display font-bold uppercase tracking-widest text-sm transition-all">Ejecutar Transferencia</button>
             </form>
         </Modal>
@@ -603,31 +629,37 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [name, setName] = useState(initialData?.name || '');
     const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
     const [frequency, setFrequency] = useState(initialData?.frequency || 'MONTHLY');
-    // Ensure the date is in YYYY-MM-DD format for <input type="date">
     const [nextRenewal, setNextRenewal] = useState(initialData?.nextRenewal?.split('T')[0] || '');
     const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id);
     const [accountId, setAccountId] = useState(initialData?.accountId || '');
     const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
     const [active, setActive] = useState(initialData ? initialData.active : true);
+    const [errors, setErrors] = useState<ValidationError[]>([]);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
 
     const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault(); 
-        onSubmit({ 
+        e.preventDefault();
+        const validationErrors = validateSubscription({ name, amount, active, nextRenewal, accountId });
+        if (validationErrors.length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+        setErrors([]);
+        onSubmit({
             ...(initialData ? { id: initialData.id } : {}),
-            name, 
-            amount: Number(amount), 
-            frequency, 
-            nextRenewal, 
-            contextId, 
-            accountId, 
+            name,
+            amount: Number(amount),
+            frequency,
+            nextRenewal,
+            contextId,
+            accountId,
             subAccountId,
-            active, 
-            paymentMethod: 'Card' 
-        }); 
-        onClose(); 
+            active,
+            paymentMethod: 'Card'
+        });
+        onClose();
     };
 
     return (
@@ -673,6 +705,11 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                      </div>
                 </div>
                 
+                {errors.length > 0 && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs space-y-1">
+                        {errors.map((err, i) => <p key={i}>{err.message}</p>)}
+                    </div>
+                )}
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">
                     {initialData ? 'Actualizar Suscripción' : 'Añadir Suscripción'}
                 </button>
