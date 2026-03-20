@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from './Icons';
 
-export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDemoOnboarding?: () => void }) => {
+export const Auth = ({ onLogin }: { onLogin: () => void }) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -39,9 +39,8 @@ export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDem
         if (error) throw error;
         onLogin();
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ocurrió un error';
-      setError(message);
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error');
     } finally {
       setLoading(false);
     }
@@ -61,9 +60,8 @@ export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDem
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
       setSuccessMessage('Se ha enviado un correo con las instrucciones para recuperar tu contraseña.');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Ocurrió un error al intentar recuperar la contraseña';
-      setError(message);
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error al intentar recuperar la contraseña');
     } finally {
       setLoading(false);
     }

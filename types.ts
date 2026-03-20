@@ -76,71 +76,7 @@ export interface AppState {
     currency: string;
     darkMode: boolean;
     language: 'ES' | 'EN';
-    timezone: string;
+    timezone: string; // New: Timezone support
     avatarUrl?: string;
   };
-}
-
-// --- Form Data Types ---
-
-export interface TransactionFormData {
-  type: 'EXPENSE' | 'INCOME';
-  contextId: string;
-  accountId: string;
-  subAccountId?: string;
-  amount: number;
-  categoryId?: string;
-  date: string;
-  notes: string;
-  distribute?: boolean;
-}
-
-export interface TransferFormData {
-  type: 'TRANSFER';
-  amount: number;
-  date: string;
-  notes: string;
-  contextId: string;
-  accountId: string;
-  subAccountId?: string;
-  toContextId: string;
-  toAccountId: string;
-  toSubAccountId?: string;
-}
-
-export interface SubAccountFormData {
-  contextId: string;
-  accountId: string;
-  name: string;
-  target?: number;
-  startDate: string;
-}
-
-export interface CategoryFormData {
-  id?: string;
-  name: string;
-  color: string;
-  budget?: number;
-  contextId: string;
-  accountId?: string;
-  subAccountId?: string;
-}
-
-export interface SubscriptionFormData {
-  id?: string;
-  name: string;
-  amount: number;
-  frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
-  nextRenewal: string;
-  contextId: string;
-  accountId: string;
-  subAccountId?: string;
-  active: boolean;
-  paymentMethod: string;
-}
-
-export interface NewBusinessFormData {
-  name: string;
-  initialBalance: number | '';
-  distributed: boolean;
 }

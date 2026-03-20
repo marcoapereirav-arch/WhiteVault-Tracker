@@ -1,25 +1,3 @@
-@import "tailwindcss";
-
-/* Custom Theme (matching the CDN config) */
-@theme {
-  --font-sans: 'Inter', sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
-
-  --color-onyx: #0E0E0F;
-  --color-stone: #F7F7F7;
-  --color-graphite: #4B4B4D;
-  --color-concrete: #DEDEDE;
-  --color-alloy: #C9A86A;
-  --color-gold: #D4A853;
-  --color-primary: #0E0E0F;
-  --color-secondary: #4B4B4D;
-}
-
-/* Custom Utilities */
-.bg-metallic {
-  background-image: linear-gradient(to right, #B89B63, #E8D3A5, #B89B63);
-}
-
 .custom-scrollbar::-webkit-scrollbar {
   width: 4px;
 }
