@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { AppState } from '../types';
 import { INITIAL_STATE } from '../constants';
@@ -6,7 +7,7 @@ import { INITIAL_STATE } from '../constants';
 export function useAuth(
   setState: React.Dispatch<React.SetStateAction<AppState>>
 ) {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
   const fetchData = async (userId: string) => {
@@ -18,7 +19,7 @@ export function useAuth(
 
       if (profileRes.data) {
         const p = profileRes.data;
-        const transactions = (txRes.data || []).map((t: any) => ({
+        const transactions = (txRes.data || []).map((t: Record<string, unknown>) => ({
           id: t.id,
           type: t.type,
           amount: t.amount,

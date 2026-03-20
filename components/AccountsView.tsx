@@ -24,7 +24,7 @@ const ProgressBar = ({ current, target, formatCurrency }: { current: number, tar
     )
 }
 
-export const AccountsView: React.FC<Props> = ({ 
+export const AccountsView: React.FC<Props> = React.memo(({
     contexts, 
     formatCurrency, 
     onDistributeIncome,
@@ -133,4 +133,4 @@ export const AccountsView: React.FC<Props> = ({
       ))}
     </div>
   );
-};
+});

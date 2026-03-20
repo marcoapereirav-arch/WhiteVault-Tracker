@@ -18,7 +18,7 @@ interface TransactionsViewProps {
   formatDateTime: (isoString: string) => string;
 }
 
-export const TransactionsView: React.FC<TransactionsViewProps> = ({
+export const TransactionsView: React.FC<TransactionsViewProps> = React.memo(({
   transactions,
   categories,
   contextFilter,
@@ -90,4 +90,4 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
       </div>
     </div>
   );
-};
+});

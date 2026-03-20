@@ -16,7 +16,7 @@ interface SidebarProps {
   navItems: { id: string; icon: any; label: string }[];
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<SidebarProps> = React.memo(({
   state,
   currentView,
   isDesktopSidebarExpanded,
@@ -139,4 +139,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
     </>
   );
-};
+});

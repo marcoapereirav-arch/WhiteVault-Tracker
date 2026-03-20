@@ -18,7 +18,7 @@ interface SubscriptionsViewProps {
   onNewSubscription: () => void;
 }
 
-export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
+export const SubscriptionsView: React.FC<SubscriptionsViewProps> = React.memo(({
   subscriptions,
   contextFilter,
   formatCurrency,
@@ -94,4 +94,4 @@ export const SubscriptionsView: React.FC<SubscriptionsViewProps> = ({
       </div>
     </div>
   );
-};
+});

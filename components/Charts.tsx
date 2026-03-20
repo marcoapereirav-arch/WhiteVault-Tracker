@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, LabelList
 } from 'recharts';
 import { Transaction, Category, Subscription } from '../types';
 import { Icons } from './Icons';
+import { formatCurrencyExact } from '../utils/formatters';
 
 interface ChartsProps {
   transactions: Transaction[];
@@ -12,27 +13,12 @@ interface ChartsProps {
   currency: string;
 }
 
-// Extended props for CashFlow to accept totals
 interface CashFlowProps extends ChartsProps {
     incomeTotal: number;
     expenseTotal: number;
 }
 
-const formatCurrencyLocal = (amount: number, currency: string) => {
-    const symbol = currency === 'USD' ? '$' : (currency === 'EUR' ? '€' : '$');
-    const formatted = new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
-    return currency === 'EUR' ? `${formatted} ${symbol}` : `${symbol} ${formatted}`;
-};
-
-// Exact formatter: Always full numbers, standard separators, no abbreviations.
-const formatExact = (amount: number, currency: string) => {
-    return new Intl.NumberFormat('es-ES', { 
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    }).format(amount);
-};
+const formatExact = formatCurrencyExact;
 
 // --- Custom Tooltip Component ---
 const CustomTooltip = ({ active, payload, label, currency, type }: any) => {

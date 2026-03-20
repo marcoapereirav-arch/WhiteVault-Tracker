@@ -1,16 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { AppState } from '../types';
 
-export function useSupabaseSync(state: AppState, isLoaded: boolean, session: any) {
+export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error';
+
+export function useSupabaseSync(state: AppState, isLoaded: boolean, session: Session | null) {
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFirstRender = useRef(true);
+
+  const dismissError = useCallback(() => setSyncError(null), []);
+
   useEffect(() => {
     if (!isLoaded || !session) return;
 
-    const syncToSupabase = async () => {
+    // Skip sync on initial data load to avoid writing back what we just read
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    // Clear previous pending sync (debounce)
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(async () => {
+      setSyncStatus('syncing');
+      setSyncError(null);
+
       try {
         const uid = session.user.id;
 
-        await supabase.from('profiles').upsert({
+        const { error: profileError } = await supabase.from('profiles').upsert({
           id: uid,
           name: state.user.name,
           email: state.user.email,
@@ -25,13 +49,25 @@ export function useSupabaseSync(state: AppState, isLoaded: boolean, session: any
           updated_at: new Date().toISOString()
         });
 
-        const { data: existingTxs } = await supabase.from('transactions').select('id').eq('user_id', uid);
+        if (profileError) throw profileError;
+
+        const { data: existingTxs, error: fetchError } = await supabase
+          .from('transactions')
+          .select('id')
+          .eq('user_id', uid);
+
+        if (fetchError) throw fetchError;
+
         const existingIds = new Set(existingTxs?.map(t => t.id) || []);
         const currentIds = new Set(state.transactions.map(t => t.id));
 
         const toDelete = [...existingIds].filter(id => !currentIds.has(id));
         if (toDelete.length > 0) {
-          await supabase.from('transactions').delete().in('id', toDelete);
+          const { error: deleteError } = await supabase
+            .from('transactions')
+            .delete()
+            .in('id', toDelete);
+          if (deleteError) throw deleteError;
         }
 
         const toUpsert = state.transactions.map(t => ({
@@ -51,14 +87,29 @@ export function useSupabaseSync(state: AppState, isLoaded: boolean, session: any
         }));
 
         if (toUpsert.length > 0) {
-          await supabase.from('transactions').upsert(toUpsert);
+          const { error: upsertError } = await supabase
+            .from('transactions')
+            .upsert(toUpsert);
+          if (upsertError) throw upsertError;
         }
-      } catch (error) {
+
+        setSyncStatus('synced');
+        // Reset status after 3 seconds
+        setTimeout(() => setSyncStatus('idle'), 3000);
+      } catch (error: unknown) {
         console.error('Error syncing to Supabase:', error);
+        const message = error instanceof Error ? error.message : 'Error de sincronización';
+        setSyncStatus('error');
+        setSyncError(message);
+      }
+    }, 1500); // 1.5s debounce
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-
-    const timeout = setTimeout(syncToSupabase, 1000);
-    return () => clearTimeout(timeout);
   }, [state, isLoaded, session]);
+
+  return { syncStatus, syncError, dismissError };
 }

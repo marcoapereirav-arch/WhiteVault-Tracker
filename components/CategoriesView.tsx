@@ -13,7 +13,7 @@ interface CategoriesViewProps {
   onNewCategory: () => void;
 }
 
-export const CategoriesView: React.FC<CategoriesViewProps> = ({
+export const CategoriesView: React.FC<CategoriesViewProps> = React.memo(({
   categories,
   contextFilter,
   formatCurrency,
@@ -71,4 +71,4 @@ export const CategoriesView: React.FC<CategoriesViewProps> = ({
       </button>
     </div>
   );
-};
+});

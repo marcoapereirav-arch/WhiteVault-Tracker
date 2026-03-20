@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import { Session } from '@supabase/supabase-js';
 import { Icons } from './Icons';
-import { AppState, FinancialContext } from '../types';
+import { AppState } from '../types';
 import { CURRENCIES } from '../constants';
 import { supabase } from '../lib/supabase';
 import { validatePasswordMatch, validateMinLength } from '../utils/helpers';
@@ -14,7 +15,7 @@ const DICTIONARY = {
 
 interface SettingsViewProps {
   state: AppState;
-  session: any;
+  session: Session | null;
   timezones: { value: string; label: string }[];
   onStateChange: (newState: AppState) => void;
   onUpdateAccountPercentage: (contextId: string, accountId: string, percentage: number) => void;
@@ -77,8 +78,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         setNewPassword('');
         setConfirmPassword('');
       }
-    } catch (error: any) {
-      setPasswordError(error.message || 'Error al actualizar contraseña');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al actualizar contraseña';
+      setPasswordError(message);
     } finally {
       setIsUpdatingPassword(false);
     }
@@ -289,7 +291,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   size={5}
                 >
                   <option value={Intl.DateTimeFormat().resolvedOptions().timeZone}>Automático (Sistema)</option>
-                  {filteredTimezones.map((tz: any) => (
+                  {filteredTimezones.map((tz) => (
                     <option key={tz.value} value={tz.value}>{tz.label}</option>
                   ))}
                 </select>

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { AppState, FinancialContext, Transaction, Account } from './types';
+import { AppState, FinancialContext, Transaction, Account, TransactionFormData, TransferFormData, SubAccountFormData, CategoryFormData, SubscriptionFormData, NewBusinessFormData } from './types';
 import { INITIAL_STATE } from './constants';
 import { Icons } from './components/Icons';
 import { AccountsView } from './components/AccountsView';
@@ -13,6 +13,7 @@ import { TransactionsView } from './components/TransactionsView';
 import { CategoriesView } from './components/CategoriesView';
 import { SubscriptionsView } from './components/SubscriptionsView';
 import { SettingsView } from './components/SettingsView';
+import { PasswordModal } from './components/PasswordModal';
 
 import { useAuth } from './hooks/useAuth';
 import { useSupabaseSync } from './hooks/useSupabaseSync';
@@ -20,8 +21,6 @@ import { useDistribution } from './hooks/useDistribution';
 import { useFormatters } from './hooks/useFormatters';
 import { useModalReducer } from './hooks/useModalReducer';
 import { generateId } from './utils/helpers';
-import { supabase } from './lib/supabase';
-import { validatePasswordMatch, validateMinLength } from './utils/helpers';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -46,14 +45,10 @@ function App() {
 
   // --- Password Modal State (for post-onboarding) ---
   const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // --- Custom Hooks ---
   const { session, isLoaded, signOut } = useAuth(setState);
-  useSupabaseSync(state, isLoaded, session);
+  const { syncStatus, syncError, dismissError } = useSupabaseSync(state, isLoaded, session);
   const { lastDistribution, recentDistributions, distributeIncome, undoLastDistribution } = useDistribution(state, setState);
   const { formatCurrency, formatDateTime, getAccountName, getSubAccountName, timezones } = useFormatters(state.user.currency, state.user.timezone, state.contexts);
   const { modalState, dispatchModal } = useModalReducer();
@@ -94,7 +89,7 @@ function App() {
   );
 
   // --- Action Handlers (with useCallback) ---
-  const handleTransaction = useCallback((data: any) => {
+  const handleTransaction = useCallback((data: TransactionFormData) => {
     const newTx: Transaction = { id: generateId('tx'), ...data };
     const newContexts = state.contexts.map(c => {
       if (c.id !== data.contextId) return c;
@@ -128,7 +123,7 @@ function App() {
     }
   }, [state.contexts, distributeIncome]);
 
-  const handleTransfer = useCallback((data: any) => {
+  const handleTransfer = useCallback((data: TransferFormData) => {
     const newContexts = state.contexts.map(c => {
       return {
         ...c,
@@ -156,7 +151,7 @@ function App() {
     setState(prev => ({ ...prev, contexts: newContexts, transactions: [newTx, ...prev.transactions] }));
   }, [state.contexts]);
 
-  const handleNewSubAccount = useCallback((data: any) => {
+  const handleNewSubAccount = useCallback((data: SubAccountFormData) => {
     const newContexts = state.contexts.map(c => {
       if (c.id !== data.contextId) return c;
       return {
@@ -179,35 +174,35 @@ function App() {
     setState(prev => ({ ...prev, contexts: newContexts }));
   }, [state.contexts]);
 
-  const handleNewCategory = useCallback((data: any) => {
+  const handleNewCategory = useCallback((data: CategoryFormData) => {
     setState(prev => ({
       ...prev,
       categories: [...prev.categories, { id: generateId('c'), ...data, icon: 'Tags' }]
     }));
   }, []);
 
-  const handleUpdateCategory = useCallback((data: any) => {
+  const handleUpdateCategory = useCallback((data: CategoryFormData) => {
     setState(prev => ({
       ...prev,
       categories: prev.categories.map(c => c.id === data.id ? { ...c, ...data } : c)
     }));
   }, []);
 
-  const handleNewSubscription = useCallback((data: any) => {
+  const handleNewSubscription = useCallback((data: SubscriptionFormData) => {
     setState(prev => ({
       ...prev,
       subscriptions: [...prev.subscriptions, { id: generateId('s'), ...data }]
     }));
   }, []);
 
-  const handleUpdateSubscription = useCallback((data: any) => {
+  const handleUpdateSubscription = useCallback((data: SubscriptionFormData) => {
     setState(prev => ({
       ...prev,
       subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s)
     }));
   }, []);
 
-  const handleNewBusiness = useCallback((data: any) => {
+  const handleNewBusiness = useCallback((data: NewBusinessFormData) => {
     let remainingBalance = Number(data.initialBalance) || 0;
 
     const accounts: Account[] = [
@@ -431,54 +426,26 @@ function App() {
 
       {/* Post-Onboarding Password Modal */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4">
-          <div className="bg-white max-w-md w-full p-8 shadow-2xl border border-black/10 animate-in zoom-in-95 duration-200">
-            <h3 className="text-2xl font-display font-bold text-onyx mb-2 text-center">Crea tu contraseña de acceso</h3>
-            <p className="text-graphite mb-6 text-sm text-center">
-              Para asegurar tu cuenta, por favor establece una contraseña.
-            </p>
-            <div className="space-y-4">
-              <input
-                type="password"
-                placeholder="Nueva contraseña"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
-              />
-              <input
-                type="password"
-                placeholder="Confirmar contraseña"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
-              />
-              {passwordError && <p className="text-red-500 text-xs font-bold text-center">{passwordError}</p>}
-              <button
-                onClick={async () => {
-                  const matchErr = validatePasswordMatch(newPassword, confirmPassword);
-                  if (matchErr) { setPasswordError(matchErr.message); return; }
-                  const lenErr = validateMinLength(newPassword, 6, 'Contraseña');
-                  if (lenErr) { setPasswordError(lenErr.message); return; }
+        <PasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
 
-                  setIsUpdatingPassword(true);
-                  setPasswordError('');
-                  try {
-                    const { error } = await supabase.auth.updateUser({ password: newPassword });
-                    if (error) { setPasswordError(error.message); }
-                    else { setShowPasswordModal(false); setNewPassword(''); setConfirmPassword(''); }
-                  } catch (err: any) {
-                    setPasswordError(err.message || 'Error');
-                  } finally {
-                    setIsUpdatingPassword(false);
-                  }
-                }}
-                disabled={isUpdatingPassword || !newPassword || !confirmPassword}
-                className="w-full py-4 bg-onyx text-white font-display font-bold text-sm uppercase tracking-widest hover:bg-alloy transition-colors disabled:opacity-50"
-              >
-                {isUpdatingPassword ? 'Guardando...' : 'Guardar Contraseña'}
-              </button>
-            </div>
-          </div>
+      {/* Sync Status Indicator */}
+      {syncStatus === 'syncing' && (
+        <div className="fixed bottom-4 right-4 z-50 bg-onyx text-white px-4 py-2 text-xs font-bold uppercase tracking-widest animate-pulse shadow-lg">
+          Guardando...
+        </div>
+      )}
+      {syncStatus === 'synced' && (
+        <div className="fixed bottom-4 right-4 z-50 bg-green-800 text-white px-4 py-2 text-xs font-bold uppercase tracking-widest shadow-lg animate-in fade-in">
+          Guardado
+        </div>
+      )}
+      {syncStatus === 'error' && syncError && (
+        <div className="fixed bottom-4 right-4 z-50 bg-red-600 text-white px-4 py-2 text-xs font-bold shadow-lg flex items-center gap-3 max-w-sm">
+          <span className="truncate">Error: {syncError}</span>
+          <button onClick={dismissError} className="text-white/80 hover:text-white shrink-0">
+            <Icons.Close className="w-4 h-4" />
+          </button>
         </div>
       )}
 

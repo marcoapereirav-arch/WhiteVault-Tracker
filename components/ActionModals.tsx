@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
-import { AppState, Category, FinancialContext, Subscription } from '../types';
+import { AppState, Category, FinancialContext, Subscription, TransactionFormData, TransferFormData, SubAccountFormData, CategoryFormData, SubscriptionFormData, NewBusinessFormData } from '../types';
 import { validateTransaction, validateTransfer, validateSubscription, ValidationError } from '../utils/helpers';
 
 interface ModalProps {
@@ -312,7 +312,7 @@ export const Select = (props: any) => (
 interface TransactionFormProps {
     type: 'EXPENSE' | 'INCOME';
     state: AppState;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: TransactionFormData) => void;
     onClose: () => void;
 }
 
@@ -363,22 +363,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
         <Modal isOpen={true} onClose={onClose} title={`Registrar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}>
             <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-2 gap-4">
-                    <Select label="Espacio (Contexto)" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setCategoryId(''); }}>
+                    <Select label="Espacio (Contexto)" value={contextId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setContextId(e.target.value); setCategoryId(''); }}>
                         {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </Select>
-                    <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
+                    <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setDateTime(e.target.value)} />
                 </div>
 
-                <Input type="number" label="Monto" required min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
-                <Input type="text" label="Descripción" required placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
+                <Input type="number" label="Monto" required min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setAmount(e.target.value)} />
+                <Input type="text" label="Descripción" required placeholder="Ej. Pago Cliente, Renta" onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNotes(e.target.value)} />
                 
-                <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
+                <Select label="Cuenta" value={accountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
                     {activeContext?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>
 
                 {activeAccount && activeAccount.subAccounts.length > 0 && (
-                    <Select label="Sub-Cuenta (Opcional)" value={subAccountId} onChange={(e: any) => setSubAccountId(e.target.value)}>
+                    <Select label="Sub-Cuenta (Opcional)" value={subAccountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSubAccountId(e.target.value)}>
                         <option value="">Ninguna</option>
                         {activeAccount.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </Select>
@@ -401,7 +401,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                 )}
 
                 {type === 'EXPENSE' && (
-                    <Select label="Categoría" value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
+                    <Select label="Categoría" value={categoryId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setCategoryId(e.target.value)}>
                         <option value="">Seleccionar Categoría</option>
                         {availableCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </Select>
@@ -422,7 +422,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
 
 interface TransferFormProps {
     state: AppState;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: TransferFormData) => void;
     onClose: () => void;
 }
 
@@ -464,20 +464,20 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     return (
         <Modal isOpen={true} onClose={onClose} title="Ejecutar Transferencia">
             <form onSubmit={handleSubmit} className="space-y-4">
-                <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
-                <Input type="number" label="Monto a Transferir" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setDateTime(e.target.value)} />
+                <Input type="number" label="Monto a Transferir" required value={amount} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setAmount(e.target.value)} />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone p-6 border border-black/5">
                     <div>
                         <h4 className="font-display font-bold text-red-900 mb-4 text-xs uppercase tracking-widest border-b border-red-900/20 pb-2">Origen (Sale)</h4>
-                        <Select label="Espacio" value={fromContext} onChange={(e: any) => setFromContext(e.target.value)}>
+                        <Select label="Espacio" value={fromContext} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFromContext(e.target.value)}>
                             {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </Select>
-                        <Select label="Cuenta" value={fromAccount} onChange={(e: any) => setFromAccount(e.target.value)}>
+                        <Select label="Cuenta" value={fromAccount} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFromAccount(e.target.value)}>
                             <option value="">Seleccionar Cuenta</option>
                             {getContext(fromContext)?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </Select>
-                         <Select label="Sub (Opcional)" value={fromSub} onChange={(e: any) => setFromSub(e.target.value)}>
+                         <Select label="Sub (Opcional)" value={fromSub} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFromSub(e.target.value)}>
                             <option value="">Ninguna</option>
                             {getAccount(fromContext, fromAccount)?.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </Select>
@@ -485,21 +485,21 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
 
                     <div>
                         <h4 className="font-display font-bold text-green-900 mb-4 text-xs uppercase tracking-widest border-b border-green-900/20 pb-2">Destino (Entra)</h4>
-                        <Select label="Espacio" value={toContext} onChange={(e: any) => setToContext(e.target.value)}>
+                        <Select label="Espacio" value={toContext} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setToContext(e.target.value)}>
                             {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </Select>
-                        <Select label="Cuenta" value={toAccount} onChange={(e: any) => setToAccount(e.target.value)}>
+                        <Select label="Cuenta" value={toAccount} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setToAccount(e.target.value)}>
                             <option value="">Seleccionar Cuenta</option>
                             {getContext(toContext)?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                         </Select>
-                         <Select label="Sub (Opcional)" value={toSub} onChange={(e: any) => setToSub(e.target.value)}>
+                         <Select label="Sub (Opcional)" value={toSub} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setToSub(e.target.value)}>
                             <option value="">Ninguna</option>
                             {getAccount(toContext, toAccount)?.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </Select>
                     </div>
                 </div>
 
-                <Input type="text" label="Nota de Referencia" value={notes} onChange={(e: any) => setNotes(e.target.value)} />
+                <Input type="text" label="Nota de Referencia" value={notes} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNotes(e.target.value)} />
                 {errors.length > 0 && (
                     <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs space-y-1">
                         {errors.map((err, i) => <p key={i}>{err.message}</p>)}
@@ -511,7 +511,13 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     );
 };
 
-export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose }) => {
+interface SubAccountFormProps {
+    state: AppState;
+    onSubmit: (data: SubAccountFormData) => void;
+    onClose: () => void;
+}
+
+export const SubAccountForm: React.FC<SubAccountFormProps> = ({ state, onSubmit, onClose }) => {
     const [contextId, setContextId] = useState(state.contexts[0]?.id || '');
     const [accountId, setAccountId] = useState('');
     const [name, setName] = useState('');
@@ -531,16 +537,16 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose }) => {
     return (
         <Modal isOpen={true} onClose={onClose} title="Nueva Sub-Cuenta / Meta">
             <form onSubmit={handleSubmit}>
-                <Select label="Espacio" value={contextId} onChange={(e: any) => setContextId(e.target.value)}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <Select label="Espacio" value={contextId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setContextId(e.target.value)}>
+                    {state.contexts.map((c: FinancialContext) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
-                <Select label="Cuenta Padre" value={accountId} onChange={(e: any) => setAccountId(e.target.value)}>
+                <Select label="Cuenta Padre" value={accountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setAccountId(e.target.value)}>
                     <option value="">Seleccionar Padre</option>
-                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a:any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a: import('../types').Account) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>
-                <Input type="text" label="Nombre Sub-Cuenta" required value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Meta / Target (Opcional)" placeholder="Dejar vacío para sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
-                <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} />
+                <Input type="text" label="Nombre Sub-Cuenta" required value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setName(e.target.value)} />
+                <Input type="number" label="Meta / Target (Opcional)" placeholder="Dejar vacío para sub-cuenta normal" value={target} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setTarget(e.target.value)} />
+                <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setStartDate(e.target.value)} />
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">Crear Entidad</button>
             </form>
         </Modal>
@@ -549,7 +555,7 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose }) => {
 
 interface CategoryFormProps {
     state: AppState;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: CategoryFormData) => void;
     onClose: () => void;
     initialData?: Category;
 }
@@ -578,11 +584,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                 }); 
                 onClose(); 
             }}>
-                <Select label="Espacio Asociado" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setAccountId(''); }}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <Select label="Espacio Asociado" value={contextId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setContextId(e.target.value); setAccountId(''); }}>
+                    {state.contexts.map((c: FinancialContext) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
                 
-                <Select label="Cuenta Asociada (Predeterminada)" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
+                <Select label="Cuenta Asociada (Predeterminada)" value={accountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
                     {activeContext?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>
@@ -590,14 +596,14 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                 <Select 
                     label="Sub-Cuenta Asociada (Opcional)" 
                     value={subAccountId} 
-                    onChange={(e: any) => setSubAccountId(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSubAccountId(e.target.value)}
                     disabled={!activeAccount || activeAccount.subAccounts.length === 0}
                 >
                     <option value="">{(!activeAccount) ? 'Selecciona una cuenta primero' : (activeAccount.subAccounts.length === 0 ? 'No hay sub-cuentas' : 'Ninguna')}</option>
-                    {activeAccount?.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {activeAccount?.subAccounts.map((s: import('../types').SubAccount) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
 
-                <Input type="text" label="Nombre Categoría" required value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="text" label="Nombre Categoría" required value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setName(e.target.value)} />
                 
                 <div className="mb-6">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Etiqueta de Color</label>
@@ -609,7 +615,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                         ))}
                     </div>
                 </div>
-                <Input type="number" label="Presupuesto Mensual (Opcional)" value={budget} onChange={(e: any) => setBudget(e.target.value)} />
+                <Input type="number" label="Presupuesto Mensual (Opcional)" value={budget} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setBudget(e.target.value)} />
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">
                     {initialData ? 'Actualizar Categoría' : 'Crear Categoría'}
                 </button>
@@ -620,7 +626,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
 
 interface SubscriptionFormProps {
     state: AppState;
-    onSubmit: (data: any) => void;
+    onSubmit: (data: SubscriptionFormData) => void;
     onClose: () => void;
     initialData?: Subscription;
 }
@@ -665,9 +671,9 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     return (
         <Modal isOpen={true} onClose={onClose} title={initialData ? "Editar Suscripción" : "Nueva Suscripción"}>
              <form onSubmit={handleSubmit}>
-                <Input type="text" label="Nombre del Servicio" required value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Monto" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
-                <Select label="Frecuencia" value={frequency} onChange={(e: any) => setFrequency(e.target.value)}>
+                <Input type="text" label="Nombre del Servicio" required value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setName(e.target.value)} />
+                <Input type="number" label="Monto" required value={amount} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setAmount(e.target.value)} />
+                <Select label="Frecuencia" value={frequency} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setFrequency(e.target.value)}>
                     <option value="WEEKLY">Semanal</option>
                     <option value="MONTHLY">Mensual</option>
                     <option value="QUARTERLY">Trimestral</option>
@@ -680,20 +686,20 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                     label={`Próxima Renovación ${active ? '*' : '(Opcional)'}`}
                     value={nextRenewal} 
                     required={active} 
-                    onChange={(e: any) => setNextRenewal(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setNextRenewal(e.target.value)}
                 />
 
-                <Select label="Espacio de Pago" value={contextId} onChange={(e: any) => setContextId(e.target.value)}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <Select label="Espacio de Pago" value={contextId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setContextId(e.target.value)}>
+                    {state.contexts.map((c: FinancialContext) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </Select>
-                <Select label="Cuenta de Pago" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
+                <Select label="Cuenta de Pago" value={accountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
-                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a:any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a: import('../types').Account) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>
                 {activeAccount && activeAccount.subAccounts.length > 0 && (
-                     <Select label="Sub-Cuenta de Pago (Opcional)" value={subAccountId} onChange={(e: any) => setSubAccountId(e.target.value)}>
+                     <Select label="Sub-Cuenta de Pago (Opcional)" value={subAccountId} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSubAccountId(e.target.value)}>
                         <option value="">Ninguna</option>
-                        {activeAccount.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        {activeAccount.subAccounts.map((s: import('../types').SubAccount) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </Select>
                 )}
                 
@@ -718,7 +724,12 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     )
 }
 
-export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
+interface NewContextFormProps {
+    onSubmit: (data: NewBusinessFormData) => void;
+    onClose: () => void;
+}
+
+export const NewContextForm: React.FC<NewContextFormProps> = ({ onSubmit, onClose }) => {
     const [name, setName] = useState('');
     const [initialBalance, setInitialBalance] = useState<number | ''>('');
     const [distributed, setDistributed] = useState(false);
@@ -739,7 +750,7 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                          Esto creará un nuevo espacio de negocio con la estructura de cuentas estándar <strong>Profit First</strong> (Income, Profit, Owner Pay, Tax, Opex).
                      </p>
                 </div>
-                <Input type="text" label="Nombre del Negocio" required placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="text" label="Nombre del Negocio" required placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setName(e.target.value)} />
                 
                 <div className="mb-6">
                     <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>

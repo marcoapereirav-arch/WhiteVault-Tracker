@@ -12,7 +12,7 @@ interface HeaderProps {
   onOpenActions: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   contexts,
   contextFilter,
   onContextFilterChange,
@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
   );
-};
+});
 
 // Quick Actions Overlay
 interface QuickActionsProps {

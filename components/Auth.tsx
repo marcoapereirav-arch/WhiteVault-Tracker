@@ -39,8 +39,9 @@ export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDem
         if (error) throw error;
         onLogin();
       }
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Ocurrió un error';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -60,8 +61,9 @@ export const Auth = ({ onLogin, onDemoOnboarding }: { onLogin: () => void; onDem
       const { error } = await supabase.auth.resetPasswordForEmail(email);
       if (error) throw error;
       setSuccessMessage('Se ha enviado un correo con las instrucciones para recuperar tu contraseña.');
-    } catch (err: any) {
-      setError(err.message || 'Ocurrió un error al intentar recuperar la contraseña');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Ocurrió un error al intentar recuperar la contraseña';
+      setError(message);
     } finally {
       setLoading(false);
     }
