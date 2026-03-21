@@ -29,8 +29,8 @@ const WHITEVAULT_ISOTYPE = "https://storage.googleapis.com/msgsndr/QDrKqO1suwk5V
 const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: FinancialContext[], filterId: string, currency: string }) => {
     const [isOpen, setIsOpen] = useState(false);
 
-    const format = (amount: number) => new Intl.NumberFormat('es-ES', { 
-        style: 'currency', currency: currency, minimumFractionDigits: 2, maximumFractionDigits: 2 
+    const format = (amount: number, cur?: string) => new Intl.NumberFormat('es-ES', {
+        style: 'currency', currency: cur || currency, minimumFractionDigits: 2, maximumFractionDigits: 2
     }).format(amount);
 
     const filteredContexts = filterId === 'ALL' ? contexts : contexts.filter(c => c.id === filterId);
@@ -66,7 +66,7 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                                 <span className="text-xs font-bold text-onyx">{acc.name}</span>
                                                 <div className="text-right">
                                                     {balanceEntries(acc.balances).length > 0 ? balanceEntries(acc.balances).map(e => (
-                                                        <span key={e.currency} className="text-xs font-mono font-bold text-onyx block">{format(e.amount)} <span className="text-[9px] text-graphite">{e.currency}</span></span>
+                                                        <span key={e.currency} className="text-xs font-mono font-bold text-onyx block">{format(e.amount, e.currency)}</span>
                                                     )) : <span className="text-xs font-mono font-bold text-onyx">{format(0)}</span>}
                                                 </div>
                                             </div>
@@ -78,7 +78,7 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                                             <span className="text-[10px] text-graphite">{sub.name}</span>
                                                             <div className="text-right">
                                                                 {balanceEntries(sub.balances).length > 0 ? balanceEntries(sub.balances).map(e => (
-                                                                    <span key={e.currency} className="text-[10px] font-mono text-graphite block">{format(e.amount)} {e.currency}</span>
+                                                                    <span key={e.currency} className="text-[10px] font-mono text-graphite block">{format(e.amount, e.currency)}</span>
                                                                 )) : <span className="text-[10px] font-mono text-graphite">{format(0)}</span>}
                                                             </div>
                                                         </div>
@@ -1299,10 +1299,25 @@ function App() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{t.email}</label>
-                                    <input type="email" value={session?.user?.email || state.user.email} readOnly className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans opacity-70" />
+                                    <input type="email" value={state.user.email} onChange={(e) => setState({...state, user: {...state.user, email: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
                                 </div>
-                                <div className="pt-4 border-t border-black/5">
-                                    <button 
+                                <div className="pt-4 border-t border-black/5 flex items-center gap-4">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const { error: authError } = await supabase.auth.updateUser({ email: state.user.email });
+                                                if (authError) throw authError;
+                                                await supabase.from('profiles').update({ email: state.user.email }).eq('id', session?.user?.id);
+                                                alert('Perfil guardado. Si cambiaste el email, revisa tu bandeja de entrada para confirmar el cambio.');
+                                            } catch (err: any) {
+                                                alert('Error al guardar: ' + (err.message || err));
+                                            }
+                                        }}
+                                        className="bg-onyx text-white px-6 py-3 rounded-md font-bold uppercase tracking-widest text-xs hover:bg-black transition-colors"
+                                    >
+                                        Guardar Cambios
+                                    </button>
+                                    <button
                                         onClick={() => supabase.auth.signOut()}
                                         className="bg-red-50 text-red-600 px-6 py-3 rounded-md font-bold uppercase tracking-widest text-xs hover:bg-red-100 transition-colors"
                                     >
