@@ -823,7 +823,7 @@ function App() {
   if (needsOnboarding) {
     return (
         <Onboarding
-            onExit={() => setNeedsOnboarding(false)}
+            onExit={() => { setNeedsOnboarding(false); supabase.auth.signOut(); }}
             onComplete={(name, avatarUrl, currency, personalContext, addBusiness, businessContext) => {
                 const newContexts = [personalContext];
                 if (addBusiness && businessContext) {
