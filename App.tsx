@@ -1305,10 +1305,10 @@ function App() {
                                     <button
                                         onClick={async () => {
                                             try {
-                                                const { error: authError } = await supabase.auth.updateUser({ email: state.user.email });
-                                                if (authError) throw authError;
-                                                await supabase.from('profiles').update({ email: state.user.email }).eq('id', session?.user?.id);
-                                                alert('Perfil guardado. Si cambiaste el email, revisa tu bandeja de entrada para confirmar el cambio.');
+                                                const userId = session?.user?.id;
+                                                if (!userId) throw new Error('No hay sesión activa');
+                                                await supabase.from('profiles').update({ email: state.user.email, name: state.user.name }).eq('id', userId);
+                                                alert('Perfil guardado correctamente.');
                                             } catch (err: any) {
                                                 alert('Error al guardar: ' + (err.message || err));
                                             }
