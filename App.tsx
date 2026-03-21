@@ -1341,7 +1341,7 @@ function App() {
                                                     }
                                                     const reader = new FileReader();
                                                     reader.onloadend = () => {
-                                                        setState({...state, user: {...state.user, avatarUrl: reader.result as string}});
+                                                        setState(prev => ({...prev, user: {...prev.user, avatarUrl: reader.result as string}}));
                                                     };
                                                     reader.readAsDataURL(file);
                                                 }}
@@ -1351,11 +1351,11 @@ function App() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Nombre</label>
-                                    <input type="text" value={state.user.name} maxLength={50} onChange={(e) => setState({...state, user: {...state.user, name: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
+                                    <input type="text" value={state.user.name} maxLength={50} onChange={(e) => { const v = e.target.value; setState(prev => ({...prev, user: {...prev.user, name: v}})); }} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{t.email}</label>
-                                    <input type="email" value={state.user.email} onChange={(e) => setState({...state, user: {...state.user, email: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
+                                    <input type="email" value={state.user.email} onChange={(e) => { const v = e.target.value; setState(prev => ({...prev, user: {...prev.user, email: v}})); }} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
                                 </div>
                                 <div className="pt-4 border-t border-black/5 flex items-center gap-4">
                                     <button
@@ -1481,7 +1481,7 @@ function App() {
                                             ).map(c => (
                                                 <button
                                                     key={c.code}
-                                                    onClick={() => setState({...state, user: {...state.user, currency: c.code}})}
+                                                    onClick={() => setState(prev => ({...prev, user: {...prev.user, currency: c.code}}))}
                                                     className={`w-full flex items-center justify-between p-3 border-b border-black/5 last:border-0 hover:bg-stone transition-colors ${state.user.currency === c.code ? 'bg-stone border-l-4 border-l-alloy' : ''}`}
                                                 >
                                                     <div className="flex items-center gap-2">
@@ -1509,7 +1509,7 @@ function App() {
                                         />
                                         <select 
                                             value={state.user.timezone} 
-                                            onChange={(e) => setState({...state, user: {...state.user, timezone: e.target.value}})}
+                                            onChange={(e) => { const v = e.target.value; setState(prev => ({...prev, user: {...prev.user, timezone: v}})); }}
                                             className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
                                             size={5} // Show multiple lines
                                         >

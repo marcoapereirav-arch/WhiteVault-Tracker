@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from './Icons';
 
-export const Auth = ({ onLogin }: { onLogin: () => void }) => {
+interface AuthProps {
+  onLogin: () => void;
+  onDemoOnboarding?: () => void;
+}
+
+export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -15,10 +20,10 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isMissingKeys) {
-      setError('Faltan las variables de entorno de Supabase (VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY). Por favor, configúralas en Google AI Studio.');
+      setError('Faltan las variables de entorno de Supabase (VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY). Por favor, configúralas.');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -38,9 +43,12 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: 'https://app.whitevault.cc',
+          },
         });
         if (error) throw error;
-        setSuccessMessage('Registro exitoso. Por favor, revisa tu correo para verificar la cuenta o inicia sesión si la verificación automática está habilitada.');
+        setSuccessMessage('Registro exitoso. Revisa tu correo para verificar la cuenta, o inicia sesión directamente.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -50,13 +58,23 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
         onLogin();
       }
     } catch (err: any) {
-      const msg = err.message || '';
-      if (msg.includes('Invalid login')) {
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('invalid login')) {
         setError('Correo o contraseña incorrectos');
-      } else if (msg.includes('Email not confirmed')) {
+      } else if (msg.includes('email not confirmed')) {
         setError('Debes confirmar tu correo electrónico antes de iniciar sesión');
+      } else if (msg.includes('user already registered')) {
+        setError('Este correo ya está registrado. Inicia sesión o recupera tu contraseña.');
+      } else if (msg.includes('signups not allowed') || msg.includes('signup is disabled')) {
+        setError('Los registros están deshabilitados en este momento. Contacta al administrador.');
+      } else if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('request this after')) {
+        setError('Demasiados intentos. Espera unos segundos e inténtalo de nuevo.');
+      } else if (msg.includes('network') || msg.includes('fetch')) {
+        setError('Error de conexión. Verifica tu conexión a internet.');
+      } else if (msg.includes('password') && msg.includes('least')) {
+        setError('La contraseña no cumple los requisitos mínimos de seguridad.');
       } else {
-        setError('Ha ocurrido un error. Por favor, inténtalo de nuevo.');
+        setError(err.message || 'Ha ocurrido un error. Por favor, inténtalo de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -68,17 +86,24 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
       setError('Por favor, ingresa tu correo electrónico para recuperar la contraseña.');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
-    
+
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://app.whitevault.cc',
+      });
       if (error) throw error;
       setSuccessMessage('Se ha enviado un correo con las instrucciones para recuperar tu contraseña.');
     } catch (err: any) {
-      setError('Ha ocurrido un error. Por favor, inténtalo de nuevo.');
+      const msg = (err.message || '').toLowerCase();
+      if (msg.includes('rate limit') || msg.includes('request this after')) {
+        setError('Demasiados intentos. Espera unos segundos e inténtalo de nuevo.');
+      } else {
+        setError(err.message || 'Ha ocurrido un error. Por favor, inténtalo de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
@@ -95,10 +120,10 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
         <h2 className="text-2xl font-display font-bold text-center mb-6 text-onyx">
           {isRegister ? 'Crear Cuenta' : 'Iniciar Sesión'}
         </h2>
-        
+
         {isMissingKeys && (
           <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm border border-yellow-200">
-            <strong>Atención:</strong> Faltan las variables de entorno de Supabase. 
+            <strong>Atención:</strong> Faltan las variables de entorno de Supabase.
             Por favor, añade <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en la configuración.
           </div>
         )}
@@ -163,7 +188,7 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => setIsRegister(!isRegister)}
+            onClick={() => { setIsRegister(!isRegister); setError(null); setSuccessMessage(null); }}
             className="text-sm text-graphite hover:text-onyx transition-colors"
           >
             {isRegister
