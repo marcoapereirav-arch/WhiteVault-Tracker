@@ -100,6 +100,7 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
 function App() {
   const [session, setSession] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasFetchedData, setHasFetchedData] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
@@ -231,13 +232,14 @@ function App() {
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
+      setHasFetchedData(true);
       setIsLoaded(true);
     }
   };
 
   // Sync state to Supabase
   const syncToSupabase = React.useCallback(async () => {
-    if (!isLoaded || !session) return;
+    if (!isLoaded || !session || !hasFetchedData) return;
     const uid = session.user.id;
 
     try {
@@ -290,19 +292,19 @@ function App() {
     } catch (err) {
       console.error('Sync error:', err);
     }
-  }, [state, isLoaded, session]);
+  }, [state, isLoaded, session, hasFetchedData]);
 
   // Debounced sync on state changes
   useEffect(() => {
-    if (!isLoaded || !session) return;
+    if (!isLoaded || !session || !hasFetchedData) return;
     const timeout = setTimeout(syncToSupabase, 500);
     return () => clearTimeout(timeout);
-  }, [state, isLoaded, session, syncToSupabase]);
+  }, [state, isLoaded, session, hasFetchedData, syncToSupabase]);
 
   // Sync immediately on page unload
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (!isLoaded || !session) return;
+      if (!isLoaded || !session || !hasFetchedData) return;
       const uid = session.user.id;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}`;
       fetch(url, {
@@ -323,7 +325,7 @@ function App() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [state, isLoaded, session]);
+  }, [state, isLoaded, session, hasFetchedData]);
 
   const t = DICTIONARY;
   const currencyCode = state.user.currency;
