@@ -7,9 +7,10 @@ import { CURRENCIES } from '../constants';
 
 interface OnboardingProps {
     onComplete: (name: string, avatarUrl: string | undefined, currency: string, personalContext: FinancialContext, addBusiness: boolean, businessContext?: FinancialContext) => void;
+    onExit?: () => void;
 }
 
-export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
+export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) => {
     const [step, setStep] = useState(1);
     const { width, height } = useWindowSize();
     
@@ -176,6 +177,16 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                         style={{ width: `${progressPercentage}%` }}
                     />
                 </div>
+
+                {onExit && (
+                    <button
+                        onClick={onExit}
+                        className="absolute top-4 right-4 p-2 text-graphite hover:text-onyx transition-colors z-20"
+                        title="Salir"
+                    >
+                        <Icons.Close className="w-5 h-5" />
+                    </button>
+                )}
 
                 <div className="flex items-center justify-center mb-8 mt-2">
                     <h1 className="text-3xl font-display font-bold text-onyx">WhiteVault<span className="text-sm text-alloy">™</span></h1>
