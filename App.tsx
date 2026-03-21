@@ -791,8 +791,6 @@ function App() {
       }
   };
 
-  const [showDemoOnboarding, setShowDemoOnboarding] = useState(false);
-
   // --- Render ---
 
   if (!isLoaded) {
@@ -806,18 +804,8 @@ function App() {
     );
   }
 
-  if (showDemoOnboarding) {
-    return (
-        <Onboarding 
-            onComplete={(name, avatarUrl, currency, personalContext, addBusiness, businessContext) => {
-                setShowDemoOnboarding(false);
-            }}
-        />
-    );
-  }
-
   if (!session) {
-    return <Auth onLogin={() => {}} onDemoOnboarding={() => setShowDemoOnboarding(true)} />;
+    return <Auth onLogin={() => {}} />;
   }
 
   if (needsOnboarding) {

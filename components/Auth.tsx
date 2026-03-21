@@ -7,20 +7,20 @@ interface AuthProps {
   onDemoOnboarding?: () => void;
 }
 
-export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
+export const Auth = ({ onLogin }: AuthProps) => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isRegister, setIsRegister] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const isMissingKeys = !import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isMissingKeys) {
-      setError('Faltan las variables de entorno de Supabase (VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY). Por favor, configúralas.');
+      setError('Faltan las variables de entorno de Supabase. Por favor, configúralas.');
       return;
     }
 
@@ -29,50 +29,22 @@ export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
     setSuccessMessage(null);
 
     try {
-      if (isRegister) {
-        if (password.length < 8) {
-          setError('La contraseña debe tener al menos 8 caracteres');
-          setLoading(false);
-          return;
-        }
-        if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-          setError('La contraseña debe incluir mayúsculas, minúsculas y números');
-          setLoading(false);
-          return;
-        }
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: 'https://app.whitevault.cc',
-          },
-        });
-        if (error) throw error;
-        setSuccessMessage('Registro exitoso. Revisa tu correo para verificar la cuenta, o inicia sesión directamente.');
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        onLogin();
-      }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      onLogin();
     } catch (err: any) {
       const msg = (err.message || '').toLowerCase();
       if (msg.includes('invalid login')) {
         setError('Correo o contraseña incorrectos');
       } else if (msg.includes('email not confirmed')) {
         setError('Debes confirmar tu correo electrónico antes de iniciar sesión');
-      } else if (msg.includes('user already registered')) {
-        setError('Este correo ya está registrado. Inicia sesión o recupera tu contraseña.');
-      } else if (msg.includes('signups not allowed') || msg.includes('signup is disabled')) {
-        setError('Los registros están deshabilitados en este momento. Contacta al administrador.');
       } else if (msg.includes('rate limit') || msg.includes('too many requests') || msg.includes('request this after')) {
         setError('Demasiados intentos. Espera unos segundos e inténtalo de nuevo.');
       } else if (msg.includes('network') || msg.includes('fetch')) {
         setError('Error de conexión. Verifica tu conexión a internet.');
-      } else if (msg.includes('password') && msg.includes('least')) {
-        setError('La contraseña no cumple los requisitos mínimos de seguridad.');
       } else {
         setError(err.message || 'Ha ocurrido un error. Por favor, inténtalo de nuevo.');
       }
@@ -81,9 +53,10 @@ export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!email) {
-      setError('Por favor, ingresa tu correo electrónico para recuperar la contraseña.');
+      setError('Por favor, ingresa tu correo electrónico.');
       return;
     }
 
@@ -118,13 +91,12 @@ export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
           </div>
         </div>
         <h2 className="text-2xl font-display font-bold text-center mb-6 text-onyx">
-          {isRegister ? 'Crear Cuenta' : 'Iniciar Sesión'}
+          {isForgotPassword ? 'Recuperar Contraseña' : 'Iniciar Sesión'}
         </h2>
 
         {isMissingKeys && (
           <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md mb-4 text-sm border border-yellow-200">
             <strong>Atención:</strong> Faltan las variables de entorno de Supabase.
-            Por favor, añade <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en la configuración.
           </div>
         )}
 
@@ -140,62 +112,84 @@ export const Auth = ({ onLogin, onDemoOnboarding }: AuthProps) => {
           </div>
         )}
 
-        <form onSubmit={handleAuth} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">
-              Correo Electrónico
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">
-              Contraseña
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
-              required
-            />
-            {!isRegister && (
-              <div className="mt-2 text-right">
-                <button
-                  type="button"
-                  onClick={handleResetPassword}
-                  disabled={loading}
-                  className="text-xs text-graphite hover:text-onyx transition-colors disabled:opacity-50"
-                >
-                  ¿Olvidaste tu contraseña?
-                </button>
+        {isForgotPassword ? (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@correo.com"
+                className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
+                required
+                autoFocus
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-onyx text-white p-3 rounded-md font-bold hover:bg-onyx/90 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+            </button>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => { setIsForgotPassword(false); setError(null); setSuccessMessage(null); }}
+                className="text-sm text-graphite hover:text-onyx transition-colors"
+              >
+                Volver a Iniciar Sesión
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">
+                  Correo Electrónico
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
+                  required
+                />
               </div>
-            )}
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-onyx text-white p-3 rounded-md font-bold hover:bg-onyx/90 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Procesando...' : isRegister ? 'Registrarse' : 'Entrar'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <button
-            onClick={() => { setIsRegister(!isRegister); setError(null); setSuccessMessage(null); }}
-            className="text-sm text-graphite hover:text-onyx transition-colors"
-          >
-            {isRegister
-              ? '¿Ya tienes cuenta? Inicia sesión'
-              : '¿No tienes cuenta? Regístrate'}
-          </button>
-        </div>
+              <div>
+                <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-1">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 border border-black/10 rounded-md focus:outline-none focus:border-alloy transition-colors"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-onyx text-white p-3 rounded-md font-bold hover:bg-onyx/90 transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Procesando...' : 'Entrar'}
+              </button>
+            </form>
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => { setIsForgotPassword(true); setError(null); setSuccessMessage(null); }}
+                className="text-sm text-graphite hover:text-onyx transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
