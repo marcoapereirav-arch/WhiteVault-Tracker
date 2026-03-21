@@ -363,13 +363,13 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
 
                 <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
-                        <Input type="number" label="Monto" required min="0" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
+                        <Input type="number" label="Monto" required min="0.01" max="999999999" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
                     <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
                         {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </Select>
                 </div>
-                <Input type="text" label="Descripción" required placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
+                <Input type="text" label="Descripción" required maxLength={200} placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
                 
                 <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
@@ -455,7 +455,7 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
                 <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
                 <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
-                        <Input type="number" label="Monto a Transferir" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                        <Input type="number" label="Monto a Transferir" required min="0.01" max="999999999" step="0.01" value={amount} onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
                     <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
                         {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
@@ -494,7 +494,7 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
                     </div>
                 </div>
 
-                <Input type="text" label="Nota de Referencia" value={notes} onChange={(e: any) => setNotes(e.target.value)} />
+                <Input type="text" label="Nota de Referencia" maxLength={200} value={notes} onChange={(e: any) => setNotes(e.target.value)} />
                 <button type="submit" className="w-full py-4 bg-onyx hover:bg-graphite text-white font-display font-bold uppercase tracking-widest text-sm transition-all">Ejecutar Transferencia</button>
             </form>
         </Modal>
@@ -528,8 +528,8 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose }) => {
                     <option value="">Seleccionar Padre</option>
                     {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a:any) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </Select>
-                <Input type="text" label="Nombre Sub-Cuenta" required value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Meta / Target (Opcional)" placeholder="Dejar vacío para sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
+                <Input type="text" label="Nombre Sub-Cuenta" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="number" label="Meta / Target (Opcional)" min="0.01" max="999999999" step="0.01" placeholder="Dejar vacío para sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
                 <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} />
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">Crear Entidad</button>
             </form>
@@ -587,7 +587,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                     {activeAccount?.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </Select>
 
-                <Input type="text" label="Nombre Categoría" required value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="text" label="Nombre Categoría" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
                 
                 <div className="mb-6">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Etiqueta de Color</label>
@@ -599,7 +599,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                         ))}
                     </div>
                 </div>
-                <Input type="number" label="Presupuesto Mensual (Opcional)" value={budget} onChange={(e: any) => setBudget(e.target.value)} />
+                <Input type="number" label="Presupuesto Mensual (Opcional)" min="0.01" max="999999999" step="0.01" value={budget} onChange={(e: any) => setBudget(e.target.value)} />
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">
                     {initialData ? 'Actualizar Categoría' : 'Crear Categoría'}
                 </button>
@@ -651,10 +651,10 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     return (
         <Modal isOpen={true} onClose={onClose} title={initialData ? "Editar Suscripción" : "Nueva Suscripción"}>
              <form onSubmit={handleSubmit}>
-                <Input type="text" label="Nombre del Servicio" required value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="text" label="Nombre del Servicio" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
                 <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
-                        <Input type="number" label="Monto" required value={amount} onChange={(e: any) => setAmount(e.target.value)} />
+                        <Input type="number" label="Monto" required min="0.01" max="999999999" step="0.01" value={amount} onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
                     <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
                         {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
@@ -728,7 +728,7 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                          Esto creará un nuevo espacio de negocio con la estructura de cuentas estándar <strong>Profit First</strong> (Income, Profit, Owner Pay, Tax, Opex).
                      </p>
                 </div>
-                <Input type="text" label="Nombre del Negocio" required placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
+                <Input type="text" label="Nombre del Negocio" required maxLength={100} placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
 
                 <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
                     {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
@@ -739,9 +739,12 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                     <div className="flex gap-4">
                         <div className="relative flex-1">
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-graphite font-bold">$</span>
-                            <input 
-                                type="number" 
+                            <input
+                                type="number"
                                 value={initialBalance}
+                                min="0"
+                                max="999999999"
+                                step="0.01"
                                 onChange={(e) => {
                                     setInitialBalance(e.target.value ? Number(e.target.value) : '');
                                     setDistributed(false);

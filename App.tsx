@@ -1274,20 +1274,28 @@ function App() {
                                         <div>
                                             <p className="text-sm font-bold text-onyx mb-1">Foto de Perfil</p>
                                             <p className="text-xs text-graphite mb-2">Haz clic para cambiar tu imagen</p>
-                                            <input 
+                                            <input
                                                 id="settings-avatar-upload"
-                                                type="file" 
-                                                accept="image/*" 
-                                                className="hidden" 
+                                                type="file"
+                                                accept="image/png,image/jpeg,image/webp"
+                                                className="hidden"
                                                 onChange={(e) => {
                                                     const file = e.target.files?.[0];
-                                                    if (file) {
-                                                        const reader = new FileReader();
-                                                        reader.onloadend = () => {
-                                                            setState({...state, user: {...state.user, avatarUrl: reader.result as string}});
-                                                        };
-                                                        reader.readAsDataURL(file);
+                                                    if (!file) return;
+                                                    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+                                                    if (!allowedTypes.includes(file.type)) {
+                                                        alert('Solo se permiten imágenes PNG, JPG o WebP');
+                                                        return;
                                                     }
+                                                    if (file.size > 2 * 1024 * 1024) {
+                                                        alert('La imagen no debe superar los 2MB');
+                                                        return;
+                                                    }
+                                                    const reader = new FileReader();
+                                                    reader.onloadend = () => {
+                                                        setState({...state, user: {...state.user, avatarUrl: reader.result as string}});
+                                                    };
+                                                    reader.readAsDataURL(file);
                                                 }}
                                             />
                                         </div>
@@ -1295,7 +1303,7 @@ function App() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Nombre</label>
-                                    <input type="text" value={state.user.name} onChange={(e) => setState({...state, user: {...state.user, name: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
+                                    <input type="text" value={state.user.name} maxLength={50} onChange={(e) => setState({...state, user: {...state.user, name: e.target.value}})} className="w-full p-3 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{t.email}</label>
@@ -1499,8 +1507,12 @@ function App() {
                                                 setPasswordError('Las contraseñas no coinciden');
                                                 return;
                                             }
-                                            if (newPassword.length < 6) {
-                                                setPasswordError('La contraseña debe tener al menos 6 caracteres');
+                                            if (newPassword.length < 8) {
+                                                setPasswordError('La contraseña debe tener al menos 8 caracteres');
+                                                return;
+                                            }
+                                            if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword)) {
+                                                setPasswordError('Debe incluir mayúsculas, minúsculas y números');
                                                 return;
                                             }
                                             setIsUpdatingPassword(true);
@@ -1509,7 +1521,7 @@ function App() {
                                             const { error } = await supabase.auth.updateUser({ password: newPassword });
                                             setIsUpdatingPassword(false);
                                             if (error) {
-                                                setPasswordError(error.message);
+                                                setPasswordError('Error al actualizar la contraseña. Inténtalo de nuevo.');
                                             } else {
                                                 setPasswordSuccess('Contraseña actualizada correctamente');
                                                 setNewPassword('');

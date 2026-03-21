@@ -25,6 +25,16 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
 
     try {
       if (isRegister) {
+        if (password.length < 8) {
+          setError('La contraseña debe tener al menos 8 caracteres');
+          setLoading(false);
+          return;
+        }
+        if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+          setError('La contraseña debe incluir mayúsculas, minúsculas y números');
+          setLoading(false);
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -40,7 +50,14 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
         onLogin();
       }
     } catch (err: any) {
-      setError(err.message || 'Ocurrió un error');
+      const msg = err.message || '';
+      if (msg.includes('Invalid login')) {
+        setError('Correo o contraseña incorrectos');
+      } else if (msg.includes('Email not confirmed')) {
+        setError('Debes confirmar tu correo electrónico antes de iniciar sesión');
+      } else {
+        setError('Ha ocurrido un error. Por favor, inténtalo de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
@@ -61,7 +78,7 @@ export const Auth = ({ onLogin }: { onLogin: () => void }) => {
       if (error) throw error;
       setSuccessMessage('Se ha enviado un correo con las instrucciones para recuperar tu contraseña.');
     } catch (err: any) {
-      setError(err.message || 'Ocurrió un error al intentar recuperar la contraseña');
+      setError('Ha ocurrido un error. Por favor, inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
