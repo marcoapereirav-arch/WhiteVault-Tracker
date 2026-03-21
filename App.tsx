@@ -100,6 +100,7 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
 function App() {
   const [session, setSession] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [contextFilter, setContextFilter] = useState<string>('ALL');
@@ -186,6 +187,7 @@ function App() {
       if (profileRes.data) {
         const p = profileRes.data;
         const userCurrency = p.currency || INITIAL_STATE.user.currency;
+        const contexts = p.contexts || [];
         const transactions = (txRes.data || []).map((t: any) => ({
           id: t.id,
           type: t.type,
@@ -202,6 +204,12 @@ function App() {
           toSubAccountId: t.to_sub_account_id
         }));
 
+        if (contexts.length === 0) {
+          setNeedsOnboarding(true);
+        } else {
+          setNeedsOnboarding(false);
+        }
+
         setState(migrateState({
           user: {
             name: p.name || INITIAL_STATE.user.name,
@@ -212,11 +220,13 @@ function App() {
             timezone: p.timezone || INITIAL_STATE.user.timezone,
             avatarUrl: p.avatar_url,
           },
-          contexts: p.contexts || INITIAL_STATE.contexts,
+          contexts,
           subscriptions: p.subscriptions || INITIAL_STATE.subscriptions,
           categories: p.categories || INITIAL_STATE.categories,
           transactions
         }));
+      } else {
+        setNeedsOnboarding(true);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -808,14 +818,15 @@ function App() {
     return <Auth onLogin={() => {}} onDemoOnboarding={() => setShowDemoOnboarding(true)} />;
   }
 
-  if (state.contexts.length === 0) {
+  if (needsOnboarding) {
     return (
-        <Onboarding 
+        <Onboarding
             onComplete={(name, avatarUrl, currency, personalContext, addBusiness, businessContext) => {
                 const newContexts = [personalContext];
                 if (addBusiness && businessContext) {
                     newContexts.push(businessContext);
                 }
+                setNeedsOnboarding(false);
                 setState(s => ({
                     ...s,
                     user: { ...s.user, name, avatarUrl, currency },
