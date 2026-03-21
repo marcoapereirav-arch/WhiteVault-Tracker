@@ -225,13 +225,13 @@ function App() {
     }
   };
 
-  useEffect(() => {
+  // Sync state to Supabase
+  const syncToSupabase = React.useCallback(async () => {
     if (!isLoaded || !session) return;
-    
-    const syncToSupabase = async () => {
-      const uid = session.user.id;
-      
-      await supabase.from('profiles').upsert({
+    const uid = session.user.id;
+
+    try {
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: uid,
         name: state.user.name,
         email: state.user.email,
@@ -245,11 +245,12 @@ function App() {
         categories: state.categories,
         updated_at: new Date().toISOString()
       });
+      if (profileError) console.error('Sync profiles error:', profileError);
 
       const { data: existingTxs } = await supabase.from('transactions').select('id').eq('user_id', uid);
       const existingIds = new Set(existingTxs?.map(t => t.id) || []);
       const currentIds = new Set(state.transactions.map(t => t.id));
-      
+
       const toDelete = [...existingIds].filter(id => !currentIds.has(id));
       if (toDelete.length > 0) {
         await supabase.from('transactions').delete().in('id', toDelete);
@@ -273,12 +274,45 @@ function App() {
       }));
 
       if (toUpsert.length > 0) {
-        await supabase.from('transactions').upsert(toUpsert);
+        const { error: txError } = await supabase.from('transactions').upsert(toUpsert);
+        if (txError) console.error('Sync transactions error:', txError);
       }
-    };
+    } catch (err) {
+      console.error('Sync error:', err);
+    }
+  }, [state, isLoaded, session]);
 
-    const timeout = setTimeout(syncToSupabase, 1000);
+  // Debounced sync on state changes
+  useEffect(() => {
+    if (!isLoaded || !session) return;
+    const timeout = setTimeout(syncToSupabase, 500);
     return () => clearTimeout(timeout);
+  }, [state, isLoaded, session, syncToSupabase]);
+
+  // Sync immediately on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!isLoaded || !session) return;
+      const uid = session.user.id;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}`;
+      fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          contexts: state.contexts,
+          subscriptions: state.subscriptions,
+          categories: state.categories,
+          updated_at: new Date().toISOString()
+        }),
+        keepalive: true,
+      });
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [state, isLoaded, session]);
 
   const t = DICTIONARY;
@@ -462,7 +496,7 @@ function App() {
                   const splitAmount = amountToDistribute * (target.percentageTarget / 100);
                   distributedTotal += splitAmount;
 
-                  const txId = `tr_dist_${Date.now()}_${acc.id}`;
+                  const txId = crypto.randomUUID();
                   txIds.push(txId);
                   distributionAmounts[acc.id] = splitAmount;
 
@@ -588,7 +622,7 @@ function App() {
 
   const handleTransaction = (data: any) => {
     const cur = data.currency || currencyCode;
-    const newTx: Transaction = { id: `tx_${Date.now()}`, ...data, currency: cur };
+    const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
     const newContexts = [...state.contexts];
     const ctxIdx = newContexts.findIndex(c => c.id === data.contextId);
 
@@ -634,36 +668,36 @@ function App() {
       };
       updateBal(data.contextId, data.accountId, data.subAccountId, -data.amount);
       updateBal(data.toContextId, data.toAccountId, data.toSubAccountId, data.amount);
-      const newTx: Transaction = { id: `tr_${Date.now()}`, ...data, currency: cur };
-      setState({ ...state, contexts: newContexts, transactions: [newTx, ...state.transactions] });
+      const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
+      setState(prev => ({ ...prev, contexts: newContexts, transactions: [newTx, ...prev.transactions] }));
   };
 
   const handleNewSubAccount = (data: any) => {
-      const newContexts = [...state.contexts];
-      const ctx = newContexts.find(c => c.id === data.contextId);
-      const acc = ctx?.accounts.find(a => a.id === data.accountId);
-      if (acc) {
-          acc.subAccounts.push({ id: `sub_${Date.now()}`, name: data.name, balances: {}, target: data.target, startDate: data.startDate });
-          setState({ ...state, contexts: newContexts });
-      }
+      setState(prev => {
+          const newContexts = [...prev.contexts];
+          const ctx = newContexts.find(c => c.id === data.contextId);
+          const acc = ctx?.accounts.find(a => a.id === data.accountId);
+          if (acc) {
+              acc.subAccounts.push({ id: `sub_${Date.now()}`, name: data.name, balances: {}, target: data.target, startDate: data.startDate });
+          }
+          return { ...prev, contexts: newContexts };
+      });
   };
 
   const handleNewCategory = (data: any) => {
-      setState({ ...state, categories: [...state.categories, { id: `c_${Date.now()}`, ...data, icon: 'Tags' }]});
+      setState(prev => ({ ...prev, categories: [...prev.categories, { id: `c_${Date.now()}`, ...data, icon: 'Tags' }]}));
   };
 
   const handleUpdateCategory = (data: any) => {
-      const updatedCats = state.categories.map(c => c.id === data.id ? { ...c, ...data } : c);
-      setState({ ...state, categories: updatedCats });
+      setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === data.id ? { ...c, ...data } : c) }));
   };
 
   const handleNewSubscription = (data: any) => {
-      setState({ ...state, subscriptions: [...state.subscriptions, { id: `s_${Date.now()}`, ...data }]});
+      setState(prev => ({ ...prev, subscriptions: [...prev.subscriptions, { id: `s_${Date.now()}`, ...data }]}));
   };
 
   const handleUpdateSubscription = (data: any) => {
-      const updatedSubs = state.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s);
-      setState({ ...state, subscriptions: updatedSubs });
+      setState(prev => ({ ...prev, subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s) }));
   };
 
   const handleNewBusiness = (data: any) => {
@@ -698,7 +732,7 @@ function App() {
       type: 'BUSINESS',
       accounts
     };
-    setState({ ...state, contexts: [...state.contexts, newContext] });
+    setState(prev => ({ ...prev, contexts: [...prev.contexts, newContext] }));
   };
 
   // --- Navigation Items ---
