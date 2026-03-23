@@ -137,6 +137,9 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | undefined>(undefined);
   const [dashboardSummaryType, setDashboardSummaryType] = useState<string | null>(null);
+  const [subAccountPreselect, setSubAccountPreselect] = useState<{ contextId: string, accountId: string } | null>(null);
+  const [bulkSelectedTxIds, setBulkSelectedTxIds] = useState<Set<string>>(new Set());
+  const [isBulkMode, setIsBulkMode] = useState(false);
   const [contextToDelete, setContextToDelete] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
@@ -720,6 +723,57 @@ function App() {
       setState(prev => ({ ...prev, subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s) }));
   };
 
+  const handleDeleteTransaction = (txId: string) => {
+      const tx = state.transactions.find(t => t.id === txId);
+      if (!tx) return;
+      const newContexts = [...state.contexts];
+
+      // Reverse balance effect
+      const ctxIdx = newContexts.findIndex(c => c.id === tx.contextId);
+      if (ctxIdx > -1) {
+          const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === tx.accountId);
+          if (accIdx > -1) {
+              const acc = newContexts[ctxIdx].accounts[accIdx];
+              const reverseDelta = tx.type === 'INCOME' ? -tx.amount : tx.amount;
+              if (tx.subAccountId) {
+                  const subIdx = acc.subAccounts.findIndex(s => s.id === tx.subAccountId);
+                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, reverseDelta);
+              } else {
+                  acc.balances = addToBalance(acc.balances, tx.currency, reverseDelta);
+              }
+          }
+      }
+
+      // For transfers, also reverse the destination
+      if (tx.type === 'TRANSFER' && tx.toContextId && tx.toAccountId) {
+          const toCtxIdx = newContexts.findIndex(c => c.id === tx.toContextId);
+          if (toCtxIdx > -1) {
+              const toAccIdx = newContexts[toCtxIdx].accounts.findIndex(a => a.id === tx.toAccountId);
+              if (toAccIdx > -1) {
+                  const acc = newContexts[toCtxIdx].accounts[toAccIdx];
+                  if (tx.toSubAccountId) {
+                      const subIdx = acc.subAccounts.findIndex(s => s.id === tx.toSubAccountId);
+                      if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, -tx.amount);
+                  } else {
+                      acc.balances = addToBalance(acc.balances, tx.currency, -tx.amount);
+                  }
+              }
+          }
+      }
+
+      setState(prev => ({
+          ...prev,
+          transactions: prev.transactions.filter(t => t.id !== txId),
+          contexts: newContexts
+      }));
+  };
+
+  const handleBulkDeleteTransactions = (txIds: Set<string>) => {
+      txIds.forEach(id => handleDeleteTransaction(id));
+      setBulkSelectedTxIds(new Set());
+      setIsBulkMode(false);
+  };
+
   const handleUpdateTransaction = (data: any) => {
       const oldTx = state.transactions.find(t => t.id === data.id);
       if (!oldTx) return;
@@ -1179,6 +1233,7 @@ function App() {
                         formatCurrency={formatCurrency}
                         baseCurrency={currencyCode}
                         onDistributeIncome={(ctxId, cur) => distributeIncome(ctxId, cur)}
+                        onAddSubAccount={(ctxId, accId) => { setSubAccountPreselect({ contextId: ctxId, accountId: accId }); setActiveModal('SUB_ACCOUNT'); }}
                         recentDistributions={recentDistributions}
                         onUndoDistribution={undoLastDistribution}
                         canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
@@ -1236,8 +1291,16 @@ function App() {
                 {currentView === 'TRANSACTIONS' && (
                     <div className="bg-white border border-black/5 shadow-sm overflow-hidden animate-in fade-in">
                         <div className="p-6 border-b border-black/5 bg-stone flex flex-col md:flex-row justify-between items-center gap-4">
-                            <h2 className="font-display font-bold text-xl uppercase tracking-widest text-onyx">{t.transactions}</h2>
-                            
+                            <div className="flex items-center gap-4">
+                                <h2 className="font-display font-bold text-xl uppercase tracking-widest text-onyx">{t.transactions}</h2>
+                                <button
+                                    onClick={() => { setIsBulkMode(!isBulkMode); setBulkSelectedTxIds(new Set()); }}
+                                    className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border transition-colors ${isBulkMode ? 'bg-red-600 text-white border-red-600' : 'bg-white text-graphite border-black/10 hover:border-alloy'}`}
+                                >
+                                    {isBulkMode ? 'Cancelar' : 'Seleccionar'}
+                                </button>
+                            </div>
+
                             {/* Ledger Filters */}
                             <div className="flex bg-white border border-black/10">
                                 {['ALL', 'INCOME', 'EXPENSE', 'TRANSFER'].map((filter) => (
@@ -1251,10 +1314,44 @@ function App() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Bulk action bar */}
+                        {isBulkMode && bulkSelectedTxIds.size > 0 && (
+                            <div className="p-4 bg-red-50 border-b border-red-200 flex justify-between items-center">
+                                <span className="text-sm font-bold text-red-800">{bulkSelectedTxIds.size} seleccionada{bulkSelectedTxIds.size > 1 ? 's' : ''}</span>
+                                <button
+                                    onClick={() => {
+                                        if (confirm(`¿Eliminar ${bulkSelectedTxIds.size} transacción(es)? Los saldos se revertirán.`)) {
+                                            handleBulkDeleteTransactions(bulkSelectedTxIds);
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-colors"
+                                >
+                                    Eliminar Seleccionadas
+                                </button>
+                            </div>
+                        )}
+
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
                                 <thead className="bg-white text-[10px] uppercase tracking-widest text-graphite font-bold border-b border-black/10">
                                     <tr>
+                                        {isBulkMode && (
+                                            <th className="p-5 w-10">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={bulkSelectedTxIds.size === filteredTransactions.filter(t => transactionTypeFilter === 'ALL' || t.type === transactionTypeFilter).length && bulkSelectedTxIds.size > 0}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setBulkSelectedTxIds(new Set(filteredTransactions.filter(t => transactionTypeFilter === 'ALL' || t.type === transactionTypeFilter).map(t => t.id)));
+                                                        } else {
+                                                            setBulkSelectedTxIds(new Set());
+                                                        }
+                                                    }}
+                                                    className="accent-onyx w-4 h-4 cursor-pointer"
+                                                />
+                                            </th>
+                                        )}
                                         <th className="p-5">Fecha / Hora</th>
                                         <th className="p-5">Tipo</th>
                                         <th className="p-5">Descripción</th>
@@ -1265,19 +1362,42 @@ function App() {
                                 <tbody className="divide-y divide-black/5">
                                     {filteredTransactions
                                         .filter(t => transactionTypeFilter === 'ALL' || t.type === transactionTypeFilter)
-                                        .map(t => (
-                                        <tr key={t.id} onClick={() => setSelectedTransaction(t)} className="hover:bg-stone transition-colors group cursor-pointer">
+                                        .map(tx => (
+                                        <tr key={tx.id}
+                                            onClick={() => {
+                                                if (isBulkMode) {
+                                                    setBulkSelectedTxIds(prev => {
+                                                        const next = new Set(prev);
+                                                        if (next.has(tx.id)) next.delete(tx.id); else next.add(tx.id);
+                                                        return next;
+                                                    });
+                                                } else {
+                                                    setSelectedTransaction(tx);
+                                                }
+                                            }}
+                                            className={`hover:bg-stone transition-colors group cursor-pointer ${isBulkMode && bulkSelectedTxIds.has(tx.id) ? 'bg-red-50' : ''}`}
+                                        >
+                                            {isBulkMode && (
+                                                <td className="p-5 w-10">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={bulkSelectedTxIds.has(tx.id)}
+                                                        onChange={() => {}}
+                                                        className="accent-onyx w-4 h-4 cursor-pointer"
+                                                    />
+                                                </td>
+                                            )}
                                             <td className="p-5 text-sm text-graphite font-mono">
-                                                {formatDateTime(t.date)}
+                                                {formatDateTime(tx.date)}
                                             </td>
-                                            <td className="p-5"><span className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wider border ${t.type === 'INCOME' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10'}`}>{t.type === 'INCOME' ? 'INGRESO' : (t.type === 'EXPENSE' ? 'GASTO' : 'TRANSF.')}</span></td>
-                                            <td className="p-5 text-sm font-bold text-onyx font-display">{t.notes}</td>
+                                            <td className="p-5"><span className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wider border ${tx.type === 'INCOME' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10'}`}>{tx.type === 'INCOME' ? 'INGRESO' : (tx.type === 'EXPENSE' ? 'GASTO' : 'TRANSF.')}</span></td>
+                                            <td className="p-5 text-sm font-bold text-onyx font-display">{tx.notes}</td>
                                             <td className="p-5 text-sm text-graphite flex items-center gap-2">
-                                                {t.categoryId && <div className="w-2 h-2 rounded-full" style={{backgroundColor: state.categories.find(c => c.id === t.categoryId)?.color}}></div>}
-                                                {t.categoryId && state.categories.find(c => c.id === t.categoryId)?.name}
+                                                {tx.categoryId && <div className="w-2 h-2 rounded-full" style={{backgroundColor: state.categories.find(c => c.id === tx.categoryId)?.color}}></div>}
+                                                {tx.categoryId && state.categories.find(c => c.id === tx.categoryId)?.name}
                                             </td>
-                                            <td className={`p-5 text-right font-mono font-bold ${t.type === 'INCOME' ? 'text-onyx' : 'text-graphite'}`}>
-                                                {formatCurrency(t.amount, t.currency)}
+                                            <td className={`p-5 text-right font-mono font-bold ${tx.type === 'INCOME' ? 'text-onyx' : 'text-graphite'}`}>
+                                                {formatCurrency(tx.amount, tx.currency)}
                                             </td>
                                         </tr>
                                     ))}
@@ -1712,7 +1832,7 @@ function App() {
       {activeModal === 'TRANSFER' && <TransferForm state={state} onSubmit={handleTransfer} onClose={() => setActiveModal(null)} />}
       {activeModal === 'CATEGORY' && <CategoryForm state={state} onSubmit={handleNewCategory} onClose={() => setActiveModal(null)} />}
       {activeModal === 'EDIT_CATEGORY' && selectedCategory && <CategoryForm state={state} initialData={selectedCategory} onSubmit={handleUpdateCategory} onClose={() => setActiveModal(null)} />}
-      {activeModal === 'SUB_ACCOUNT' && <SubAccountForm state={state} onSubmit={handleNewSubAccount} onClose={() => setActiveModal(null)} />}
+      {activeModal === 'SUB_ACCOUNT' && <SubAccountForm state={state} onSubmit={handleNewSubAccount} onClose={() => { setActiveModal(null); setSubAccountPreselect(null); }} initialContextId={subAccountPreselect?.contextId} initialAccountId={subAccountPreselect?.accountId} />}
       {activeModal === 'SUBSCRIPTION' && <SubscriptionForm state={state} onSubmit={handleNewSubscription} onClose={() => setActiveModal(null)} />}
       {activeModal === 'EDIT_SUBSCRIPTION' && selectedSubscription && <SubscriptionForm state={state} initialData={selectedSubscription} onSubmit={handleUpdateSubscription} onClose={() => setActiveModal(null)} />}
       {activeModal === 'EDIT_TRANSACTION' && selectedTransaction && (
@@ -1874,12 +1994,23 @@ function App() {
                 )}
               </div>
             </div>
-            <div className="p-4 border-t border-black/5 bg-stone">
+            <div className="p-4 border-t border-black/5 bg-stone flex gap-3">
               <button
                 onClick={() => setActiveModal('EDIT_TRANSACTION')}
-                className="w-full py-3 bg-onyx text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-graphite transition-colors"
+                className="flex-1 py-3 bg-onyx text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-graphite transition-colors"
               >
-                Editar Transacción
+                Editar
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm('¿Estás seguro de que quieres eliminar esta transacción?')) {
+                    handleDeleteTransaction(selectedTransaction.id);
+                    setSelectedTransaction(undefined);
+                  }
+                }}
+                className="py-3 px-5 bg-red-600 text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-red-700 transition-colors"
+              >
+                Eliminar
               </button>
             </div>
             <div className="h-1 w-full bg-metallic"></div>

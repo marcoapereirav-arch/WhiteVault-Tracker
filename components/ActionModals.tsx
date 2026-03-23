@@ -333,9 +333,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
 
     useEffect(() => {
+        if (initialData) return; // Don't auto-select when editing
         if (type === 'INCOME' && activeContext) {
             const incAcc = activeContext.accounts.find(a => a.type === 'INCOME');
             if (incAcc) setAccountId(incAcc.id);
+        }
+        if (type === 'EXPENSE' && activeContext && !accountId) {
+            const expAcc = activeContext.accounts.find(a => a.type === 'EXPENSE');
+            if (expAcc) setAccountId(expAcc.id);
         }
     }, [type, activeContext]);
 
@@ -403,12 +408,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                     </div>
                 )}
 
-                {type === 'EXPENSE' && (
-                    <Select label="Categoría" value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
-                        <option value="">Seleccionar Categoría</option>
-                        {availableCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                )}
+                <Select label={`Categoría${type === 'INCOME' ? ' (Opcional)' : ''}`} value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
+                    <option value="">Seleccionar Categoría</option>
+                    {availableCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
 
                 <div className="mb-5">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Notas (Opcional)</label>
@@ -517,9 +520,9 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     );
 };
 
-export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose }) => {
-    const [contextId, setContextId] = useState(state.contexts[0]?.id || '');
-    const [accountId, setAccountId] = useState('');
+export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initialContextId, initialAccountId }) => {
+    const [contextId, setContextId] = useState(initialContextId || state.contexts[0]?.id || '');
+    const [accountId, setAccountId] = useState(initialAccountId || '');
     const [name, setName] = useState('');
     const [target, setTarget] = useState('');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);

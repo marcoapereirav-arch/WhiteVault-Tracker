@@ -8,6 +8,7 @@ interface Props {
   formatCurrency: (amount: number, currency?: string) => string;
   baseCurrency: string;
   onDistributeIncome: (contextId: string, currency: string) => void;
+  onAddSubAccount?: (contextId: string, accountId: string) => void;
   recentDistributions?: { [accountId: string]: number }; // map of accountId -> amount
   onUndoDistribution?: () => void; // Undo action
   canUndo?: boolean; // check if undo is available
@@ -31,6 +32,7 @@ export const AccountsView: React.FC<Props> = ({
     formatCurrency,
     baseCurrency,
     onDistributeIncome,
+    onAddSubAccount,
     recentDistributions = {},
     onUndoDistribution,
     canUndo
@@ -163,8 +165,11 @@ export const AccountsView: React.FC<Props> = ({
                         )}
 
                         <div className="mt-6 flex justify-end opacity-0 group-hover/card:opacity-100 transition-opacity">
-                            <button className="text-[10px] text-alloy font-bold uppercase tracking-widest hover:text-gold flex items-center gap-1">
-                                <Icons.Plus className="w-3 h-3"/> Anadir Sub-cuenta
+                            <button
+                                onClick={() => onAddSubAccount?.(context.id, account.id)}
+                                className="text-[10px] text-alloy font-bold uppercase tracking-widest hover:text-gold flex items-center gap-1"
+                            >
+                                <Icons.Plus className="w-3 h-3"/> Añadir Sub-cuenta
                             </button>
                         </div>
                     </div>
