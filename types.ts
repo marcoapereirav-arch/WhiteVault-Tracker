@@ -41,6 +41,7 @@ export interface Transaction {
   amount: number;
   date: string; // ISO string with Time
   notes?: string;
+  comments?: string; // Optional extra notes/comments
   contextId: string;
   accountId: string;
   subAccountId?: string;
@@ -64,6 +65,7 @@ export interface Subscription {
   subAccountId?: string;
   categoryId?: string;
   paymentMethod: string;
+  cardLastFour?: string; // Last 4 digits of payment card
   active: boolean;
 }
 

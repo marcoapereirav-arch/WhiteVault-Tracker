@@ -314,17 +314,19 @@ interface TransactionFormProps {
     state: AppState;
     onSubmit: (data: any) => void;
     onClose: () => void;
+    initialData?: any;
 }
 
-export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, onSubmit, onClose }) => {
-    const [contextId, setContextId] = useState(state.contexts[0]?.id || '');
-    const [accountId, setAccountId] = useState('');
-    const [subAccountId, setSubAccountId] = useState('');
-    const [amount, setAmount] = useState('');
-    const [currency, setCurrency] = useState(state.user.currency);
-    const [categoryId, setCategoryId] = useState('');
-    const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
-    const [notes, setNotes] = useState('');
+export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, onSubmit, onClose, initialData }) => {
+    const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id || '');
+    const [accountId, setAccountId] = useState(initialData?.accountId || '');
+    const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
+    const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
+    const [currency, setCurrency] = useState(initialData?.currency || state.user.currency);
+    const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
+    const [dateTime, setDateTime] = useState(initialData?.date ? new Date(initialData.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16));
+    const [notes, setNotes] = useState(initialData?.notes || '');
+    const [comments, setComments] = useState(initialData?.comments || '');
     const [distribute, setDistribute] = useState(false);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
@@ -344,15 +346,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
         const isoDate = new Date(dateTime).toISOString();
 
         onSubmit({
+            ...(initialData ? { id: initialData.id } : {}),
             type, contextId, accountId, subAccountId,
             amount: Number(amount), currency, categoryId, date: isoDate, notes,
+            comments: comments || undefined,
             distribute
         });
         onClose();
     };
 
     return (
-        <Modal isOpen={true} onClose={onClose} title={`Registrar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}>
+        <Modal isOpen={true} onClose={onClose} title={initialData ? `Editar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}` : `Registrar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}>
             <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-2 gap-4">
                     <Select label="Espacio (Contexto)" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setCategoryId(''); }}>
@@ -369,7 +373,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                         {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
                     </Select>
                 </div>
-                <Input type="text" label="Descripción" required maxLength={200} placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
+                <Input type="text" label="Descripción" required maxLength={200} value={notes} placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
                 
                 <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
@@ -406,8 +410,20 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                     </Select>
                 )}
 
+                <div className="mb-5">
+                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Notas (Opcional)</label>
+                    <textarea
+                        value={comments}
+                        onChange={(e) => setComments(e.target.value)}
+                        maxLength={500}
+                        rows={2}
+                        placeholder="Añade notas adicionales..."
+                        className="w-full p-3 bg-stone border border-black/10 text-sm focus:outline-none focus:border-alloy transition-colors resize-none"
+                    />
+                </div>
+
                 <button type="submit" className={`w-full py-4 mt-4 font-display font-bold uppercase tracking-widest text-sm text-white transition-all hover:opacity-90 ${type === 'EXPENSE' ? 'bg-red-900' : 'bg-green-900'}`}>
-                    Confirmar {type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}
+                    {initialData ? 'Guardar Cambios' : `Confirmar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}
                 </button>
             </form>
         </Modal>
@@ -625,6 +641,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id);
     const [accountId, setAccountId] = useState(initialData?.accountId || '');
     const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
+    const [cardLastFour, setCardLastFour] = useState(initialData?.cardLastFour || '');
     const [active, setActive] = useState(initialData ? initialData.active : true);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
@@ -642,6 +659,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
             contextId,
             accountId,
             subAccountId,
+            cardLastFour: cardLastFour || undefined,
             active,
             paymentMethod: 'Card'
         });
@@ -690,6 +708,24 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                     </Select>
                 )}
                 
+                <div className="mb-5">
+                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Últimos 4 dígitos de tarjeta (Opcional)</label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-graphite text-sm">••••</span>
+                        <input
+                            type="text"
+                            value={cardLastFour}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                setCardLastFour(val);
+                            }}
+                            maxLength={4}
+                            placeholder="0000"
+                            className="w-24 p-3 bg-stone border border-black/10 text-sm font-mono tracking-widest focus:outline-none focus:border-alloy transition-colors text-center"
+                        />
+                    </div>
+                </div>
+
                 <div className="mb-5">
                      <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Estado</label>
                      <div className="flex gap-4">

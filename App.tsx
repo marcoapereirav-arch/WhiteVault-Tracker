@@ -135,6 +135,8 @@ function App() {
   const [activeModal, setActiveModal] = useState<string | null>(null);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>(undefined);
   const [selectedCategory, setSelectedCategory] = useState<Category | undefined>(undefined);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | undefined>(undefined);
+  const [dashboardSummaryType, setDashboardSummaryType] = useState<string | null>(null);
   const [contextToDelete, setContextToDelete] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   
@@ -718,6 +720,51 @@ function App() {
       setState(prev => ({ ...prev, subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s) }));
   };
 
+  const handleUpdateTransaction = (data: any) => {
+      const oldTx = state.transactions.find(t => t.id === data.id);
+      if (!oldTx) return;
+      const cur = data.currency || currencyCode;
+      const newContexts = [...state.contexts];
+
+      // Reverse old balance
+      const oldCtxIdx = newContexts.findIndex(c => c.id === oldTx.contextId);
+      if (oldCtxIdx > -1) {
+          const oldAccIdx = newContexts[oldCtxIdx].accounts.findIndex(a => a.id === oldTx.accountId);
+          if (oldAccIdx > -1) {
+              const acc = newContexts[oldCtxIdx].accounts[oldAccIdx];
+              const reverseDelta = oldTx.type === 'INCOME' ? -oldTx.amount : oldTx.amount;
+              if (oldTx.subAccountId) {
+                  const subIdx = acc.subAccounts.findIndex(s => s.id === oldTx.subAccountId);
+                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, oldTx.currency, reverseDelta);
+              } else {
+                  acc.balances = addToBalance(acc.balances, oldTx.currency, reverseDelta);
+              }
+          }
+      }
+
+      // Apply new balance
+      const newCtxIdx = newContexts.findIndex(c => c.id === data.contextId);
+      if (newCtxIdx > -1) {
+          const newAccIdx = newContexts[newCtxIdx].accounts.findIndex(a => a.id === data.accountId);
+          if (newAccIdx > -1) {
+              const acc = newContexts[newCtxIdx].accounts[newAccIdx];
+              const newDelta = data.type === 'INCOME' ? data.amount : -data.amount;
+              if (data.subAccountId) {
+                  const subIdx = acc.subAccounts.findIndex(s => s.id === data.subAccountId);
+                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, cur, newDelta);
+              } else {
+                  acc.balances = addToBalance(acc.balances, cur, newDelta);
+              }
+          }
+      }
+
+      setState(prev => ({
+          ...prev,
+          transactions: prev.transactions.map(t => t.id === data.id ? { ...t, ...data, currency: cur } : t),
+          contexts: newContexts
+      }));
+  };
+
   const handleNewBusiness = (data: any) => {
     let remainingBalance = Number(data.initialBalance) || 0;
     const cur = data.currency || currencyCode;
@@ -1083,12 +1130,12 @@ function App() {
                         {/* Top Stats Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {[
-                                { label: t.totalBalance, multiCurrency: totalsByCurrency, color: 'text-onyx', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('ALL'); } },
-                                { label: t.monthlyIn, multiCurrency: monthlyIncomeByCurrency, color: 'text-green-600', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('INCOME'); } },
-                                { label: t.monthlyOut, multiCurrency: monthlyExpenseByCurrency, color: 'text-red-600', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('EXPENSE'); } },
-                                { label: t.activeSubs, val: activeSubsCount, isCount: true, color: 'text-alloy', onClick: () => { setCurrentView('SUBSCRIPTIONS'); } },
+                                { label: t.totalBalance, multiCurrency: totalsByCurrency, color: 'text-onyx', summaryKey: 'BALANCE' },
+                                { label: t.monthlyIn, multiCurrency: monthlyIncomeByCurrency, color: 'text-green-600', summaryKey: 'INCOME' },
+                                { label: t.monthlyOut, multiCurrency: monthlyExpenseByCurrency, color: 'text-red-600', summaryKey: 'EXPENSE' },
+                                { label: t.activeSubs, val: activeSubsCount, isCount: true, color: 'text-alloy', summaryKey: 'SUBS' },
                             ].map((stat, i) => (
-                                <div key={i} onClick={stat.onClick} className="bg-white p-6 border border-black/5 shadow-sm hover:border-alloy transition-colors cursor-pointer">
+                                <div key={i} onClick={() => setDashboardSummaryType(stat.summaryKey)} className="bg-white p-6 border border-black/5 shadow-sm hover:border-alloy transition-colors cursor-pointer">
                                     <p className="text-[10px] text-graphite uppercase tracking-widest mb-2">{stat.label}</p>
                                     <p className={`font-display font-bold text-2xl ${stat.color}`}>
                                         {stat.multiCurrency ? (
@@ -1143,16 +1190,20 @@ function App() {
                         {state.categories
                             .filter(c => contextFilter === 'ALL' || c.contextId === contextFilter)
                             .map(c => (
-                            <div key={c.id} 
-                                 onClick={() => { setSelectedCategory(c); setActiveModal('EDIT_CATEGORY'); }}
+                            <div key={c.id}
+                                 onClick={() => { setSelectedCategory(c); setActiveModal('VIEW_CATEGORY'); }}
                                  className="bg-white p-6 border border-black/5 hover:border-alloy transition-colors group relative overflow-hidden cursor-pointer"
                             >
                                 <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: c.color}}></div>
                                 <div className="flex items-center justify-between mb-4 pl-3">
                                     <h3 className="font-display font-bold text-lg text-onyx">{c.name}</h3>
-                                    <div className="p-2 rounded-full border border-black/5">
-                                        <Icons.Category className="w-4 h-4" style={{color: c.color}} />
-                                    </div>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(c); setActiveModal('EDIT_CATEGORY'); }}
+                                        className="p-2 rounded-full border border-black/5 hover:border-alloy hover:bg-stone transition-colors"
+                                        title="Editar categoría"
+                                    >
+                                        <Icons.Settings className="w-4 h-4 text-graphite group-hover:text-alloy" />
+                                    </button>
                                 </div>
                                 <div className="pl-3 mb-2">
                                     <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Presupuesto</p>
@@ -1162,7 +1213,6 @@ function App() {
                                     <span className="text-[10px] text-gray-400 uppercase tracking-wider block">
                                         {state.contexts.find(ctx => ctx.id === c.contextId)?.name || 'Desconocido'}
                                     </span>
-                                    {/* Explicitly show Account and Sub Account */}
                                     <div className="flex flex-col">
                                         <span className="text-[10px] font-bold text-onyx uppercase tracking-wider block truncate">
                                             Cuenta: {getAccountName(c.contextId, c.accountId || '')}
@@ -1216,7 +1266,7 @@ function App() {
                                     {filteredTransactions
                                         .filter(t => transactionTypeFilter === 'ALL' || t.type === transactionTypeFilter)
                                         .map(t => (
-                                        <tr key={t.id} className="hover:bg-stone transition-colors group">
+                                        <tr key={t.id} onClick={() => setSelectedTransaction(t)} className="hover:bg-stone transition-colors group cursor-pointer">
                                             <td className="p-5 text-sm text-graphite font-mono">
                                                 {formatDateTime(t.date)}
                                             </td>
@@ -1255,26 +1305,39 @@ function App() {
                                 .filter(s => contextFilter === 'ALL' || s.contextId === contextFilter)
                                 .filter(s => subscriptionStatusFilter === 'ALL' || (subscriptionStatusFilter === 'ACTIVE' ? s.active : !s.active))
                                 .map(s => (
-                                <div key={s.id} 
-                                    onClick={() => { setSelectedSubscription(s); setActiveModal('EDIT_SUBSCRIPTION'); }}
+                                <div key={s.id}
+                                    onClick={() => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
                                     className="bg-white border border-black/5 p-6 relative group hover:border-alloy transition-colors cursor-pointer"
                                 >
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="p-3 bg-stone">
                                             <Icons.Subscription className="w-6 h-6 text-onyx" />
                                         </div>
-                                        <div className={`px-2 py-1 text-[10px] uppercase tracking-widest font-bold ${s.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
-                                            {s.active ? t.active : t.paused}
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setSelectedSubscription(s); setActiveModal('EDIT_SUBSCRIPTION'); }}
+                                                className="p-1.5 border border-black/5 hover:border-alloy hover:bg-stone transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Editar suscripción"
+                                            >
+                                                <Icons.Settings className="w-3.5 h-3.5 text-graphite" />
+                                            </button>
+                                            <div className={`px-2 py-1 text-[10px] uppercase tracking-widest font-bold ${s.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                                                {s.active ? t.active : t.paused}
+                                            </div>
                                         </div>
                                     </div>
                                     <h3 className="text-lg font-display font-bold text-onyx mb-1">{s.name}</h3>
-                                    <p className="text-xs text-graphite mb-2 uppercase tracking-wider">{s.frequency} Renewal</p>
-                                    
+                                    <p className="text-xs text-graphite mb-2 uppercase tracking-wider">{s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}</p>
+
                                     <div className="text-xs text-alloy font-bold mb-4 uppercase tracking-wider">
                                         {getAccountName(s.contextId, s.accountId || '')}
                                         {s.subAccountId && ` / ${getSubAccountName(s.contextId, s.accountId || '', s.subAccountId)}`}
                                     </div>
-                                    
+
+                                    {s.cardLastFour && (
+                                        <p className="text-xs font-mono text-graphite mb-3">•••• {s.cardLastFour}</p>
+                                    )}
+
                                     <div className="flex justify-between items-end border-t border-black/5 pt-4">
                                         <div>
                                             <p className="text-[10px] text-gray-400 uppercase tracking-wider">{t.nextBilling}</p>
@@ -1652,7 +1715,301 @@ function App() {
       {activeModal === 'SUB_ACCOUNT' && <SubAccountForm state={state} onSubmit={handleNewSubAccount} onClose={() => setActiveModal(null)} />}
       {activeModal === 'SUBSCRIPTION' && <SubscriptionForm state={state} onSubmit={handleNewSubscription} onClose={() => setActiveModal(null)} />}
       {activeModal === 'EDIT_SUBSCRIPTION' && selectedSubscription && <SubscriptionForm state={state} initialData={selectedSubscription} onSubmit={handleUpdateSubscription} onClose={() => setActiveModal(null)} />}
+      {activeModal === 'EDIT_TRANSACTION' && selectedTransaction && (
+        <TransactionForm
+          type={selectedTransaction.type as 'EXPENSE' | 'INCOME'}
+          state={state}
+          initialData={selectedTransaction}
+          onSubmit={(data: any) => { handleUpdateTransaction(data); setSelectedTransaction(undefined); }}
+          onClose={() => { setActiveModal(null); setSelectedTransaction(undefined); }}
+        />
+      )}
       {activeModal === 'NEW_BIZ' && <NewContextForm onSubmit={handleNewBusiness} onClose={() => setActiveModal(null)} />}
+
+      {/* Dashboard Summary Modal */}
+      {dashboardSummaryType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setDashboardSummaryType(null)}>
+          <div className="bg-white w-full max-w-lg shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-alloy flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-black/5 flex justify-between items-center bg-stone">
+              <h2 className="text-xl font-display font-bold text-onyx uppercase tracking-tight">
+                {dashboardSummaryType === 'BALANCE' ? 'Balance Total' : dashboardSummaryType === 'INCOME' ? 'Ingresos del Mes' : dashboardSummaryType === 'EXPENSE' ? 'Gastos del Mes' : 'Suscripciones Activas'}
+              </h2>
+              <button onClick={() => setDashboardSummaryType(null)} className="p-2 hover:bg-concrete transition-colors text-onyx">
+                <Icons.Close className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              {dashboardSummaryType === 'BALANCE' && (
+                <div className="space-y-3">
+                  {Object.entries(totalsByCurrency).length > 0 ? Object.entries(totalsByCurrency).map(([cur, amt]) => (
+                    <div key={cur} className="flex justify-between items-center p-3 bg-stone border border-black/5">
+                      <span className="text-sm font-bold text-onyx uppercase">{cur}</span>
+                      <span className="font-display font-bold text-lg text-onyx">{formatCurrency(amt as number, cur)}</span>
+                    </div>
+                  )) : <p className="text-graphite text-sm text-center py-4">Sin saldos registrados</p>}
+                </div>
+              )}
+              {dashboardSummaryType === 'INCOME' && (
+                <div className="space-y-2">
+                  {filteredTransactions.filter(tx => tx.type === 'INCOME').length > 0 ? filteredTransactions.filter(tx => tx.type === 'INCOME').slice(0, 20).map(tx => (
+                    <div key={tx.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedTransaction(tx); setDashboardSummaryType(null); }}>
+                      <div>
+                        <p className="text-sm font-bold text-onyx">{tx.notes || 'Sin descripción'}</p>
+                        <p className="text-[10px] text-graphite">{formatDateTime(tx.date)}</p>
+                      </div>
+                      <span className="font-mono font-bold text-green-600">{formatCurrency(tx.amount, tx.currency)}</span>
+                    </div>
+                  )) : <p className="text-graphite text-sm text-center py-4">Sin ingresos este mes</p>}
+                </div>
+              )}
+              {dashboardSummaryType === 'EXPENSE' && (
+                <div className="space-y-2">
+                  {filteredTransactions.filter(tx => tx.type === 'EXPENSE').length > 0 ? filteredTransactions.filter(tx => tx.type === 'EXPENSE').slice(0, 20).map(tx => (
+                    <div key={tx.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedTransaction(tx); setDashboardSummaryType(null); }}>
+                      <div>
+                        <p className="text-sm font-bold text-onyx">{tx.notes || 'Sin descripción'}</p>
+                        <p className="text-[10px] text-graphite">{formatDateTime(tx.date)} {tx.categoryId && `· ${state.categories.find(c => c.id === tx.categoryId)?.name || ''}`}</p>
+                      </div>
+                      <span className="font-mono font-bold text-red-600">{formatCurrency(tx.amount, tx.currency)}</span>
+                    </div>
+                  )) : <p className="text-graphite text-sm text-center py-4">Sin gastos este mes</p>}
+                </div>
+              )}
+              {dashboardSummaryType === 'SUBS' && (
+                <div className="space-y-2">
+                  {state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).length > 0 ? state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).map(s => (
+                    <div key={s.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedSubscription(s); setDashboardSummaryType(null); setActiveModal('VIEW_SUBSCRIPTION'); }}>
+                      <div>
+                        <p className="text-sm font-bold text-onyx">{s.name}</p>
+                        <p className="text-[10px] text-graphite">{s.frequency} · Prox: {s.nextRenewal || '-'}{s.cardLastFour ? ` · •••• ${s.cardLastFour}` : ''}</p>
+                      </div>
+                      <span className="font-mono font-bold text-alloy">{formatCurrency(s.amount, s.currency)}</span>
+                    </div>
+                  )) : <p className="text-graphite text-sm text-center py-4">Sin suscripciones activas</p>}
+                </div>
+              )}
+            </div>
+            <div className="h-1 w-full bg-metallic"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Detail Modal */}
+      {selectedTransaction && (!activeModal || activeModal === 'VIEW_TRANSACTION') && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => setSelectedTransaction(undefined)}>
+          <div className="bg-white w-full max-w-md shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-alloy" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-black/5 flex justify-between items-center bg-stone">
+              <h2 className="text-xl font-display font-bold text-onyx uppercase tracking-tight">Detalle</h2>
+              <button onClick={() => setSelectedTransaction(undefined)} className="p-2 hover:bg-concrete transition-colors text-onyx">
+                <Icons.Close className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {/* Type badge + Amount */}
+              <div className="flex justify-between items-center mb-6">
+                <span className={`text-[10px] font-bold px-3 py-1.5 uppercase tracking-wider border ${selectedTransaction.type === 'INCOME' ? 'bg-green-50 text-green-800 border-green-200' : selectedTransaction.type === 'EXPENSE' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-stone text-onyx border-black/10'}`}>
+                  {selectedTransaction.type === 'INCOME' ? 'Ingreso' : selectedTransaction.type === 'EXPENSE' ? 'Gasto' : 'Transferencia'}
+                </span>
+                <span className={`font-display font-bold text-2xl ${selectedTransaction.type === 'INCOME' ? 'text-green-600' : selectedTransaction.type === 'EXPENSE' ? 'text-red-600' : 'text-onyx'}`}>
+                  {formatCurrency(selectedTransaction.amount, selectedTransaction.currency)}
+                </span>
+              </div>
+              {/* Details */}
+              <div className="space-y-4">
+                {selectedTransaction.notes && (
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Descripción</p>
+                    <p className="text-sm font-bold text-onyx">{selectedTransaction.notes}</p>
+                  </div>
+                )}
+                {selectedTransaction.comments && (
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Notas</p>
+                    <p className="text-sm text-graphite">{selectedTransaction.comments}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Fecha</p>
+                    <p className="text-sm font-mono text-onyx">{formatDateTime(selectedTransaction.date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Moneda</p>
+                    <p className="text-sm font-mono text-onyx">{selectedTransaction.currency}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Espacio</p>
+                    <p className="text-sm text-onyx">{state.contexts.find(c => c.id === selectedTransaction.contextId)?.name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Cuenta</p>
+                    <p className="text-sm text-onyx">{getAccountName(selectedTransaction.contextId, selectedTransaction.accountId)}</p>
+                  </div>
+                </div>
+                {selectedTransaction.subAccountId && (
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Sub-Cuenta</p>
+                    <p className="text-sm text-onyx">{getSubAccountName(selectedTransaction.contextId, selectedTransaction.accountId, selectedTransaction.subAccountId)}</p>
+                  </div>
+                )}
+                {selectedTransaction.categoryId && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{backgroundColor: state.categories.find(c => c.id === selectedTransaction.categoryId)?.color}}></div>
+                    <div>
+                      <p className="text-[10px] text-graphite uppercase tracking-widest">Categoría</p>
+                      <p className="text-sm text-onyx">{state.categories.find(c => c.id === selectedTransaction.categoryId)?.name}</p>
+                    </div>
+                  </div>
+                )}
+                {selectedTransaction.type === 'TRANSFER' && (
+                  <div className="p-3 bg-stone border border-black/5">
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Destino</p>
+                    <p className="text-sm text-onyx">
+                      {state.contexts.find(c => c.id === selectedTransaction.toContextId)?.name} → {getAccountName(selectedTransaction.toContextId || '', selectedTransaction.toAccountId || '')}
+                      {selectedTransaction.toSubAccountId && ` / ${getSubAccountName(selectedTransaction.toContextId || '', selectedTransaction.toAccountId || '', selectedTransaction.toSubAccountId)}`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-black/5 bg-stone">
+              <button
+                onClick={() => setActiveModal('EDIT_TRANSACTION')}
+                className="w-full py-3 bg-onyx text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-graphite transition-colors"
+              >
+                Editar Transacción
+              </button>
+            </div>
+            <div className="h-1 w-full bg-metallic"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscription Detail Modal (View) */}
+      {activeModal === 'VIEW_SUBSCRIPTION' && selectedSubscription && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => { setActiveModal(null); setSelectedSubscription(undefined); }}>
+          <div className="bg-white w-full max-w-md shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-alloy" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-black/5 flex justify-between items-center bg-stone">
+              <h2 className="text-xl font-display font-bold text-onyx uppercase tracking-tight">Suscripción</h2>
+              <button onClick={() => { setActiveModal(null); setSelectedSubscription(undefined); }} className="p-2 hover:bg-concrete transition-colors text-onyx">
+                <Icons.Close className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="font-display font-bold text-xl text-onyx">{selectedSubscription.name}</h3>
+                  <span className={`inline-block mt-1 px-2 py-0.5 text-[10px] uppercase tracking-widest font-bold ${selectedSubscription.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-500'}`}>
+                    {selectedSubscription.active ? 'Activo' : 'Pausado'}
+                  </span>
+                </div>
+                <span className="font-display font-bold text-2xl text-onyx">{formatCurrency(selectedSubscription.amount, selectedSubscription.currency)}</span>
+              </div>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Frecuencia</p>
+                    <p className="text-sm font-bold text-onyx">{selectedSubscription.frequency === 'WEEKLY' ? 'Semanal' : selectedSubscription.frequency === 'MONTHLY' ? 'Mensual' : selectedSubscription.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Próx. Cobro</p>
+                    <p className="text-sm font-mono text-onyx">{selectedSubscription.nextRenewal || '-'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Espacio</p>
+                    <p className="text-sm text-onyx">{state.contexts.find(c => c.id === selectedSubscription.contextId)?.name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Cuenta</p>
+                    <p className="text-sm text-onyx">{getAccountName(selectedSubscription.contextId, selectedSubscription.accountId)}</p>
+                  </div>
+                </div>
+                {selectedSubscription.subAccountId && (
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Sub-Cuenta</p>
+                    <p className="text-sm text-onyx">{getSubAccountName(selectedSubscription.contextId, selectedSubscription.accountId, selectedSubscription.subAccountId)}</p>
+                  </div>
+                )}
+                {selectedSubscription.cardLastFour && (
+                  <div>
+                    <p className="text-[10px] text-graphite uppercase tracking-widest mb-1">Tarjeta</p>
+                    <p className="text-sm font-mono text-onyx">•••• {selectedSubscription.cardLastFour}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-black/5 bg-stone">
+              <button
+                onClick={() => setActiveModal('EDIT_SUBSCRIPTION')}
+                className="w-full py-3 bg-onyx text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-graphite transition-colors"
+              >
+                Editar Suscripción
+              </button>
+            </div>
+            <div className="h-1 w-full bg-metallic"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Category History Modal */}
+      {activeModal === 'VIEW_CATEGORY' && selectedCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" onClick={() => { setActiveModal(null); setSelectedCategory(undefined); }}>
+          <div className="bg-white w-full max-w-lg shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-alloy flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-5 border-b border-black/5 flex justify-between items-center bg-stone">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full" style={{backgroundColor: selectedCategory.color}}></div>
+                <h2 className="text-xl font-display font-bold text-onyx uppercase tracking-tight">{selectedCategory.name}</h2>
+              </div>
+              <button onClick={() => { setActiveModal(null); setSelectedCategory(undefined); }} className="p-2 hover:bg-concrete transition-colors text-onyx">
+                <Icons.Close className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-black/5">
+                <div>
+                  <p className="text-[10px] text-graphite uppercase tracking-widest">Presupuesto</p>
+                  <p className="font-mono font-bold text-onyx">{selectedCategory.budget ? formatCurrency(selectedCategory.budget) : 'N/A'}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-graphite uppercase tracking-widest">Total Gastado</p>
+                  <p className="font-mono font-bold text-red-600">
+                    {formatCurrency(state.transactions.filter(tx => tx.categoryId === selectedCategory.id).reduce((sum, tx) => sum + tx.amount, 0))}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[10px] text-graphite uppercase tracking-widest mb-3">Historial de Movimientos</p>
+              <div className="space-y-2">
+                {state.transactions.filter(tx => tx.categoryId === selectedCategory.id).length > 0 ?
+                  state.transactions.filter(tx => tx.categoryId === selectedCategory.id)
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 30)
+                    .map(tx => (
+                    <div key={tx.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedTransaction(tx); setActiveModal(null); setSelectedCategory(undefined); }}>
+                      <div>
+                        <p className="text-sm font-bold text-onyx">{tx.notes || 'Sin descripción'}</p>
+                        <p className="text-[10px] text-graphite">{formatDateTime(tx.date)}</p>
+                      </div>
+                      <span className={`font-mono font-bold ${tx.type === 'INCOME' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(tx.amount, tx.currency)}</span>
+                    </div>
+                  )) : <p className="text-graphite text-sm text-center py-4">Sin movimientos en esta categoría</p>}
+              </div>
+            </div>
+            <div className="p-4 border-t border-black/5 bg-stone">
+              <button
+                onClick={() => setActiveModal('EDIT_CATEGORY')}
+                className="w-full py-3 bg-onyx text-white font-display font-bold uppercase tracking-widest text-xs hover:bg-graphite transition-colors"
+              >
+                Editar Categoría
+              </button>
+            </div>
+            <div className="h-1 w-full bg-metallic"></div>
+          </div>
+        </div>
+      )}
 
       {contextToDelete && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
