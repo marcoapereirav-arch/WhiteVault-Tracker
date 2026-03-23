@@ -86,9 +86,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
     <div className="min-h-screen bg-stone flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md border border-black/5">
         <div className="flex justify-center mb-8">
-          <div className="w-12 h-12 bg-onyx text-white rounded-lg flex items-center justify-center">
-            <Icons.Wallet className="w-6 h-6" />
-          </div>
+          <img src="/logo.png" alt="WhiteVault" className="w-14 h-14 object-contain" />
         </div>
         <h2 className="text-2xl font-display font-bold text-center mb-6 text-onyx">
           {isForgotPassword ? 'Recuperar Contraseña' : 'Iniciar Sesión'}
