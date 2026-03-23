@@ -1351,8 +1351,27 @@ function App() {
                                             try {
                                                 const userId = session?.user?.id;
                                                 if (!userId) throw new Error('No hay sesión activa');
+                                                const currentEmail = session?.user?.email;
+                                                if (state.user.email !== currentEmail) {
+                                                    const res = await fetch('https://avezdjpqwddyvnxtskuq.supabase.co/functions/v1/change-email', {
+                                                        method: 'POST',
+                                                        headers: {
+                                                            'Authorization': 'Bearer whitevault2026secure',
+                                                            'Content-Type': 'application/json'
+                                                        },
+                                                        body: JSON.stringify({
+                                                            currentEmail,
+                                                            newEmail: state.user.email,
+                                                            userName: state.user.name
+                                                        })
+                                                    });
+                                                    const result = await res.json();
+                                                    if (!res.ok) throw new Error(result.error || 'Error al cambiar email');
+                                                }
                                                 await supabase.from('profiles').update({ email: state.user.email, name: state.user.name }).eq('id', userId);
-                                                alert('Perfil guardado correctamente.');
+                                                alert(state.user.email !== currentEmail
+                                                    ? 'Revisa tu nuevo correo para confirmar el cambio de email.'
+                                                    : 'Perfil guardado correctamente.');
                                             } catch (err: any) {
                                                 alert('Error al guardar: ' + (err.message || err));
                                             }
