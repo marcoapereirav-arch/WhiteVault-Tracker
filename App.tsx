@@ -1360,6 +1360,7 @@ function App() {
                                                             'Content-Type': 'application/json'
                                                         },
                                                         body: JSON.stringify({
+                                                            userId,
                                                             currentEmail,
                                                             newEmail: state.user.email,
                                                             userName: state.user.name
@@ -1367,10 +1368,11 @@ function App() {
                                                     });
                                                     const result = await res.json();
                                                     if (!res.ok) throw new Error(result.error || 'Error al cambiar email');
+                                                } else {
+                                                    await supabase.from('profiles').update({ name: state.user.name }).eq('id', userId);
                                                 }
-                                                await supabase.from('profiles').update({ email: state.user.email, name: state.user.name }).eq('id', userId);
                                                 alert(state.user.email !== currentEmail
-                                                    ? 'Revisa tu nuevo correo para confirmar el cambio de email.'
+                                                    ? 'Email actualizado correctamente. Usa tu nuevo email para iniciar sesión.'
                                                     : 'Perfil guardado correctamente.');
                                             } catch (err: any) {
                                                 alert('Error al guardar: ' + (err.message || err));
