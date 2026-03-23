@@ -473,8 +473,14 @@ function App() {
   
   const totalsByCurrency = getTotalsByCurrency(filteredContexts);
 
-  const monthlyIncome = filteredTransactions.filter(t => t.type === 'INCOME').reduce((sum, t) => sum + t.amount, 0);
-  const monthlyExpense = filteredTransactions.filter(t => t.type === 'EXPENSE').reduce((sum, t) => sum + t.amount, 0);
+  const monthlyIncomeByCurrency = filteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
+    acc[t.currency] = (acc[t.currency] || 0) + t.amount;
+    return acc;
+  }, {});
+  const monthlyExpenseByCurrency = filteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
+    acc[t.currency] = (acc[t.currency] || 0) + t.amount;
+    return acc;
+  }, {});
   const activeSubsCount = state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).length;
 
   // --- Actions ---
@@ -1077,12 +1083,12 @@ function App() {
                         {/* Top Stats Cards */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {[
-                                { label: t.totalBalance, multiCurrency: totalsByCurrency, color: 'text-onyx' },
-                                { label: t.monthlyIn, val: monthlyIncome, color: 'text-green-600' },
-                                { label: t.monthlyOut, val: monthlyExpense, color: 'text-red-600' },
-                                { label: t.activeSubs, val: activeSubsCount, isCount: true, color: 'text-alloy' },
+                                { label: t.totalBalance, multiCurrency: totalsByCurrency, color: 'text-onyx', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('ALL'); } },
+                                { label: t.monthlyIn, multiCurrency: monthlyIncomeByCurrency, color: 'text-green-600', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('INCOME'); } },
+                                { label: t.monthlyOut, multiCurrency: monthlyExpenseByCurrency, color: 'text-red-600', onClick: () => { setCurrentView('TRANSACTIONS'); setTransactionTypeFilter('EXPENSE'); } },
+                                { label: t.activeSubs, val: activeSubsCount, isCount: true, color: 'text-alloy', onClick: () => { setCurrentView('SUBSCRIPTIONS'); } },
                             ].map((stat, i) => (
-                                <div key={i} className="bg-white p-6 border border-black/5 shadow-sm hover:border-alloy transition-colors">
+                                <div key={i} onClick={stat.onClick} className="bg-white p-6 border border-black/5 shadow-sm hover:border-alloy transition-colors cursor-pointer">
                                     <p className="text-[10px] text-graphite uppercase tracking-widest mb-2">{stat.label}</p>
                                     <p className={`font-display font-bold text-2xl ${stat.color}`}>
                                         {stat.multiCurrency ? (
