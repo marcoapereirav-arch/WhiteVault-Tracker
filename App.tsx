@@ -25,9 +25,13 @@ const DICTIONARY = {
 
 const WHITEVAULT_ISOTYPE = "https://storage.googleapis.com/msgsndr/QDrKqO1suwk5VOPoTKJE/media/693880a4fb91d00b324304d7.png";
 
+// Account color palette for visual dots
+const ACCOUNT_COLORS = ['#4F46E5', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#BE185D', '#65A30D', '#EA580C', '#6366F1'];
+
 // Internal Component for Quick View
 const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: FinancialContext[], filterId: string, currency: string }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
 
     const format = (amount: number, cur?: string) => new Intl.NumberFormat('es-ES', {
         style: 'currency', currency: cur || currency, minimumFractionDigits: 2, maximumFractionDigits: 2
@@ -35,9 +39,36 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
 
     const filteredContexts = filterId === 'ALL' ? contexts : contexts.filter(c => c.id === filterId);
 
+    const toggleSubAccounts = (accountId: string) => {
+        setExpandedAccounts(prev => {
+            const next = new Set(prev);
+            if (next.has(accountId)) next.delete(accountId);
+            else next.add(accountId);
+            return next;
+        });
+    };
+
+    // Find max balance across ALL accounts and sub-accounts (per currency, use primary/first entry)
+    const getMaxBalance = () => {
+        let max = 0;
+        filteredContexts.forEach(ctx => {
+            ctx.accounts.forEach(acc => {
+                const entries = balanceEntries(acc.balances);
+                entries.forEach(e => { if (Math.abs(e.amount) > max) max = Math.abs(e.amount); });
+                acc.subAccounts.forEach(sub => {
+                    const subEntries = balanceEntries(sub.balances);
+                    subEntries.forEach(e => { if (Math.abs(e.amount) > max) max = Math.abs(e.amount); });
+                });
+            });
+        });
+        return max || 1; // avoid division by zero
+    };
+
+    const maxBalance = isOpen ? getMaxBalance() : 0;
+
     return (
         <div className="bg-white border border-black/5 shadow-sm overflow-hidden mb-6">
-            <button 
+            <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between p-4 hover:bg-stone transition-colors group"
             >
@@ -52,41 +83,78 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                 </div>
                 <Icons.ChevronDown className={`w-4 h-4 text-graphite transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
             </button>
-            
+
             {isOpen && (
-                <div className="border-t border-black/5 bg-stone/30 p-4 animate-in slide-in-from-top-2 fade-in duration-200">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="border-t border-black/5 bg-stone/30 p-5 animate-in slide-in-from-top-2 fade-in duration-200">
+                    <div className="space-y-6">
                         {filteredContexts.map(ctx => (
-                            <div key={ctx.id} className="bg-white border border-black/5 p-4 rounded-sm">
-                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-alloy mb-3 border-b border-black/5 pb-1">{ctx.name}</h4>
-                                <div className="space-y-3">
-                                    {ctx.accounts.map(acc => (
-                                        <div key={acc.id}>
-                                            <div className="flex justify-between items-start mb-1">
-                                                <span className="text-xs font-bold text-onyx">{acc.name}</span>
-                                                <div className="text-right">
-                                                    {balanceEntries(acc.balances).length > 0 ? balanceEntries(acc.balances).map(e => (
-                                                        <span key={e.currency} className="text-xs font-mono font-bold text-onyx block">{format(e.amount, e.currency)}</span>
-                                                    )) : <span className="text-xs font-mono font-bold text-onyx">{format(0)}</span>}
+                            <div key={ctx.id}>
+                                <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-gold mb-4">{ctx.name}</h4>
+                                <div className="space-y-4">
+                                    {ctx.accounts.map((acc, accIdx) => {
+                                        const entries = balanceEntries(acc.balances);
+                                        const primaryAmount = entries.length > 0 ? Math.abs(entries[0].amount) : 0;
+                                        const barWidth = Math.min(100, (primaryAmount / maxBalance) * 100);
+                                        const color = ACCOUNT_COLORS[accIdx % ACCOUNT_COLORS.length];
+                                        const hasSubs = acc.subAccounts.length > 0;
+                                        const isExpanded = expandedAccounts.has(acc.id);
+
+                                        return (
+                                            <div key={acc.id}>
+                                                {/* Account Row */}
+                                                <div className="flex items-center justify-between mb-1.5">
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                                                        <span className="text-sm font-semibold text-onyx">{acc.name}</span>
+                                                        {hasSubs && (
+                                                            <button
+                                                                onClick={() => toggleSubAccounts(acc.id)}
+                                                                className="text-[10px] text-graphite hover:text-onyx transition-colors flex items-center gap-0.5 ml-1"
+                                                            >
+                                                                <span>{acc.subAccounts.length} sub</span>
+                                                                <Icons.ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right">
+                                                        {entries.length > 0 ? entries.map(e => (
+                                                            <span key={e.currency} className="text-sm font-bold font-mono text-onyx block">{format(e.amount, e.currency)}</span>
+                                                        )) : <span className="text-sm font-bold font-mono text-onyx">{format(0)}</span>}
+                                                    </div>
                                                 </div>
+                                                {/* Visual Bar */}
+                                                <div className="w-full bg-black/5 h-[5px] rounded-full overflow-hidden ml-[19px]" style={{ width: 'calc(100% - 19px)' }}>
+                                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barWidth}%`, backgroundColor: color }} />
+                                                </div>
+
+                                                {/* Expandable Sub-accounts */}
+                                                {hasSubs && isExpanded && (
+                                                    <div className="mt-3 ml-[19px] pl-3 border-l border-black/10 space-y-3">
+                                                        {acc.subAccounts.map(sub => {
+                                                            const subEntries = balanceEntries(sub.balances);
+                                                            const subPrimaryAmount = subEntries.length > 0 ? Math.abs(subEntries[0].amount) : 0;
+                                                            const subBarWidth = Math.min(100, (subPrimaryAmount / maxBalance) * 100);
+                                                            return (
+                                                                <div key={sub.id}>
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span className="text-xs text-graphite font-medium">{sub.name}</span>
+                                                                        <div className="text-right">
+                                                                            {subEntries.length > 0 ? subEntries.map(e => (
+                                                                                <span key={e.currency} className="text-xs font-mono font-semibold text-graphite block">{format(e.amount, e.currency)}</span>
+                                                                            )) : <span className="text-xs font-mono font-semibold text-graphite">{format(0)}</span>}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="w-full bg-black/5 h-[4px] rounded-full overflow-hidden">
+                                                                        <div className="h-full rounded-full transition-all duration-500 opacity-60" style={{ width: `${subBarWidth}%`, backgroundColor: color }} />
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
-                                            {/* Sub Accounts */}
-                                            {acc.subAccounts.length > 0 && (
-                                                <div className="pl-2 border-l-2 border-black/5 ml-1 space-y-1 mt-1">
-                                                    {acc.subAccounts.map(sub => (
-                                                        <div key={sub.id} className="flex justify-between items-start">
-                                                            <span className="text-[10px] text-graphite">{sub.name}</span>
-                                                            <div className="text-right">
-                                                                {balanceEntries(sub.balances).length > 0 ? balanceEntries(sub.balances).map(e => (
-                                                                    <span key={e.currency} className="text-[10px] font-mono text-graphite block">{format(e.amount, e.currency)}</span>
-                                                                )) : <span className="text-[10px] font-mono text-graphite">{format(0)}</span>}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         ))}
