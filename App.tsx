@@ -25,9 +25,6 @@ const DICTIONARY = {
 
 const WHITEVAULT_ISOTYPE = "https://storage.googleapis.com/msgsndr/QDrKqO1suwk5VOPoTKJE/media/693880a4fb91d00b324304d7.png";
 
-// Account color palette for visual dots
-const ACCOUNT_COLORS = ['#4F46E5', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0891B2', '#BE185D', '#65A30D', '#EA580C', '#6366F1'];
-
 // Internal Component for Quick View
 const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: FinancialContext[], filterId: string, currency: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -85,17 +82,16 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
             </button>
 
             {isOpen && (
-                <div className="border-t border-black/5 bg-stone/30 p-5 animate-in slide-in-from-top-2 fade-in duration-200">
+                <div className="border-t border-black/10 bg-stone/30 p-5 animate-in slide-in-from-top-2 fade-in duration-200">
                     <div className="space-y-6">
                         {filteredContexts.map(ctx => (
                             <div key={ctx.id}>
                                 <h4 className="text-[10px] font-bold uppercase tracking-[0.15em] text-gold mb-4">{ctx.name}</h4>
                                 <div className="space-y-4">
-                                    {ctx.accounts.map((acc, accIdx) => {
+                                    {ctx.accounts.map(acc => {
                                         const entries = balanceEntries(acc.balances);
                                         const primaryAmount = entries.length > 0 ? Math.abs(entries[0].amount) : 0;
                                         const barWidth = Math.min(100, (primaryAmount / maxBalance) * 100);
-                                        const color = ACCOUNT_COLORS[accIdx % ACCOUNT_COLORS.length];
                                         const hasSubs = acc.subAccounts.length > 0;
                                         const isExpanded = expandedAccounts.has(acc.id);
 
@@ -104,12 +100,12 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                                 {/* Account Row */}
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <div className="flex items-center gap-2.5">
-                                                        <div className="w-[7px] h-[7px] rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                                                        <span className="text-sm font-semibold text-onyx">{acc.name}</span>
+                                                        <div className="w-1.5 h-1.5 bg-onyx rotate-45 flex-shrink-0" />
+                                                        <span className="text-sm font-display font-semibold text-onyx">{acc.name}</span>
                                                         {hasSubs && (
                                                             <button
                                                                 onClick={() => toggleSubAccounts(acc.id)}
-                                                                className="text-[10px] text-graphite hover:text-onyx transition-colors flex items-center gap-0.5 ml-1"
+                                                                className="text-[10px] text-graphite hover:text-alloy transition-colors flex items-center gap-0.5 ml-1"
                                                             >
                                                                 <span>{acc.subAccounts.length} sub</span>
                                                                 <Icons.ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -123,13 +119,13 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                                     </div>
                                                 </div>
                                                 {/* Visual Bar */}
-                                                <div className="w-full bg-black/5 h-[5px] rounded-full overflow-hidden ml-[19px]" style={{ width: 'calc(100% - 19px)' }}>
-                                                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${barWidth}%`, backgroundColor: color }} />
+                                                <div className="w-full bg-black/5 h-[5px] overflow-hidden ml-[18px]" style={{ width: 'calc(100% - 18px)' }}>
+                                                    <div className="h-full bg-alloy transition-all duration-500" style={{ width: `${barWidth}%` }} />
                                                 </div>
 
                                                 {/* Expandable Sub-accounts */}
                                                 {hasSubs && isExpanded && (
-                                                    <div className="mt-3 ml-[19px] pl-3 border-l border-black/10 space-y-3">
+                                                    <div className="mt-3 ml-[18px] pl-3 border-l border-black/10 space-y-3">
                                                         {acc.subAccounts.map(sub => {
                                                             const subEntries = balanceEntries(sub.balances);
                                                             const subPrimaryAmount = subEntries.length > 0 ? Math.abs(subEntries[0].amount) : 0;
@@ -144,8 +140,8 @@ const AccountsQuickView = ({ contexts, filterId, currency }: { contexts: Financi
                                                                             )) : <span className="text-xs font-mono font-semibold text-graphite">{format(0)}</span>}
                                                                         </div>
                                                                     </div>
-                                                                    <div className="w-full bg-black/5 h-[4px] rounded-full overflow-hidden">
-                                                                        <div className="h-full rounded-full transition-all duration-500 opacity-60" style={{ width: `${subBarWidth}%`, backgroundColor: color }} />
+                                                                    <div className="w-full bg-black/5 h-[4px] overflow-hidden">
+                                                                        <div className="h-full bg-alloy/40 transition-all duration-500" style={{ width: `${subBarWidth}%` }} />
                                                                     </div>
                                                                 </div>
                                                             );
