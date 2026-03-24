@@ -166,6 +166,7 @@ function App() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasFetchedData, setHasFetchedData] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [isAccountPaused, setIsAccountPaused] = useState(false);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [contextFilter, setContextFilter] = useState<string>('ALL');
@@ -273,6 +274,13 @@ function App() {
           toAccountId: t.to_account_id,
           toSubAccountId: t.to_sub_account_id
         }));
+
+        // Check if account is paused
+        if (p.active === false) {
+          setIsAccountPaused(true);
+        } else {
+          setIsAccountPaused(false);
+        }
 
         if (contexts.length === 0) {
           setNeedsOnboarding(true);
@@ -977,6 +985,37 @@ function App() {
 
   if (!session) {
     return <Auth onLogin={() => {}} />;
+  }
+
+  if (isAccountPaused) {
+    return (
+      <div className="min-h-screen bg-stone flex items-center justify-center p-6">
+        <div className="bg-white border border-black/10 shadow-sm max-w-md w-full p-10 text-center">
+          <div className="w-[2px] h-8 bg-alloy mx-auto mb-6" />
+          <img src={WHITEVAULT_ISOTYPE} alt="WhiteVault" className="w-16 h-16 mx-auto mb-6 opacity-80" />
+          <h1 className="font-display text-2xl font-bold text-onyx tracking-tight mb-2">Cuenta Pausada</h1>
+          <p className="text-graphite text-sm leading-relaxed mb-6">
+            Tu suscripción no se ha podido renovar. Para recuperar el acceso a tu bóveda, actualiza tu método de pago.
+          </p>
+          <a
+            href="#"
+            className="block w-full py-3 bg-onyx text-white text-[11px] font-bold uppercase tracking-widest hover:bg-gold transition-colors"
+          >
+            Renovar Suscripción
+          </a>
+          <p className="text-[10px] text-graphite/60 mt-4">
+            Tus datos están seguros. Al renovar, recuperarás acceso completo.
+          </p>
+          <div className="w-[2px] h-8 bg-alloy mx-auto mt-6" />
+          <button
+            onClick={() => { supabase.auth.signOut(); }}
+            className="mt-4 text-[10px] text-graphite hover:text-onyx uppercase tracking-widest font-bold transition-colors"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (needsOnboarding) {

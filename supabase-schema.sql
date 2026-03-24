@@ -13,6 +13,7 @@ CREATE TABLE profiles (
   contexts JSONB DEFAULT '[]'::jsonb,
   subscriptions JSONB DEFAULT '[]'::jsonb,
   categories JSONB DEFAULT '[]'::jsonb,
+  active BOOLEAN DEFAULT true,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
