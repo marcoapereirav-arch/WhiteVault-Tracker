@@ -559,19 +559,18 @@ function App() {
     return acc;
   }, {});
   const dashboardFilteredSubs = useMemo(() => {
-    const start = new Date(dashboardDateRange.start);
-    start.setHours(0,0,0,0);
-    const end = new Date(dashboardDateRange.end);
-    end.setHours(23,59,59,999);
+    const today = new Date();
+    today.setHours(0,0,0,0);
     return state.subscriptions
       .filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter))
       .filter(s => {
         if (!s.nextRenewal) return false;
         const renewal = new Date(s.nextRenewal);
-        return renewal >= start && renewal <= end;
+        renewal.setHours(0,0,0,0);
+        return renewal >= today;
       })
       .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
-  }, [state.subscriptions, contextFilter, dashboardDateRange]);
+  }, [state.subscriptions, contextFilter]);
   const activeSubsCount = dashboardFilteredSubs.length;
 
   // --- Actions ---
