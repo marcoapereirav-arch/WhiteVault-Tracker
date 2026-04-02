@@ -550,11 +550,11 @@ function App() {
   
   const totalsByCurrency = getTotalsByCurrency(filteredContexts);
 
-  const monthlyIncomeByCurrency = filteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
+  const monthlyIncomeByCurrency = dashboardFilteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
     acc[t.currency] = (acc[t.currency] || 0) + t.amount;
     return acc;
   }, {});
-  const monthlyExpenseByCurrency = filteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
+  const monthlyExpenseByCurrency = dashboardFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
     acc[t.currency] = (acc[t.currency] || 0) + t.amount;
     return acc;
   }, {});
