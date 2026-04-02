@@ -559,15 +559,36 @@ function App() {
     return acc;
   }, {});
   const dashboardFilteredSubs = useMemo(() => {
+    // Calculate the real end of the period (not capped to today)
+    const start = new Date(dashboardDateRange.start);
+    start.setHours(0,0,0,0);
+    let periodEnd: Date;
+    const preset = dashboardDateRange.preset;
+    const now = new Date();
+    if (preset === 'TODAY') {
+      periodEnd = new Date(now);
+    } else if (preset === 'THIS_WEEK') {
+      const day = now.getDay();
+      periodEnd = new Date(now);
+      periodEnd.setDate(now.getDate() + (day === 0 ? 0 : 7 - day)); // Sunday
+    } else if (preset === 'THIS_MONTH') {
+      periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of month
+    } else if (preset === 'THIS_YEAR') {
+      periodEnd = new Date(now.getFullYear(), 11, 31);
+    } else {
+      periodEnd = new Date(dashboardDateRange.end);
+    }
+    periodEnd.setHours(23,59,59,999);
+
     return state.subscriptions
       .filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter))
-      .sort((a, b) => {
-        if (!a.nextRenewal && !b.nextRenewal) return 0;
-        if (!a.nextRenewal) return 1;
-        if (!b.nextRenewal) return -1;
-        return new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
-      });
-  }, [state.subscriptions, contextFilter]);
+      .filter(s => {
+        if (!s.nextRenewal) return false;
+        const renewal = new Date(s.nextRenewal);
+        return renewal >= start && renewal <= periodEnd;
+      })
+      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
+  }, [state.subscriptions, contextFilter, dashboardDateRange]);
   const activeSubsCount = dashboardFilteredSubs.length;
 
   // --- Actions ---
