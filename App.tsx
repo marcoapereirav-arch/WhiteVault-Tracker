@@ -559,17 +559,14 @@ function App() {
     return acc;
   }, {});
   const dashboardFilteredSubs = useMemo(() => {
-    const today = new Date();
-    today.setHours(0,0,0,0);
     return state.subscriptions
       .filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter))
-      .filter(s => {
-        if (!s.nextRenewal) return false;
-        const renewal = new Date(s.nextRenewal);
-        renewal.setHours(0,0,0,0);
-        return renewal >= today;
-      })
-      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
+      .sort((a, b) => {
+        if (!a.nextRenewal && !b.nextRenewal) return 0;
+        if (!a.nextRenewal) return 1;
+        if (!b.nextRenewal) return -1;
+        return new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
+      });
   }, [state.subscriptions, contextFilter]);
   const activeSubsCount = dashboardFilteredSubs.length;
 
