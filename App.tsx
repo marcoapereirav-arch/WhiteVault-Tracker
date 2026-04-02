@@ -1974,7 +1974,7 @@ function App() {
               )}
               {dashboardSummaryType === 'INCOME' && (
                 <div className="space-y-2">
-                  {filteredTransactions.filter(tx => tx.type === 'INCOME').length > 0 ? filteredTransactions.filter(tx => tx.type === 'INCOME').slice(0, 20).map(tx => (
+                  {dashboardFilteredTransactions.filter(tx => tx.type === 'INCOME').length > 0 ? dashboardFilteredTransactions.filter(tx => tx.type === 'INCOME').slice(0, 20).map(tx => (
                     <div key={tx.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedTransaction(tx); setDashboardSummaryType(null); }}>
                       <div>
                         <p className="text-sm font-bold text-onyx">{tx.notes || 'Sin descripción'}</p>
@@ -1987,7 +1987,7 @@ function App() {
               )}
               {dashboardSummaryType === 'EXPENSE' && (
                 <div className="space-y-2">
-                  {filteredTransactions.filter(tx => tx.type === 'EXPENSE').length > 0 ? filteredTransactions.filter(tx => tx.type === 'EXPENSE').slice(0, 20).map(tx => (
+                  {dashboardFilteredTransactions.filter(tx => tx.type === 'EXPENSE').length > 0 ? dashboardFilteredTransactions.filter(tx => tx.type === 'EXPENSE').slice(0, 20).map(tx => (
                     <div key={tx.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedTransaction(tx); setDashboardSummaryType(null); }}>
                       <div>
                         <p className="text-sm font-bold text-onyx">{tx.notes || 'Sin descripción'}</p>
