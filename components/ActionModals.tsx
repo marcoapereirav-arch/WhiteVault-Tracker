@@ -645,6 +645,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [accountId, setAccountId] = useState(initialData?.accountId || '');
     const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
     const [cardLastFour, setCardLastFour] = useState(initialData?.cardLastFour || '');
+    const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
     const [active, setActive] = useState(initialData ? initialData.active : true);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
@@ -663,6 +664,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
             accountId,
             subAccountId,
             cardLastFour: cardLastFour || undefined,
+            categoryId: categoryId || undefined,
             active,
             paymentMethod: 'Card'
         });
@@ -710,7 +712,12 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                         {activeAccount.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </Select>
                 )}
-                
+
+                <Select label="Categoría (Opcional)" value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
+                    <option value="">Sin categoría</option>
+                    {state.categories.filter((c: any) => c.contextId === contextId).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </Select>
+
                 <div className="mb-5">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Últimos 4 dígitos de tarjeta (Opcional)</label>
                     <div className="flex items-center gap-2">

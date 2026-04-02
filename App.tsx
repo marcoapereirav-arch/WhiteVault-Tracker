@@ -558,7 +558,21 @@ function App() {
     acc[t.currency] = (acc[t.currency] || 0) + t.amount;
     return acc;
   }, {});
-  const activeSubsCount = state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).length;
+  const dashboardFilteredSubs = useMemo(() => {
+    const start = new Date(dashboardDateRange.start);
+    start.setHours(0,0,0,0);
+    const end = new Date(dashboardDateRange.end);
+    end.setHours(23,59,59,999);
+    return state.subscriptions
+      .filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter))
+      .filter(s => {
+        if (!s.nextRenewal) return false;
+        const renewal = new Date(s.nextRenewal);
+        return renewal >= start && renewal <= end;
+      })
+      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
+  }, [state.subscriptions, contextFilter, dashboardDateRange]);
+  const activeSubsCount = dashboardFilteredSubs.length;
 
   // --- Actions ---
 
@@ -1527,7 +1541,16 @@ function App() {
                             {state.subscriptions
                                 .filter(s => contextFilter === 'ALL' || s.contextId === contextFilter)
                                 .filter(s => subscriptionStatusFilter === 'ALL' || (subscriptionStatusFilter === 'ACTIVE' ? s.active : !s.active))
-                                .map(s => (
+                                .sort((a, b) => {
+                                    if (!a.nextRenewal && !b.nextRenewal) return 0;
+                                    if (!a.nextRenewal) return 1;
+                                    if (!b.nextRenewal) return -1;
+                                    return new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
+                                })
+                                .map(s => {
+                                const ctx = state.contexts.find(c => c.id === s.contextId);
+                                const cat = s.categoryId ? state.categories.find(c => c.id === s.categoryId) : null;
+                                return (
                                 <div key={s.id}
                                     onClick={() => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
                                     className="bg-white border border-black/5 p-6 relative group hover:border-alloy transition-colors cursor-pointer"
@@ -1552,6 +1575,11 @@ function App() {
                                     <h3 className="text-lg font-display font-bold text-onyx mb-1">{s.name}</h3>
                                     <p className="text-xs text-graphite mb-2 uppercase tracking-wider">{s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}</p>
 
+                                    <div className="flex flex-wrap gap-1.5 mb-3">
+                                        {ctx && <span className={`px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider ${ctx.type === 'PERSONAL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{ctx.name}</span>}
+                                        {cat && <span className="px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-stone border border-black/10 text-graphite">{cat.name}</span>}
+                                    </div>
+
                                     <div className="text-xs text-alloy font-bold mb-4 uppercase tracking-wider">
                                         {getAccountName(s.contextId, s.accountId || '')}
                                         {s.subAccountId && ` / ${getSubAccountName(s.contextId, s.accountId || '', s.subAccountId)}`}
@@ -1564,12 +1592,12 @@ function App() {
                                     <div className="flex justify-between items-end border-t border-black/5 pt-4">
                                         <div>
                                             <p className="text-[10px] text-gray-400 uppercase tracking-wider">{t.nextBilling}</p>
-                                            <p className="text-sm font-medium text-onyx">{s.nextRenewal || '-'}</p>
+                                            <p className="text-sm font-medium text-onyx">{s.nextRenewal ? formatDateTime(s.nextRenewal) : '-'}</p>
                                         </div>
                                         <span className="text-xl font-display font-bold text-onyx">{formatCurrency(s.amount, s.currency)}</span>
                                     </div>
                                 </div>
-                            ))}
+                            );})}
                             <button onClick={() => { setSelectedSubscription(undefined); setActiveModal('SUBSCRIPTION'); }} className="border-2 border-dashed border-black/10 flex flex-col items-center justify-center p-6 text-graphite hover:border-alloy hover:text-alloy transition-colors group h-full min-h-[200px]">
                                 <Icons.Plus className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
                                 <span className="font-display font-bold text-sm uppercase tracking-widest">Añadir Suscripción</span>
@@ -2000,15 +2028,24 @@ function App() {
               )}
               {dashboardSummaryType === 'SUBS' && (
                 <div className="space-y-2">
-                  {state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).length > 0 ? state.subscriptions.filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter)).map(s => (
+                  {dashboardFilteredSubs.length > 0 ? dashboardFilteredSubs.map(s => {
+                    const ctx = state.contexts.find(c => c.id === s.contextId);
+                    const cat = s.categoryId ? state.categories.find(c => c.id === s.categoryId) : null;
+                    return (
                     <div key={s.id} className="flex justify-between items-center p-3 bg-stone border border-black/5 hover:border-alloy transition-colors cursor-pointer" onClick={() => { setSelectedSubscription(s); setDashboardSummaryType(null); setActiveModal('VIEW_SUBSCRIPTION'); }}>
                       <div>
                         <p className="text-sm font-bold text-onyx">{s.name}</p>
-                        <p className="text-[10px] text-graphite">{s.frequency} · Prox: {s.nextRenewal || '-'}{s.cardLastFour ? ` · •••• ${s.cardLastFour}` : ''}</p>
+                        <p className="text-[10px] text-graphite">
+                          {s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'} · Prox: {s.nextRenewal ? formatDateTime(s.nextRenewal) : '-'}{s.cardLastFour ? ` · •••• ${s.cardLastFour}` : ''}
+                        </p>
+                        <div className="flex gap-1.5 mt-1">
+                          {ctx && <span className={`inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${ctx.type === 'PERSONAL' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>{ctx.name}</span>}
+                          {cat && <span className="inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-stone border border-black/10 text-graphite">{cat.name}</span>}
+                        </div>
                       </div>
                       <span className="font-mono font-bold text-alloy">{formatCurrency(s.amount, s.currency)}</span>
                     </div>
-                  )) : <p className="text-graphite text-sm text-center py-4">Sin suscripciones activas</p>}
+                  );}) : <p className="text-graphite text-sm text-center py-4">Sin suscripciones en este periodo</p>}
                 </div>
               )}
             </div>
