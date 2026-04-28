@@ -166,31 +166,38 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
     const progressPercentage = (step / totalSteps) * 100;
 
     return (
-        <div className="fixed inset-0 z-50 bg-stone flex flex-col items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 marble flex flex-col">
             {step === 6 && <Confetti width={width} height={height} recycle={false} numberOfPieces={500} />}
-            
-            <div className="w-full max-w-2xl bg-white border border-black/5 shadow-2xl p-8 md:p-12 relative z-10 overflow-y-auto max-h-[95vh]">
-                {/* Progress Bar */}
-                <div className="absolute top-0 left-0 w-full h-1 bg-stone">
-                    <div 
-                        className="h-full bg-alloy transition-all duration-700 ease-out shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+
+            {/* Top bar with progress + exit */}
+            <div className="pt-safe sticky top-0 z-20 bg-stone/80 backdrop-blur-xl border-b border-black/5">
+                <div className="h-1 bg-concrete/40">
+                    <div
+                        className="h-full bg-metallic transition-all duration-700 ease-out"
                         style={{ width: `${progressPercentage}%` }}
                     />
                 </div>
-
-                {onExit && (
-                    <button
-                        onClick={onExit}
-                        className="absolute top-4 right-4 p-2 text-graphite hover:text-onyx transition-colors z-20"
-                        title="Salir"
-                    >
-                        <Icons.Close className="w-5 h-5" />
-                    </button>
-                )}
-
-                <div className="flex items-center justify-center mb-8 mt-2">
-                    <h1 className="text-3xl font-display font-bold text-onyx">WhiteVault<span className="text-sm text-alloy">™</span></h1>
+                <div className="flex items-center justify-between px-5 py-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite">
+                        Paso {Math.min(step, totalSteps)}/{totalSteps}
+                    </span>
+                    {onExit && (
+                        <button
+                            onClick={onExit}
+                            className="w-9 h-9 rounded-full bg-white border border-black/5 flex items-center justify-center active:scale-95 transition-transform"
+                            aria-label="Salir"
+                        >
+                            <Icons.Close className="w-4 h-4 text-onyx" />
+                        </button>
+                    )}
                 </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pb-safe">
+                <div className="w-full max-w-[480px] mx-auto px-5 sm:px-6 py-6 sm:py-10">
+                    <div className="flex items-center justify-center mb-6">
+                        <h1 className="text-2xl font-display font-bold text-onyx tracking-tight">WhiteVault<span className="text-xs text-alloy align-top">™</span></h1>
+                    </div>
 
                 {step === 1 && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -573,10 +580,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
 
                 {step === 6 && (
                     <div className="animate-in zoom-in duration-500 flex flex-col items-center justify-center py-12">
-                        <h2 className="text-4xl font-display font-bold text-onyx mb-4 text-center">¡Bienvenido a WhiteVault™!</h2>
-                        <p className="text-graphite text-center text-lg">Tu bóveda financiera está lista.</p>
+                        <h2 className="text-3xl font-display font-bold text-onyx mb-3 text-center tracking-tight">¡Bienvenido a WhiteVault™!</h2>
+                        <p className="text-graphite text-center text-sm">Tu bóveda financiera está lista.</p>
                     </div>
                 )}
+                </div>
             </div>
         </div>
     );

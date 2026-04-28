@@ -141,7 +141,7 @@ export const AccountsView: React.FC<Props> = ({
                                 {account.subAccounts.map(sub => {
                                     const subEntries = balanceEntries(sub.balances);
                                     // For progress bar, sum all currencies (simple approach)
-                                    const subTotal = Object.values(sub.balances).reduce((s, v) => s + v, 0);
+                                    const subTotal = (Object.values(sub.balances) as number[]).reduce((s, v) => s + v, 0);
                                     return (
                                     <div key={sub.id} className="text-sm">
                                         <div className="flex justify-between items-start">

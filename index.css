@@ -1,13 +1,122 @@
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+/* WhiteVault™ — Mobile-first native-feel base */
+
+:root {
+  --safe-top: env(safe-area-inset-top);
+  --safe-bottom: env(safe-area-inset-bottom);
+  --safe-left: env(safe-area-inset-left);
+  --safe-right: env(safe-area-inset-right);
+  --tabbar-height: calc(56px + max(env(safe-area-inset-bottom), 8px));
 }
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+  background: #F7F7F7;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 4px;
+
+body {
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
+
+* { -webkit-tap-highlight-color: transparent; }
+
+input, textarea, select { font-size: 16px; } /* prevents iOS zoom on focus */
+
+/* Disable text selection on UI chrome (kept on inputs / content) */
+button, [role="button"], nav, header, footer { -webkit-user-select: none; user-select: none; }
+
+/* Hide native scrollbars on horizontal scrollers (carousels) */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Custom scrollbar (desktop) */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); border-radius: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.2); }
+
+/* Safe-area helpers */
+.pt-safe { padding-top: max(env(safe-area-inset-top), 8px); }
+.pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 8px); }
+.pl-safe { padding-left: max(env(safe-area-inset-left), 0px); }
+.pr-safe { padding-right: max(env(safe-area-inset-right), 0px); }
+.h-safe-bottom { height: max(env(safe-area-inset-bottom), 0px); }
+.pb-tabbar { padding-bottom: calc(var(--tabbar-height) + 16px); }
+
+/* Native-feel motion */
+@keyframes wv-slide-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
+@keyframes wv-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes wv-pop-in {
+  0% { transform: scale(0.92); opacity: 0; }
+  60% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes wv-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.wv-slide-up { animation: wv-slide-up 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.wv-fade-in { animation: wv-fade-in 200ms ease-out both; }
+.wv-pop-in { animation: wv-pop-in 320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+
+/* Stagger helper */
+.wv-stagger > * { animation: wv-slide-up 320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.wv-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.wv-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.wv-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.wv-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.wv-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.wv-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.wv-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.wv-stagger > *:nth-child(8) { animation-delay: 280ms; }
+.wv-stagger > *:nth-child(n+9) { animation-delay: 320ms; }
+
+/* Numeric tabular for currency */
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* Standalone (PWA) tweaks */
+@media (display-mode: standalone) {
+  body { overscroll-behavior-y: contain; }
+}
+
+/* Marble texture (subtle) for hero areas */
+.marble {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(201, 168, 106, 0.08), transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(14, 14, 15, 0.04), transparent 50%),
+    #F7F7F7;
+}
+
+.marble-dark {
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(212, 168, 83, 0.18), transparent 50%),
+    radial-gradient(ellipse at 80% 90%, rgba(255, 255, 255, 0.04), transparent 50%),
+    #0E0E0F;
+}
+
+/* Metallic gradient line */
+.metallic-line {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #B89B63, #E8D3A5, #B89B63, transparent);
+}
+
+/* Skeleton shimmer */
+.shimmer {
+  background: linear-gradient(90deg, rgba(0,0,0,0.04) 25%, rgba(0,0,0,0.08) 37%, rgba(0,0,0,0.04) 63%);
+  background-size: 200% 100%;
+  animation: wv-shimmer 1.4s infinite;
+}
+
+/* Disable iOS double-tap zoom on interactive surfaces */
+button, a, [role="button"] { touch-action: manipulation; }

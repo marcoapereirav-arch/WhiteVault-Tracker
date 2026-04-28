@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
+import { BottomSheet } from './Mobile';
 
 interface ModalProps {
   isOpen: boolean;
@@ -10,25 +11,12 @@ interface ModalProps {
   children: React.ReactNode;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-onyx/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-lg shadow-[0_4px_24px_rgba(0,0,0,0.2)] border border-alloy flex flex-col max-h-[90vh]">
-        <div className="p-5 border-b border-black/5 flex justify-between items-center bg-stone">
-          <h2 className="text-xl font-display font-bold text-onyx uppercase tracking-tight">{title}</h2>
-          <button onClick={onClose} className="p-2 hover:bg-concrete transition-colors text-onyx">
-            <Icons.Close className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-6 overflow-y-auto">
-          {children}
-        </div>
-        <div className="h-1 w-full bg-metallic"></div>
-      </div>
-    </div>
-  );
-};
+// All form modals render as native-feel bottom sheets.
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => (
+  <BottomSheet open={isOpen} onClose={onClose} title={title} size="full">
+    {children}
+  </BottomSheet>
+);
 
 // --- Custom DateTimePicker Component ---
 
