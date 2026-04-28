@@ -17,12 +17,17 @@ export const haptic = (style: 'light' | 'medium' | 'heavy' | 'selection' = 'ligh
   try { navigator.vibrate(map[style]); } catch {}
 };
 
-// ─── SAFE-AREA SHELL ────────────────────────────────────────────────────
-export const MobileShell: React.FC<{ children: ReactNode; className?: string }> = ({ children, className = '' }) => {
+// ─── SAFE-AREA SHELL (mobile + desktop with sidebar) ────────────────────
+export const MobileShell: React.FC<{ children: ReactNode; sidebar?: ReactNode; className?: string }> = ({ children, sidebar, className = '' }) => {
   return (
     <div className={`min-h-[100dvh] bg-stone text-onyx ${className}`}>
-      <div className="mx-auto max-w-[480px] min-h-[100dvh] bg-stone relative overflow-hidden">
-        {children}
+      <div className="lg:flex lg:items-stretch lg:min-h-[100dvh]">
+        {sidebar}
+        <div className="mx-auto lg:mx-auto max-w-[480px] lg:max-w-[720px] w-full min-h-[100dvh] bg-stone relative lg:border-x lg:border-black/5">
+          {children}
+        </div>
+        {/* Desktop right rail (decorative) */}
+        <div className="hidden lg:block lg:flex-1 lg:max-w-[260px]" />
       </div>
     </div>
   );
@@ -105,7 +110,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
     <nav
       role="navigation"
       aria-label="Navegación principal"
-      className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none"
+      className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none lg:hidden"
     >
       <div className="mx-auto max-w-[480px] pointer-events-auto">
         <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),8px)] pt-1.5">
@@ -120,6 +125,82 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
     </nav>
   );
 };
+
+// ─── DESKTOP SIDEBAR ────────────────────────────────────────────────────
+interface DesktopSidebarProps {
+  tabs: TabItem[];
+  activeId: string;
+  onChange: (id: string) => void;
+  onFabPress: () => void;
+  user: { name: string; email: string; avatarUrl?: string };
+  onUserClick?: () => void;
+  brand?: { isotype: string };
+}
+export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ tabs, activeId, onChange, onFabPress, user, onUserClick, brand }) => {
+  return (
+    <aside className="hidden lg:flex lg:flex-col lg:w-[240px] lg:flex-shrink-0 lg:bg-white lg:border-r lg:border-black/5 lg:sticky lg:top-0 lg:h-[100dvh] lg:overflow-y-auto">
+      {/* Brand */}
+      <div className="px-6 pt-7 pb-6 border-b border-black/5">
+        <div className="flex items-center gap-3">
+          {brand?.isotype && <img src={brand.isotype} alt="WhiteVault" className="w-8 h-8 object-contain" />}
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">WhiteVault™</div>
+            <div className="text-xs text-graphite mt-0.5">Disciplined Premium</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick action */}
+      <div className="px-4 pt-4">
+        <button
+          onClick={() => { haptic('medium'); onFabPress(); }}
+          className="w-full h-11 bg-onyx text-white text-xs font-display font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] hover:bg-graphite transition-all"
+        >
+          <Plus />
+          Acción Rápida
+        </button>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          const active = activeId === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => { haptic('selection'); onChange(t.id); }}
+              className={`w-full flex items-center gap-3 px-3 h-11 rounded-xl transition-all ${active ? 'bg-stone text-onyx' : 'text-graphite hover:bg-stone/60 hover:text-onyx'}`}
+            >
+              <Icon className={`w-[18px] h-[18px] ${active ? 'text-gold' : ''}`} />
+              <span className="text-sm font-medium tracking-tight">{t.label}</span>
+              {active && <span className="ml-auto w-1.5 h-1.5 bg-gold rounded-full" />}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* User */}
+      <div className="px-3 pb-5 pt-3 border-t border-black/5">
+        <button
+          onClick={() => { haptic('selection'); onUserClick?.(); }}
+          className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-stone transition-colors"
+        >
+          <div className="w-9 h-9 bg-onyx rounded-xl flex items-center justify-center text-white font-display font-bold text-sm overflow-hidden flex-shrink-0">
+            {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : (user.name.charAt(0) || '?')}
+          </div>
+          <div className="text-left min-w-0 flex-1">
+            <div className="text-sm font-display font-bold text-onyx truncate">{user.name || 'Usuario'}</div>
+            <div className="text-[10px] text-graphite truncate">{user.email}</div>
+          </div>
+          <Icons.Settings className="w-4 h-4 text-graphite flex-shrink-0" />
+        </button>
+      </div>
+    </aside>
+  );
+};
+
+const Plus: React.FC = () => <Icons.Plus className="w-4 h-4" />;
 
 const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void }> = ({ item, active, onClick }) => {
   const Icon = item.icon;
@@ -310,7 +391,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   return (
     <ToastContext.Provider value={{ show }}>
       {children}
-      <div className="fixed left-0 right-0 bottom-24 z-[60] pointer-events-none flex flex-col items-center gap-2 px-4">
+      <div className="fixed left-0 right-0 bottom-24 lg:bottom-8 z-[60] pointer-events-none flex flex-col items-center gap-2 px-4">
         {toasts.map((t) => (
           <div
             key={t.id}

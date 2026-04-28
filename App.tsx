@@ -13,6 +13,7 @@ import {
   MobileHeader,
   HeaderButton,
   BottomTabBar,
+  DesktopSidebar,
   TabItem,
   FabSheet,
   ToastProvider,
@@ -1009,13 +1010,23 @@ function App() {
     return first ? `${greet}, ${first}` : greet;
   };
 
-  // Tabs (5 — last opens "Más" view = SETTINGS+CATEGORIES drawer)
+  // Mobile bottom-tab items (5 — last opens "Más" drawer)
   const tabItems: TabItem[] = [
     { id: 'DASHBOARD', label: 'Inicio', icon: Icons.Dashboard },
     { id: 'ACCOUNTS', label: 'Bóvedas', icon: Icons.Accounts },
     { id: 'TRANSACTIONS', label: 'Libro', icon: Icons.Receipt },
     { id: 'SUBSCRIPTIONS', label: 'Subs', icon: Icons.Subscription },
     { id: 'MORE', label: 'Más', icon: Icons.More },
+  ];
+
+  // Desktop sidebar items (full set, no "Más")
+  const sidebarItems: TabItem[] = [
+    { id: 'DASHBOARD', label: 'Inicio', icon: Icons.Dashboard },
+    { id: 'ACCOUNTS', label: 'Bóvedas', icon: Icons.Accounts },
+    { id: 'TRANSACTIONS', label: 'Libro Mayor', icon: Icons.Receipt },
+    { id: 'SUBSCRIPTIONS', label: 'Suscripciones', icon: Icons.Subscription },
+    { id: 'CATEGORIES', label: 'Categorías', icon: Icons.Category },
+    { id: 'SETTINGS', label: 'Configuración', icon: Icons.Settings },
   ];
 
   const handleTabChange = (id: string) => {
@@ -1058,31 +1069,40 @@ function App() {
 
   return (
     <ToastProvider>
-      <MobileShell>
+      <MobileShell
+        sidebar={
+          <DesktopSidebar
+            tabs={sidebarItems}
+            activeId={currentView}
+            onChange={(id) => setCurrentView(id as View)}
+            onFabPress={() => setIsActionsOpen(true)}
+            user={{ name: state.user.name, email: state.user.email, avatarUrl: state.user.avatarUrl }}
+            onUserClick={() => setCurrentView('SETTINGS')}
+            brand={{ isotype: WHITEVAULT_ISOTYPE }}
+          />
+        }
+      >
         <MobileHeader
           {...hc}
           leading={
-            <button onClick={() => haptic('light')} className="p-1 active:scale-95 transition-transform">
+            <button onClick={() => haptic('light')} className="p-1 active:scale-95 transition-transform lg:hidden">
               <img src={WHITEVAULT_ISOTYPE} alt="WhiteVault" className="w-7 h-7 object-contain" />
             </button>
           }
           trailing={
-            <>
-              {currentView === 'DASHBOARD' && (
-                <ContextSwitcher contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
-              )}
-              {currentView !== 'DASHBOARD' && (
+            currentView !== 'SETTINGS' ? (
+              <div className="lg:hidden">
                 <HeaderButton onClick={() => setCurrentView('SETTINGS')} ariaLabel="Configuración">
                   <Icons.Settings className="w-4 h-4 text-onyx" />
                 </HeaderButton>
-              )}
-            </>
+              </div>
+            ) : null
           }
         />
 
-        {/* Context switcher row (non-dashboard views) */}
+        {/* Context switcher row (non-dashboard, non-settings views) */}
         {currentView !== 'DASHBOARD' && currentView !== 'SETTINGS' && state.contexts.length > 1 && (
-          <div className="px-5 pb-3 -mt-1">
+          <div className="px-5 pb-3 -mt-1 lg:hidden">
             <ContextSwitcher contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
           </div>
         )}

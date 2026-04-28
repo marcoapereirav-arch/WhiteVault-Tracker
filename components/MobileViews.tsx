@@ -502,7 +502,7 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
 
   return (
     <div className="pb-tabbar">
-      <div className="px-5 pt-1 pb-3 sticky top-[56px] bg-stone/80 backdrop-blur-md z-10">
+      <div className="px-5 pt-1 pb-3">
         <div className="relative mb-3">
           <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-graphite" />
           <input
@@ -1166,6 +1166,7 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
         budget_alerts_enabled: true, budget_threshold: 90,
         income_received_enabled: true, account_status_enabled: true,
         weekly_summary_enabled: true,
+        quiet_hours_enabled: true,
         quiet_hours_start: 22, quiet_hours_end: 8
       });
       setLoading(false);
@@ -1256,22 +1257,29 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
           </div>
 
           <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite px-2 mt-4">Modo Silencioso</div>
-          <div className="bg-white border border-black/5 rounded-2xl p-4">
-            <div className="text-sm text-onyx mb-3">Sin avisos entre <span className="font-display font-bold text-gold">{prefs.quiet_hours_start ?? 22}:00</span> y <span className="font-display font-bold text-gold">{prefs.quiet_hours_end ?? 8}:00</span></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Inicio</label>
-                <select value={prefs.quiet_hours_start ?? 22} onChange={(e) => update({ quiet_hours_start: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
-                  {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-                </select>
+          <div className="bg-white border border-black/5 rounded-2xl divide-y divide-black/5">
+            <ToggleRow
+              label="Activar modo silencioso"
+              desc={prefs.quiet_hours_enabled === false ? 'Recibirás avisos a cualquier hora' : `No te molestaremos entre ${String(prefs.quiet_hours_start ?? 22).padStart(2, '0')}:00 y ${String(prefs.quiet_hours_end ?? 8).padStart(2, '0')}:00`}
+              value={prefs.quiet_hours_enabled !== false}
+              onChange={(v) => update({ quiet_hours_enabled: v })}
+            />
+            {prefs.quiet_hours_enabled !== false && (
+              <div className="p-4 grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Inicio</label>
+                  <select value={prefs.quiet_hours_start ?? 22} onChange={(e) => update({ quiet_hours_start: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
+                    {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Fin</label>
+                  <select value={prefs.quiet_hours_end ?? 8} onChange={(e) => update({ quiet_hours_end: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
+                    {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Fin</label>
-                <select value={prefs.quiet_hours_end ?? 8} onChange={(e) => update({ quiet_hours_end: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
-                  {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-                </select>
-              </div>
-            </div>
+            )}
           </div>
 
           <button

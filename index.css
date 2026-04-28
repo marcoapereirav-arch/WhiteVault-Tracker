@@ -46,6 +46,7 @@ button, [role="button"], nav, header, footer { -webkit-user-select: none; user-s
 .pr-safe { padding-right: max(env(safe-area-inset-right), 0px); }
 .h-safe-bottom { height: max(env(safe-area-inset-bottom), 0px); }
 .pb-tabbar { padding-bottom: calc(var(--tabbar-height) + 16px); }
+@media (min-width: 1024px) { .pb-tabbar { padding-bottom: 32px; } }
 
 /* Native-feel motion */
 @keyframes wv-slide-up {
