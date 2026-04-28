@@ -48,10 +48,12 @@ button, [role="button"], nav, header, footer { -webkit-user-select: none; user-s
 .pb-tabbar { padding-bottom: calc(var(--tabbar-height) + 16px); }
 @media (min-width: 1024px) { .pb-tabbar { padding-bottom: 32px; } }
 
-/* Native-feel motion */
+/* Native-feel motion — final keyframe MUST NOT leave a transform applied,
+   otherwise it creates a containing block that clips descendant `position: fixed`
+   elements (e.g. BottomSheet renders inside the animated element instead of viewport). */
 @keyframes wv-slide-up {
   from { transform: translateY(8px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  to { transform: none; opacity: 1; }
 }
 @keyframes wv-fade-in {
   from { opacity: 0; }
@@ -60,19 +62,21 @@ button, [role="button"], nav, header, footer { -webkit-user-select: none; user-s
 @keyframes wv-pop-in {
   0% { transform: scale(0.92); opacity: 0; }
   60% { transform: scale(1.02); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
+  100% { transform: none; opacity: 1; }
 }
 @keyframes wv-shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
 
-.wv-slide-up { animation: wv-slide-up 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
-.wv-fade-in { animation: wv-fade-in 200ms ease-out both; }
-.wv-pop-in { animation: wv-pop-in 320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+/* Use backwards fill-mode so initial state applies before delay,
+   and the element returns to its natural (transform-free) state after. */
+.wv-slide-up { animation: wv-slide-up 280ms cubic-bezier(0.32, 0.72, 0, 1) backwards; }
+.wv-fade-in { animation: wv-fade-in 200ms ease-out backwards; }
+.wv-pop-in { animation: wv-pop-in 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards; }
 
 /* Stagger helper */
-.wv-stagger > * { animation: wv-slide-up 320ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.wv-stagger > * { animation: wv-slide-up 320ms cubic-bezier(0.32, 0.72, 0, 1) backwards; }
 .wv-stagger > *:nth-child(1) { animation-delay: 0ms; }
 .wv-stagger > *:nth-child(2) { animation-delay: 40ms; }
 .wv-stagger > *:nth-child(3) { animation-delay: 80ms; }

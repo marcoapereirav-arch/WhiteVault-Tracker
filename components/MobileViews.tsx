@@ -74,25 +74,25 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
   const otherCurrencies = balanceTotal.slice(1);
 
   return (
-    <div className="pb-tabbar wv-stagger">
+    <div className="pb-tabbar">
       {/* Hero patrimonio */}
-      <section className="px-5 pt-2">
-        <div className="marble-dark text-white p-6 rounded-3xl border border-black/40 shadow-[0_8px_32px_rgba(0,0,0,0.18)] relative overflow-hidden">
+      <section className="px-5 lg:px-8 pt-2 lg:pt-0">
+        <div className="marble-dark text-white p-6 lg:p-8 rounded-3xl border border-black/40 shadow-[0_8px_32px_rgba(0,0,0,0.18)] relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-px bg-metallic opacity-50" />
           <div className="flex items-center justify-between mb-5">
             <div>
-              <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">Patrimonio</div>
+              <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-gold">Patrimonio</div>
               <div className="text-[10px] text-graphite mt-0.5">{p.getPresetLabel(p.dashboardDateRange.preset)}</div>
             </div>
             <button
               onClick={() => { haptic('light'); setShowFilter(true); }}
-              className="flex items-center gap-1.5 px-3 h-8 bg-white/10 backdrop-blur-md border border-white/10 text-[10px] font-bold uppercase tracking-widest rounded-full active:scale-95 transition-transform"
+              className="flex items-center gap-1.5 px-3 h-8 lg:h-9 bg-white/10 backdrop-blur-md border border-white/10 text-[10px] lg:text-[11px] font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-white/15 transition-all"
             >
               <Icons.Calendar className="w-3 h-3" />
               {p.getPresetLabel(p.dashboardDateRange.preset)}
             </button>
           </div>
-          <div className="text-4xl font-display font-bold tracking-tight tabular">
+          <div className="text-4xl lg:text-6xl font-display font-bold tracking-tight tabular">
             {p.formatCurrency(primaryAmount, primaryCurrency)}
           </div>
           {otherCurrencies.length > 0 && (
@@ -108,88 +108,102 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
             <ContextSwitcher contexts={p.state.contexts} value={p.contextFilter} onChange={p.setContextFilter} dark />
             <div className="text-right">
               <div className="text-[9px] uppercase tracking-widest text-graphite">Suscripciones</div>
-              <div className="text-sm font-display font-bold text-white">{p.activeSubsCount} activas</div>
+              <div className="text-sm lg:text-base font-display font-bold text-white">{p.activeSubsCount} activas</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats horizontales */}
-      <section className="mt-5">
-        <div className="px-5 mb-2 flex items-center justify-between">
-          <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite">Movimiento del Periodo</h3>
+      {/* Stats — mobile horiz scroll, desktop grid 4-col */}
+      <section className="mt-5 lg:mt-6">
+        <div className="px-5 lg:px-8 mb-2 flex items-center justify-between">
+          <h3 className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite">Movimiento del Periodo</h3>
         </div>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar px-5 pb-1">
-          <MetricCard
-            label="Ingresos"
-            value={Object.entries(p.monthlyIncomeByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyIncomeByCurrency)[0][1], Object.entries(p.monthlyIncomeByCurrency)[0][0]) : p.formatCurrency(0)}
-            sublabel={Object.keys(p.monthlyIncomeByCurrency).length > 1 ? `+${Object.keys(p.monthlyIncomeByCurrency).length - 1} monedas` : undefined}
-            tone="income"
-            onClick={() => p.onSummaryClick('INCOME')}
-          />
-          <MetricCard
-            label="Gastos"
-            value={Object.entries(p.monthlyExpenseByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyExpenseByCurrency)[0][1], Object.entries(p.monthlyExpenseByCurrency)[0][0]) : p.formatCurrency(0)}
-            sublabel={Object.keys(p.monthlyExpenseByCurrency).length > 1 ? `+${Object.keys(p.monthlyExpenseByCurrency).length - 1} monedas` : undefined}
-            tone="expense"
-            onClick={() => p.onSummaryClick('EXPENSE')}
-          />
-          <MetricCard
-            label="Subs"
-            value={String(p.activeSubsCount)}
-            sublabel="activas"
-            tone="gold"
-            onClick={() => p.onSummaryClick('SUBS')}
-          />
-          <MetricCard
-            label="Total"
-            value={p.formatCurrency(primaryAmount, primaryCurrency)}
-            sublabel="balance"
-            onClick={() => p.onSummaryClick('BALANCE')}
-          />
+        <div className="flex gap-3 overflow-x-auto no-scrollbar px-5 lg:hidden pb-1">
+          <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
+        </div>
+        <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4 lg:px-8">
+          <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
         </div>
       </section>
 
-      {/* Próximas renovaciones */}
-      {upcoming.length > 0 && (
-        <ListSection
-          title="Próximas Renovaciones"
-          trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite" onClick={() => p.onSummaryClick('SUBS')}>Ver todas</button>}
-        >
-          {upcoming.map((s) => {
-            const days = Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000);
-            return (
-              <ListRow
-                key={s.id}
-                leading={<IconCircle tone="gold"><Icons.Subscription className="w-4 h-4" /></IconCircle>}
-                title={s.name}
-                subtitle={days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días · ${p.formatDateTime(s.nextRenewal).split(' ')[0]}`}
-                trailing={
-                  <div>
-                    <div className="text-sm font-display font-bold text-onyx tabular">{p.formatCurrency(s.amount, s.currency)}</div>
-                    {s.cardLastFour && <div className="text-[10px] text-graphite font-mono">•••• {s.cardLastFour}</div>}
-                  </div>
-                }
-                onClick={() => p.onSubscriptionClick(s)}
-                chevron={false}
-              />
-            );
-          })}
-        </ListSection>
-      )}
+      {/* Desktop: 2-column layout for upcoming + recent activity */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8 lg:mt-6">
+        {/* Próximas renovaciones */}
+        {upcoming.length > 0 && (
+          <div className="lg:col-span-1">
+            <ListSection
+              title="Próximas Renovaciones"
+              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" onClick={() => p.onSummaryClick('SUBS')}>Ver todas</button>}
+            >
+              {upcoming.map((s) => {
+                const days = Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000);
+                return (
+                  <ListRow
+                    key={s.id}
+                    leading={<IconCircle tone="gold"><Icons.Subscription className="w-4 h-4" /></IconCircle>}
+                    title={s.name}
+                    subtitle={days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días · ${p.formatDateTime(s.nextRenewal).split(' ')[0]}`}
+                    trailing={
+                      <div>
+                        <div className="text-sm font-display font-bold text-onyx tabular">{p.formatCurrency(s.amount, s.currency)}</div>
+                        {s.cardLastFour && <div className="text-[10px] text-graphite font-mono">•••• {s.cardLastFour}</div>}
+                      </div>
+                    }
+                    onClick={() => p.onSubscriptionClick(s)}
+                    chevron={false}
+                  />
+                );
+              })}
+            </ListSection>
+          </div>
+        )}
 
-      {/* Charts */}
-      <section className="px-3 mt-2 space-y-4">
-        <div className="bg-white border border-black/5 rounded-2xl p-4 overflow-hidden">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Ingresos vs Gastos</div>
+        {/* Actividad reciente */}
+        {recent.length > 0 && (
+          <div className={upcoming.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
+            <ListSection
+              title="Actividad Reciente"
+              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" onClick={() => p.onSummaryClick('ALL')}>Ver libro</button>}
+            >
+              {recent.map((tx) => {
+                const cat = tx.categoryId ? p.state.categories.find((c) => c.id === tx.categoryId) : null;
+                const sign = tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : '';
+                const tone = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
+                const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
+                return (
+                  <ListRow
+                    key={tx.id}
+                    leading={<IconCircle tone={tone as any} bgColor={cat?.color}><Icon className="w-4 h-4" /></IconCircle>}
+                    title={tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}
+                    subtitle={`${p.formatDateTime(tx.date).split(',')[0]}${cat ? ` · ${cat.name}` : ''}`}
+                    trailing={
+                      <span className={`text-sm font-display font-bold tabular ${tx.type === 'INCOME' ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : 'text-onyx'}`}>
+                        {sign}{p.formatCurrency(tx.amount, tx.currency)}
+                      </span>
+                    }
+                    onClick={() => p.onTransactionClick(tx)}
+                    chevron={false}
+                  />
+                );
+              })}
+            </ListSection>
+          </div>
+        )}
+      </div>
+
+      {/* Charts: 2-col grid on desktop */}
+      <section className="px-3 lg:px-8 mt-2 lg:mt-2 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden">
+          <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Ingresos vs Gastos</div>
           <IncomeVsExpenseChart transactions={p.dashboardFilteredTransactions} currency={p.currencyCode} />
         </div>
-        <div className="bg-white border border-black/5 rounded-2xl p-4 overflow-hidden">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Desglose por Categoría</div>
+        <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden">
+          <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Desglose por Categoría</div>
           <ExpenseBreakdown transactions={p.dashboardFilteredTransactions} categories={p.state.categories} currency={p.currencyCode} />
         </div>
-        <div className="bg-white border border-black/5 rounded-2xl p-4 overflow-hidden">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Cash Flow</div>
+        <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden lg:col-span-2">
+          <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Cash Flow</div>
           <CashFlowChart
             transactions={p.dashboardFilteredTransactions}
             categories={p.state.categories}
@@ -198,41 +212,11 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
             expenseTotal={p.dashboardExpense}
           />
         </div>
-        <div className="bg-white border border-black/5 rounded-2xl p-4 overflow-hidden">
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Calendario Financiero</div>
+        <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden lg:col-span-2">
+          <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Calendario Financiero</div>
           <FinancialCalendar transactions={p.filteredTransactions} subscriptions={p.state.subscriptions} currency={p.currencyCode} />
         </div>
       </section>
-
-      {/* Actividad reciente */}
-      {recent.length > 0 && (
-        <ListSection
-          title="Actividad Reciente"
-          trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite" onClick={() => p.onSummaryClick('ALL')}>Ver libro</button>}
-        >
-          {recent.map((tx) => {
-            const cat = tx.categoryId ? p.state.categories.find((c) => c.id === tx.categoryId) : null;
-            const sign = tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : '';
-            const tone = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
-            const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
-            return (
-              <ListRow
-                key={tx.id}
-                leading={<IconCircle tone={tone as any} bgColor={cat?.color}><Icon className="w-4 h-4" /></IconCircle>}
-                title={tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}
-                subtitle={`${p.formatDateTime(tx.date).split(',')[0]}${cat ? ` · ${cat.name}` : ''}`}
-                trailing={
-                  <span className={`text-sm font-display font-bold tabular ${tx.type === 'INCOME' ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : 'text-onyx'}`}>
-                    {sign}{p.formatCurrency(tx.amount, tx.currency)}
-                  </span>
-                }
-                onClick={() => p.onTransactionClick(tx)}
-                chevron={false}
-              />
-            );
-          })}
-        </ListSection>
-      )}
 
       {/* Date filter sheet */}
       <BottomSheet open={showFilter} onClose={() => setShowFilter(false)} title="Rango de Fecha" subtitle="Filtrar Periodo">
@@ -272,6 +256,39 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
     </div>
   );
 };
+
+// Inner component: the 4 metric cards (used twice — mobile horiz scroll + desktop grid)
+const DashboardStatsMobile: React.FC<{ p: DashboardProps; primaryAmount: number; primaryCurrency: string }> = ({ p, primaryAmount, primaryCurrency }) => (
+  <>
+    <MetricCard
+      label="Ingresos"
+      value={Object.entries(p.monthlyIncomeByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyIncomeByCurrency)[0][1], Object.entries(p.monthlyIncomeByCurrency)[0][0]) : p.formatCurrency(0)}
+      sublabel={Object.keys(p.monthlyIncomeByCurrency).length > 1 ? `+${Object.keys(p.monthlyIncomeByCurrency).length - 1} monedas` : undefined}
+      tone="income"
+      onClick={() => p.onSummaryClick('INCOME')}
+    />
+    <MetricCard
+      label="Gastos"
+      value={Object.entries(p.monthlyExpenseByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyExpenseByCurrency)[0][1], Object.entries(p.monthlyExpenseByCurrency)[0][0]) : p.formatCurrency(0)}
+      sublabel={Object.keys(p.monthlyExpenseByCurrency).length > 1 ? `+${Object.keys(p.monthlyExpenseByCurrency).length - 1} monedas` : undefined}
+      tone="expense"
+      onClick={() => p.onSummaryClick('EXPENSE')}
+    />
+    <MetricCard
+      label="Subs"
+      value={String(p.activeSubsCount)}
+      sublabel="activas"
+      tone="gold"
+      onClick={() => p.onSummaryClick('SUBS')}
+    />
+    <MetricCard
+      label="Total"
+      value={p.formatCurrency(primaryAmount, primaryCurrency)}
+      sublabel="balance"
+      onClick={() => p.onSummaryClick('BALANCE')}
+    />
+  </>
+);
 
 // ─── CONTEXT SWITCHER ───────────────────────────────────────────────────
 export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: string; onChange: (id: string) => void; dark?: boolean }> = ({ contexts, value, onChange, dark }) => {
@@ -351,7 +368,7 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
   }
 
   return (
-    <div className="pb-tabbar wv-stagger">
+    <div className="pb-tabbar lg:px-8 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
       {contexts.map((ctx) => {
         const incomeAcc = ctx.accounts.find((a) => a.type === 'INCOME');
         const total = ctx.accounts.reduce((sum, a) => {
@@ -359,23 +376,23 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
           return sum + (e[0]?.amount || 0);
         }, 0);
         return (
-          <section key={ctx.id} className="mb-6">
-            <div className="px-5 mb-2 flex items-center justify-between">
+          <section key={ctx.id} className="mb-6 lg:mb-0">
+            <div className="px-5 lg:px-0 mb-2 flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">{ctx.type === 'PERSONAL' ? 'Personal' : 'Negocio'}</div>
-                <div className="text-base font-display font-bold text-onyx">{ctx.name}</div>
+                <div className="text-base lg:text-lg font-display font-bold text-onyx">{ctx.name}</div>
               </div>
               {incomeAcc && balanceEntries(incomeAcc.balances).some((e) => e.amount > 0) && (
                 <button
                   onClick={() => { haptic('medium'); onDistributeIncome(ctx.id, balanceEntries(incomeAcc.balances)[0]?.currency || 'USD'); }}
-                  className="flex items-center gap-1.5 h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 transition-transform"
+                  className="flex items-center gap-1.5 h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-all"
                 >
                   <Icons.Zap className="w-3.5 h-3.5 text-gold" />
                   Distribuir
                 </button>
               )}
             </div>
-            <div className="bg-white mx-3 border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+            <div className="bg-white mx-3 lg:mx-0 border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
               {ctx.accounts.map((acc) => {
                 const entries = balanceEntries(acc.balances);
                 const primary = entries[0];
@@ -455,7 +472,7 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                 );
               })}
             </div>
-            <div className="px-5 mt-2 flex items-center justify-between">
+            <div className="px-5 lg:px-0 mt-2 flex items-center justify-between">
               <span className="text-[9px] uppercase tracking-widest text-graphite">Total Asignado</span>
               <span className="text-[10px] font-display font-bold text-onyx tabular">{formatCurrency(total)}</span>
             </div>
@@ -502,17 +519,18 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
 
   return (
     <div className="pb-tabbar">
-      <div className="px-5 pt-1 pb-3">
-        <div className="relative mb-3">
+      <div className="px-5 lg:px-8 pt-1 pb-3">
+        <div className="relative mb-3 lg:max-w-xl">
           <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-graphite" />
           <input
             type="text"
             placeholder="Buscar transacciones..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-11 pl-9 pr-4 bg-white border border-black/5 rounded-full text-sm placeholder:text-graphite/60"
+            className="w-full h-11 pl-9 pr-4 bg-white border border-black/5 rounded-full text-sm placeholder:text-graphite/60 focus:border-onyx focus:outline-none transition-colors"
           />
         </div>
+        <div className="lg:max-w-xl">
         <Segmented
           options={[
             { id: 'ALL', label: 'Todas' },
@@ -523,6 +541,7 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
           activeId={transactionTypeFilter}
           onChange={(id) => setTransactionTypeFilter(id as any)}
         />
+        </div>
         <div className="flex items-center justify-between mt-3">
           <span className="text-[10px] font-bold uppercase tracking-widest text-graphite">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
           <button
@@ -548,7 +567,7 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
       {filtered.length === 0 ? (
         <EmptyState icon={Icons.Receipt} title="Sin transacciones" description="Cuando registres movimientos los verás aquí." />
       ) : (
-        <div className="px-3 mt-2 space-y-4 wv-stagger">
+        <div className="px-3 lg:px-8 mt-2 space-y-4">
           {grouped.map(([day, txs]) => {
             const date = new Date(day);
             const today = new Date(); today.setHours(0,0,0,0);
@@ -655,23 +674,47 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
   }, [list]);
 
   return (
-    <div className="pb-tabbar wv-stagger">
-      <section className="px-5 pt-2 mb-4">
-        <div className="bg-white border border-black/5 rounded-2xl p-4 relative overflow-hidden">
+    <div className="pb-tabbar">
+      <section className="px-5 lg:px-8 pt-2 mb-4 grid grid-cols-1 lg:grid-cols-3 lg:gap-4">
+        <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 relative overflow-hidden lg:col-span-2">
           <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
-          <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite mb-2">Coste Mensual Estimado</div>
+          <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.2em] text-graphite mb-2">Coste Mensual Estimado</div>
           {Object.entries(monthlyTotalByCurrency).length === 0 ? (
-            <div className="text-2xl font-display font-bold text-onyx tabular">{formatCurrency(0)}</div>
+            <div className="text-2xl lg:text-4xl font-display font-bold text-onyx tabular">{formatCurrency(0)}</div>
           ) : (
             Object.entries(monthlyTotalByCurrency).map(([cur, amt]) => (
-              <div key={cur} className="text-2xl font-display font-bold text-onyx tabular">{formatCurrency(amt, cur)}</div>
+              <div key={cur} className="text-2xl lg:text-4xl font-display font-bold text-onyx tabular">{formatCurrency(amt, cur)}</div>
             ))
           )}
-          <div className="text-[10px] text-graphite mt-1">{list.filter((s) => s.active).length} activas · {list.filter((s) => !s.active).length} pausadas</div>
+          <div className="text-[10px] lg:text-xs text-graphite mt-1">{list.filter((s) => s.active).length} activas · {list.filter((s) => !s.active).length} pausadas</div>
+        </div>
+        <div className="hidden lg:flex bg-white border border-black/5 rounded-2xl p-6 flex-col justify-between">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-graphite mb-2">Próximo cobro</div>
+            {list[0] ? (
+              <>
+                <div className="text-base font-display font-bold text-onyx truncate">{list[0].name}</div>
+                <div className="text-2xl font-display font-bold text-onyx tabular mt-1">{formatCurrency(list[0].amount, list[0].currency)}</div>
+                {list[0].nextRenewal && (
+                  <div className="text-xs text-graphite mt-1">
+                    {(() => {
+                      const d = Math.ceil((new Date(list[0].nextRenewal).getTime() - Date.now()) / 86_400_000);
+                      return d <= 0 ? 'Hoy' : d === 1 ? 'Mañana' : `En ${d} días`;
+                    })()}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-sm text-graphite">Sin suscripciones</div>
+            )}
+          </div>
+          <button onClick={onAddSub} className="mt-4 h-10 px-4 bg-onyx text-white rounded-xl text-[10px] font-display font-bold uppercase tracking-widest hover:bg-graphite transition-colors active:scale-[0.98]">
+            + Nueva
+          </button>
         </div>
       </section>
 
-      <div className="px-5 mb-3">
+      <div className="px-5 lg:px-8 mb-3 lg:mb-4 max-w-[480px] lg:max-w-none">
         <Segmented
           options={[
             { id: 'ALL', label: 'Todas' },
@@ -686,7 +729,7 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
       {list.length === 0 ? (
         <EmptyState icon={Icons.Subscription} title="Sin suscripciones" description="Añade suscripciones para no perder ningún cobro." action={{ label: 'Añadir', onClick: onAddSub }} />
       ) : (
-        <div className="px-3 space-y-3">
+        <div className="px-3 lg:px-8 space-y-3 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
           {list.map((s) => {
             const ctx = state.contexts.find((c) => c.id === s.contextId);
             const days = s.nextRenewal ? Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
@@ -768,7 +811,7 @@ export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, for
   };
 
   return (
-    <div className="pb-tabbar wv-stagger px-3 space-y-3 mt-2">
+    <div className="pb-tabbar px-3 lg:px-8 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 mt-2">
       {list.map((c) => {
         const ctx = state.contexts.find((x) => x.id === c.contextId);
         const total = totalByCategory(c.id);
@@ -884,12 +927,12 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
   };
 
   return (
-    <div className="pb-tabbar wv-stagger">
+    <div className="pb-tabbar lg:px-8">
       {/* Profile card */}
-      <section className="px-5 pt-2">
-        <div className="bg-white border border-black/5 rounded-3xl p-5 flex items-center gap-4">
+      <section className="px-5 lg:px-0 pt-2">
+        <div className="bg-white border border-black/5 rounded-3xl p-5 lg:p-6 flex items-center gap-4">
           <div className="relative">
-            <div className="w-16 h-16 bg-onyx rounded-2xl flex items-center justify-center text-white font-display font-bold text-xl overflow-hidden">
+            <div className="w-16 h-16 lg:w-20 lg:h-20 bg-onyx rounded-2xl flex items-center justify-center text-white font-display font-bold text-xl lg:text-2xl overflow-hidden">
               {p.state.user.avatarUrl ? <img src={p.state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : p.state.user.name.charAt(0)}
             </div>
             <button
@@ -922,34 +965,40 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
         </div>
       </section>
 
-      <ListSection title="Cuenta">
-        <ListRow leading={<IconCircle><Icons.Personal className="w-4 h-4" /></IconCircle>} title="Perfil" subtitle="Nombre, email, foto" onClick={() => setSection('profile')} />
-        <ListRow leading={<IconCircle><Icons.Dollar className="w-4 h-4" /></IconCircle>} title="Divisa principal" subtitle={p.state.user.currency} onClick={() => setSection('currency')} />
-        <ListRow leading={<IconCircle><Icons.Globe className="w-4 h-4" /></IconCircle>} title="Zona horaria" subtitle={p.state.user.timezone} onClick={() => setSection('timezone')} />
-      </ListSection>
+      <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:mt-6">
+        <div>
+          <ListSection title="Cuenta">
+            <ListRow leading={<IconCircle><Icons.Personal className="w-4 h-4" /></IconCircle>} title="Perfil" subtitle="Nombre, email, foto" onClick={() => setSection('profile')} />
+            <ListRow leading={<IconCircle><Icons.Dollar className="w-4 h-4" /></IconCircle>} title="Divisa principal" subtitle={p.state.user.currency} onClick={() => setSection('currency')} />
+            <ListRow leading={<IconCircle><Icons.Globe className="w-4 h-4" /></IconCircle>} title="Zona horaria" subtitle={p.state.user.timezone} onClick={() => setSection('timezone')} />
+          </ListSection>
 
-      <ListSection title="Notificaciones">
-        <ListRow
-          leading={<IconCircle tone={pushSubscribed ? 'gold' : 'default'}>{pushSubscribed ? <Icons.BellRing className="w-4 h-4" /> : <Icons.Bell className="w-4 h-4" />}</IconCircle>}
-          title="Push notifications"
-          subtitle={
-            pushState === 'unsupported' ? 'No soportado en este dispositivo' :
-            pushState === 'denied' ? 'Bloqueadas — habilítalas en ajustes del navegador' :
-            pushSubscribed ? 'Activadas en este dispositivo' : 'Recibe avisos de renovaciones, presupuestos y pagos'
-          }
-          onClick={() => setSection('notifications')}
-        />
-      </ListSection>
+          <ListSection title="Notificaciones">
+            <ListRow
+              leading={<IconCircle tone={pushSubscribed ? 'gold' : 'default'}>{pushSubscribed ? <Icons.BellRing className="w-4 h-4" /> : <Icons.Bell className="w-4 h-4" />}</IconCircle>}
+              title="Push notifications"
+              subtitle={
+                pushState === 'unsupported' ? 'No soportado en este dispositivo' :
+                pushState === 'denied' ? 'Bloqueadas — habilítalas en ajustes del navegador' :
+                pushSubscribed ? 'Activadas en este dispositivo' : 'Recibe avisos de renovaciones, presupuestos y pagos'
+              }
+              onClick={() => setSection('notifications')}
+            />
+          </ListSection>
+        </div>
 
-      <ListSection title="Configuración Avanzada">
-        <ListRow leading={<IconCircle tone="gold"><Icons.Chart className="w-4 h-4" /></IconCircle>} title="Distribución (Profit First)" subtitle={`${p.state.contexts.length} ${p.state.contexts.length === 1 ? 'espacio' : 'espacios'}`} onClick={() => setSection('distribution')} />
-        <ListRow leading={<IconCircle><Icons.Building className="w-4 h-4" /></IconCircle>} title="Iniciar Nuevo Negocio" subtitle="Crear espacio Profit First" onClick={p.onNewBusiness} />
-        <ListRow leading={<IconCircle><Icons.Lock className="w-4 h-4" /></IconCircle>} title="Cambiar contraseña" onClick={() => setSection('security')} />
-      </ListSection>
+        <div>
+          <ListSection title="Configuración Avanzada">
+            <ListRow leading={<IconCircle tone="gold"><Icons.Chart className="w-4 h-4" /></IconCircle>} title="Distribución (Profit First)" subtitle={`${p.state.contexts.length} ${p.state.contexts.length === 1 ? 'espacio' : 'espacios'}`} onClick={() => setSection('distribution')} />
+            <ListRow leading={<IconCircle><Icons.Building className="w-4 h-4" /></IconCircle>} title="Iniciar Nuevo Negocio" subtitle="Crear espacio Profit First" onClick={p.onNewBusiness} />
+            <ListRow leading={<IconCircle><Icons.Lock className="w-4 h-4" /></IconCircle>} title="Cambiar contraseña" onClick={() => setSection('security')} />
+          </ListSection>
 
-      <ListSection>
-        <ListRow leading={<IconCircle tone="expense"><Icons.LogOut className="w-4 h-4" /></IconCircle>} title="Cerrar sesión" danger onClick={p.onSignOut} chevron={false} />
-      </ListSection>
+          <ListSection>
+            <ListRow leading={<IconCircle tone="expense"><Icons.LogOut className="w-4 h-4" /></IconCircle>} title="Cerrar sesión" danger onClick={p.onSignOut} chevron={false} />
+          </ListSection>
+        </div>
+      </div>
 
       <div className="text-center mt-6 mb-4">
         <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-graphite">WhiteVault™</div>

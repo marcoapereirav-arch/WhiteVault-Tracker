@@ -23,11 +23,9 @@ export const MobileShell: React.FC<{ children: ReactNode; sidebar?: ReactNode; c
     <div className={`min-h-[100dvh] bg-stone text-onyx ${className}`}>
       <div className="lg:flex lg:items-stretch lg:min-h-[100dvh]">
         {sidebar}
-        <div className="mx-auto lg:mx-auto max-w-[480px] lg:max-w-[720px] w-full min-h-[100dvh] bg-stone relative lg:border-x lg:border-black/5">
+        <div className="mx-auto max-w-[480px] lg:max-w-none lg:flex-1 w-full min-h-[100dvh] bg-stone relative">
           {children}
         </div>
-        {/* Desktop right rail (decorative) */}
-        <div className="hidden lg:block lg:flex-1 lg:max-w-[260px]" />
       </div>
     </div>
   );
@@ -47,26 +45,26 @@ export const MobileHeader: React.FC<HeaderProps> = ({ title, subtitle, leading, 
     <header
       className={`sticky top-0 z-30 ${transparent ? 'bg-transparent' : 'bg-stone/80 backdrop-blur-xl'} ${transparent ? '' : 'border-b border-black/5'} pt-[env(safe-area-inset-top)]`}
     >
-      <div className={`flex items-center justify-between px-5 ${large ? 'py-3' : 'py-3.5'}`}>
+      <div className={`flex items-center justify-between px-5 lg:px-8 ${large ? 'py-3 lg:py-5' : 'py-3.5 lg:py-4'} lg:max-w-[1200px] lg:mx-auto lg:w-full`}>
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {leading && <div className="flex-shrink-0">{leading}</div>}
           {!large && (
             <div className="min-w-0">
               {subtitle && (
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">{subtitle}</div>
+                <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.2em] text-graphite">{subtitle}</div>
               )}
-              {title && <h1 className="text-base font-display font-bold text-onyx truncate">{title}</h1>}
+              {title && <h1 className="text-base lg:text-xl font-display font-bold text-onyx truncate">{title}</h1>}
             </div>
           )}
         </div>
         {trailing && <div className="flex-shrink-0 flex items-center gap-2">{trailing}</div>}
       </div>
       {large && (title || subtitle) && (
-        <div className="px-5 pb-4">
+        <div className="px-5 lg:px-8 pb-4 lg:pb-6 lg:max-w-[1200px] lg:mx-auto lg:w-full">
           {subtitle && (
-            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-1.5">{subtitle}</div>
+            <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-gold mb-1.5">{subtitle}</div>
           )}
-          {title && <h1 className="text-3xl font-display font-bold text-onyx tracking-tight">{title}</h1>}
+          {title && <h1 className="text-3xl lg:text-4xl font-display font-bold text-onyx tracking-tight">{title}</h1>}
         </div>
       )}
     </header>
@@ -442,12 +440,12 @@ export const Segmented: React.FC<{ options: { id: string; label: string }[]; act
 export const ListSection: React.FC<{ title?: string; trailing?: ReactNode; children: ReactNode }> = ({ title, trailing, children }) => (
   <section className="mb-6">
     {(title || trailing) && (
-      <div className="flex items-center justify-between px-5 mb-2">
-        {title && <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite">{title}</h3>}
+      <div className="flex items-center justify-between px-5 lg:px-1 mb-2">
+        {title && <h3 className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite">{title}</h3>}
         {trailing}
       </div>
     )}
-    <div className="bg-white mx-3 border border-black/5 overflow-hidden rounded-2xl">{children}</div>
+    <div className="bg-white mx-3 lg:mx-0 border border-black/5 overflow-hidden rounded-2xl">{children}</div>
   </section>
 );
 

@@ -1107,7 +1107,7 @@ function App() {
           </div>
         )}
 
-        <main className="overflow-x-hidden">
+        <main className="overflow-x-hidden lg:max-w-[1200px] lg:mx-auto lg:w-full lg:px-2">
           {currentView === 'DASHBOARD' && (
             <MobileDashboard
               state={state}
