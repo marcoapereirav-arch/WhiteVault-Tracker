@@ -2,7 +2,7 @@
 // Shared UI building blocks tuned for native-app feel: bottom tab bar,
 // bottom sheets, FAB, toast, safe-area shell, headers, gestures.
 
-import React, { useEffect, useRef, useState, useCallback, ReactNode } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, ReactNode } from 'react';
 import { Icons } from './Icons';
 
 // ─── HAPTICS ────────────────────────────────────────────────────────────

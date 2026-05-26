@@ -427,18 +427,18 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                 {type === 'EXPENSE' && !initialData && activeSubscriptions.length > 0 && (
                     <div className="mb-5">
                         <label className="block text-[10px] font-bold uppercase tracking-widest text-gold mb-2">Pagar Suscripción <span className="text-graphite">(opcional)</span></label>
-                        <button
-                            type="button"
-                            onClick={() => setSubPickerOpen(true)}
-                            className={`w-full h-14 px-4 rounded-2xl flex items-center justify-between gap-3 text-left transition-all active:scale-[0.99] ${linkedSub ? 'bg-onyx text-white border border-onyx' : 'bg-gold/10 border border-gold/30 hover:border-gold'}`}
-                        >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`w-full rounded-2xl flex items-stretch gap-2 transition-all ${linkedSub ? 'bg-onyx text-white border border-onyx' : 'bg-gold/10 border border-gold/30'}`}>
+                            <button
+                                type="button"
+                                onClick={() => setSubPickerOpen(true)}
+                                className="flex-1 min-w-0 h-14 px-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+                            >
                                 <IconCircle tone="gold" size="sm"><Icons.Subscription className="w-3.5 h-3.5" /></IconCircle>
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     {linkedSub ? (
                                         <>
                                             <div className="text-sm font-display font-bold truncate">{linkedSub.name}</div>
-                                            <div className="text-[11px] text-gold font-mono tabular">{formatMoney(linkedSub.amount, linkedSub.currency)} · al guardar se avanzará el ciclo</div>
+                                            <div className="text-[11px] text-gold font-mono tabular truncate">{formatMoney(linkedSub.amount, linkedSub.currency)} · avanzará al guardar</div>
                                         </>
                                     ) : (
                                         <>
@@ -447,19 +447,19 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                                         </>
                                     )}
                                 </div>
-                            </div>
-                            {linkedSub ? (
-                                <span
-                                    role="button"
-                                    onClick={(e) => { e.stopPropagation(); setLinkedSubscriptionId(''); }}
-                                    className="text-[10px] font-bold uppercase tracking-widest text-rose-300 hover:text-rose-200 px-2"
+                                {!linkedSub && <Icons.ChevronRight className="w-4 h-4 text-graphite flex-shrink-0" />}
+                            </button>
+                            {linkedSub && (
+                                <button
+                                    type="button"
+                                    onClick={() => setLinkedSubscriptionId('')}
+                                    className="h-14 px-4 text-[10px] font-bold uppercase tracking-widest text-rose-300 hover:text-rose-200 active:scale-95 transition-transform"
+                                    aria-label="Quitar suscripción"
                                 >
                                     Quitar
-                                </span>
-                            ) : (
-                                <Icons.ChevronRight className="w-4 h-4 text-graphite flex-shrink-0" />
+                                </button>
                             )}
-                        </button>
+                        </div>
                     </div>
                 )}
 
