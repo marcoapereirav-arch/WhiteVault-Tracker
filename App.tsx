@@ -843,38 +843,61 @@ function App() {
   };
 
   const handleDeleteTransaction = (txId: string) => {
-      const tx = state.transactions.find(t => t.id === txId);
-      if (!tx || tx.deletedAt) return;
-
-      // Reverse balance, soft-mark as deleted, log audit
-      const reverted = applyTxEffect(state.contexts, tx, -1);
       const deletedAt = new Date().toISOString();
-      setState(prev => ({
-          ...prev,
-          transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt } : t),
-          contexts: reverted,
-      }));
-      logAudit(txId, 'DELETE', tx, { ...tx, deletedAt });
+      let txSnapshot: Transaction | undefined;
+      setState(prev => {
+          const tx = prev.transactions.find(t => t.id === txId);
+          if (!tx || tx.deletedAt) return prev;
+          txSnapshot = tx;
+          return {
+              ...prev,
+              transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt } : t),
+              contexts: applyTxEffect(prev.contexts, tx, -1),
+          };
+      });
+      if (txSnapshot) logAudit(txId, 'DELETE', txSnapshot, { ...txSnapshot, deletedAt });
   };
 
   const handleRestoreTransaction = (txId: string) => {
-      const tx = state.transactions.find(t => t.id === txId);
-      if (!tx || !tx.deletedAt) return;
-
-      // Re-apply balance, clear deletedAt, log audit
-      const reapplied = applyTxEffect(state.contexts, tx, 1);
-      const before = { ...tx };
-      const after = { ...tx, deletedAt: null };
-      setState(prev => ({
-          ...prev,
-          transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt: null } : t),
-          contexts: reapplied,
-      }));
-      logAudit(txId, 'RESTORE', before, after);
+      let before: Transaction | undefined;
+      setState(prev => {
+          const tx = prev.transactions.find(t => t.id === txId);
+          if (!tx || !tx.deletedAt) return prev;
+          before = tx;
+          return {
+              ...prev,
+              transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt: null } : t),
+              contexts: applyTxEffect(prev.contexts, tx, 1),
+          };
+      });
+      if (before) logAudit(txId, 'RESTORE', before, { ...before, deletedAt: null });
   };
 
+  // Bulk delete — accumulates all reversals against the SAME prev state to
+  // avoid the closure race where serial setState calls overwrote each other's
+  // context updates (resulting in only the last reversal being applied).
   const handleBulkDeleteTransactions = (txIds: Set<string>) => {
-      txIds.forEach(id => handleDeleteTransaction(id));
+      const deletedAt = new Date().toISOString();
+      setState(prev => {
+          let contexts = prev.contexts;
+          const toDeleteList: Transaction[] = [];
+          for (const id of txIds) {
+              const tx = prev.transactions.find(t => t.id === id);
+              if (!tx || tx.deletedAt) continue;
+              contexts = applyTxEffect(contexts, tx, -1);
+              toDeleteList.push(tx);
+          }
+          return {
+              ...prev,
+              transactions: prev.transactions.map(t => txIds.has(t.id) && !t.deletedAt ? { ...t, deletedAt } : t),
+              contexts,
+          };
+      });
+      // Fire-and-forget audit entries
+      txIds.forEach(id => {
+          const tx = state.transactions.find(t => t.id === id);
+          if (tx && !tx.deletedAt) logAudit(id, 'DELETE', tx, { ...tx, deletedAt });
+      });
       setBulkSelectedTxIds(new Set());
       setIsBulkMode(false);
   };
