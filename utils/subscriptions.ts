@@ -41,3 +41,18 @@ export const reminderToMs = (value?: number, unit?: 'minutes' | 'hours' | 'days'
     case 'days':    return value * 24 * 60 * 60 * 1000;
   }
 };
+
+// Subscription is overdue when active + nextRenewal in the past.
+export const isSubscriptionOverdue = (sub: Subscription, now = Date.now()): boolean => {
+  if (!sub.active || !sub.nextRenewal) return false;
+  const t = new Date(sub.nextRenewal).getTime();
+  return !isNaN(t) && t < now;
+};
+
+// Days overdue (positive number) — useful for sorting & UI.
+export const daysOverdue = (sub: Subscription, now = Date.now()): number => {
+  if (!sub.nextRenewal) return 0;
+  const t = new Date(sub.nextRenewal).getTime();
+  if (isNaN(t)) return 0;
+  return Math.max(0, Math.floor((now - t) / 86_400_000));
+};

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
-import { BottomSheet } from './Mobile';
+import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic } from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
 
 // Compact money formatter for select options (no decimals if integer to save space).
@@ -339,6 +339,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const [comments, setComments] = useState(initialData?.comments || '');
     const [distribute, setDistribute] = useState(false);
     const [linkedSubscriptionId, setLinkedSubscriptionId] = useState<string>('');
+    const [subPickerOpen, setSubPickerOpen] = useState(false);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
@@ -387,103 +388,148 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
         onClose();
     };
 
+    // Subscription picker sheet state
+    const linkedSub = activeSubscriptions.find(s => s.id === linkedSubscriptionId);
+
+    // Helpers to build SelectField options
+    const accountOptions: SelectFieldOption[] = (activeContext?.accounts || []).map((a) => {
+        const bal = a.balances?.[currency] ?? 0;
+        const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
+        const projected = bal + delta;
+        return {
+            value: a.id,
+            label: a.name,
+            hint: amount ? `${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : formatMoney(bal, currency),
+        };
+    });
+    const subAccountOptions: SelectFieldOption[] = activeAccount ? [
+        { value: '', label: 'Ninguna', hint: '' },
+        ...activeAccount.subAccounts.map((s) => {
+            const bal = s.balances?.[currency] ?? 0;
+            const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
+            const projected = bal + delta;
+            return {
+                value: s.id,
+                label: s.name,
+                hint: amount ? `${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : formatMoney(bal, currency),
+            };
+        }),
+    ] : [];
+    const categoryOptions: SelectFieldOption[] = [
+        { value: '', label: type === 'INCOME' ? 'Sin categoría' : 'Seleccionar categoría' },
+        ...availableCategories.map((c) => ({ value: c.id, label: c.name, swatch: c.color })),
+    ];
+
     return (
         <Modal isOpen={true} onClose={onClose} title={initialData ? `Editar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}` : `Registrar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}>
             <form onSubmit={handleSubmit}>
                 {/* Subscription quick-pay (only for new EXPENSE, not edit) */}
                 {type === 'EXPENSE' && !initialData && activeSubscriptions.length > 0 && (
-                    <div className="mb-5 p-4 bg-gold/10 border border-gold/30 rounded-2xl">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-2">Pagar Suscripción</div>
-                        <p className="text-[11px] text-graphite mb-3">Selecciona una para rellenar los campos automáticamente. Al guardar, la fecha de cobro avanzará al siguiente ciclo.</p>
-                        <div className="flex flex-wrap gap-2">
-                            {activeSubscriptions.map((s) => {
-                                const selected = linkedSubscriptionId === s.id;
-                                return (
-                                    <button
-                                        key={s.id}
-                                        type="button"
-                                        onClick={() => applySubscription(s)}
-                                        className={`flex items-center gap-2 px-3 h-9 rounded-full border text-[11px] font-medium transition-all active:scale-95 ${selected ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
-                                    >
-                                        <span className="font-display font-bold">{s.name}</span>
-                                        <span className="font-mono tabular">{new Intl.NumberFormat('es-ES', { style: 'currency', currency: s.currency, maximumFractionDigits: 2 }).format(s.amount)}</span>
-                                    </button>
-                                );
-                            })}
-                            {linkedSubscriptionId && (
-                                <button
-                                    type="button"
-                                    onClick={() => { setLinkedSubscriptionId(''); }}
-                                    className="px-3 h-9 rounded-full border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-bold uppercase tracking-widest"
+                    <div className="mb-5">
+                        <label className="block text-[10px] font-bold uppercase tracking-widest text-gold mb-2">Pagar Suscripción <span className="text-graphite">(opcional)</span></label>
+                        <button
+                            type="button"
+                            onClick={() => setSubPickerOpen(true)}
+                            className={`w-full h-14 px-4 rounded-2xl flex items-center justify-between gap-3 text-left transition-all active:scale-[0.99] ${linkedSub ? 'bg-onyx text-white border border-onyx' : 'bg-gold/10 border border-gold/30 hover:border-gold'}`}
+                        >
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <IconCircle tone="gold" size="sm"><Icons.Subscription className="w-3.5 h-3.5" /></IconCircle>
+                                <div className="min-w-0">
+                                    {linkedSub ? (
+                                        <>
+                                            <div className="text-sm font-display font-bold truncate">{linkedSub.name}</div>
+                                            <div className="text-[11px] text-gold font-mono tabular">{formatMoney(linkedSub.amount, linkedSub.currency)} · al guardar se avanzará el ciclo</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="text-sm font-display font-bold text-onyx">Pagar una suscripción</div>
+                                            <div className="text-[11px] text-graphite">{activeSubscriptions.length} {activeSubscriptions.length === 1 ? 'activa' : 'activas'} en este espacio</div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            {linkedSub ? (
+                                <span
+                                    role="button"
+                                    onClick={(e) => { e.stopPropagation(); setLinkedSubscriptionId(''); }}
+                                    className="text-[10px] font-bold uppercase tracking-widest text-rose-300 hover:text-rose-200 px-2"
                                 >
                                     Quitar
-                                </button>
+                                </span>
+                            ) : (
+                                <Icons.ChevronRight className="w-4 h-4 text-graphite flex-shrink-0" />
                             )}
-                        </div>
+                        </button>
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
-                    <Select label="Espacio (Contexto)" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setCategoryId(''); setLinkedSubscriptionId(''); }}>
-                        {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </Select>
-                    <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
+                <div className="grid grid-cols-1 gap-0">
+                    <SelectField
+                        label="Espacio"
+                        value={contextId}
+                        options={state.contexts.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(v) => { setContextId(v); setCategoryId(''); setLinkedSubscriptionId(''); }}
+                    />
                 </div>
+
+                <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
 
                 <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                         <Input type="number" label="Monto" required min="0.01" max="999999999" step="0.01" value={amount} placeholder="0.00" onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
-                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
-                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                    </Select>
+                    <SelectField
+                        label="Moneda"
+                        value={currency}
+                        options={CURRENCIES.map((c) => ({ value: c.code, label: c.code, hint: c.symbol }))}
+                        onChange={setCurrency}
+                        searchable
+                    />
                 </div>
                 <Input type="text" label="Descripción" required maxLength={200} value={notes} placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
 
-                <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
-                    <option value="">Seleccionar Cuenta</option>
-                    {activeContext?.accounts.map(a => {
-                        const bal = a.balances?.[currency] ?? 0;
-                        const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
-                        const projected = bal + delta;
-                        const label = amount ? `${a.name} · ${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : `${a.name} · ${formatMoney(bal, currency)}`;
-                        return <option key={a.id} value={a.id}>{label}</option>;
-                    })}
-                </Select>
+                <SelectField
+                    label="Cuenta"
+                    placeholder="Seleccionar cuenta"
+                    value={accountId}
+                    options={accountOptions}
+                    onChange={(v) => { setAccountId(v); setSubAccountId(''); }}
+                    subtitle="Saldo actual → saldo tras la operación"
+                />
 
                 {activeAccount && activeAccount.subAccounts.length > 0 && (
-                    <Select label="Sub-Cuenta (Opcional)" value={subAccountId} onChange={(e: any) => setSubAccountId(e.target.value)}>
-                        <option value="">Ninguna</option>
-                        {activeAccount.subAccounts.map(s => {
-                            const bal = s.balances?.[currency] ?? 0;
-                            const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
-                            const projected = bal + delta;
-                            const label = amount ? `${s.name} · ${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : `${s.name} · ${formatMoney(bal, currency)}`;
-                            return <option key={s.id} value={s.id}>{label}</option>;
-                        })}
-                    </Select>
+                    <SelectField
+                        label="Sub-Cuenta (opcional)"
+                        value={subAccountId}
+                        options={subAccountOptions}
+                        onChange={setSubAccountId}
+                        subtitle="Saldo actual → saldo tras la operación"
+                    />
                 )}
 
                 {type === 'INCOME' && activeAccount?.type === 'INCOME' && (
-                    <div className="mb-6 p-4 bg-stone border border-black/5 flex items-start gap-3 group hover:border-alloy transition-colors">
-                        <input 
-                            type="checkbox" 
-                            id="distribute" 
-                            checked={distribute} 
+                    <div className="mb-5 p-4 bg-gold/10 border border-gold/30 rounded-2xl flex items-start gap-3">
+                        <input
+                            type="checkbox"
+                            id="distribute"
+                            checked={distribute}
                             onChange={(e) => setDistribute(e.target.checked)}
                             className="mt-1 accent-onyx w-4 h-4 cursor-pointer"
                         />
                         <label htmlFor="distribute" className="text-sm cursor-pointer">
-                            <span className="block font-bold text-onyx">Distribuir automáticamente</span>
-                            <span className="text-xs text-graphite">Repartir este ingreso en las cuentas según los porcentajes definidos (Profit First).</span>
+                            <span className="block font-display font-bold text-onyx">Distribuir automáticamente</span>
+                            <span className="text-xs text-graphite">Repartir este ingreso según los % definidos (Profit First).</span>
                         </label>
                     </div>
                 )}
 
-                <Select label={`Categoría${type === 'INCOME' ? ' (Opcional)' : ''}`} value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
-                    <option value="">Seleccionar Categoría</option>
-                    {availableCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
+                <SelectField
+                    label={`Categoría${type === 'INCOME' ? ' (opcional)' : ''}`}
+                    value={categoryId}
+                    options={categoryOptions}
+                    onChange={setCategoryId}
+                    placeholder="Sin categoría"
+                />
 
                 <div className="mb-5">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Notas (Opcional)</label>
@@ -497,10 +543,41 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                     />
                 </div>
 
-                <button type="submit" className={`w-full py-4 mt-4 font-display font-bold uppercase tracking-widest text-sm text-white transition-all hover:opacity-90 ${type === 'EXPENSE' ? 'bg-red-900' : 'bg-green-900'}`}>
+                <button type="submit" className={`w-full h-14 mt-4 font-display font-bold uppercase tracking-widest text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] rounded-xl ${type === 'EXPENSE' ? 'bg-rose-800' : 'bg-emerald-800'}`}>
                     {initialData ? 'Guardar Cambios' : `Confirmar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}
                 </button>
             </form>
+
+            {/* Subscription picker sheet */}
+            <BottomSheet open={subPickerOpen} onClose={() => setSubPickerOpen(false)} title="Pagar Suscripción" subtitle="Selecciona y rellena automáticamente" size={activeSubscriptions.length > 6 ? 'full' : 'auto'}>
+                <p className="text-[11px] text-graphite mb-3">
+                    Al guardar el gasto, la suscripción avanzará a su <strong className="text-onyx">siguiente fecha de cobro</strong> y se sumará al contador de pagos.
+                </p>
+                <div className="space-y-2">
+                    {activeSubscriptions.map((s) => {
+                        const isSelected = linkedSubscriptionId === s.id;
+                        const days = s.nextRenewal ? Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
+                        return (
+                            <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => { applySubscription(s); setSubPickerOpen(false); }}
+                                className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all active:scale-[0.99] text-left ${isSelected ? 'bg-onyx text-white' : 'bg-white border border-black/5 hover:border-onyx'}`}
+                            >
+                                <IconCircle tone="gold" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
+                                <div className="flex-1 min-w-0">
+                                    <div className={`text-sm font-display font-bold truncate ${isSelected ? 'text-white' : 'text-onyx'}`}>{s.name}</div>
+                                    <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-graphite' : 'text-graphite'}`}>
+                                        {s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}
+                                        {days !== null && ` · Próx. ${days <= 0 ? 'hoy' : days === 1 ? 'mañana' : `en ${days} días`}`}
+                                    </div>
+                                </div>
+                                <div className={`text-sm font-display font-bold tabular ${isSelected ? 'text-gold' : 'text-onyx'}`}>{formatMoney(s.amount, s.currency)}</div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </BottomSheet>
         </Modal>
     );
 };
@@ -540,53 +617,111 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     const getContext = (id: string) => state.contexts.find(c => c.id === id);
     const getAccount = (ctxId: string, accId: string) => getContext(ctxId)?.accounts.find(a => a.id === accId);
 
+    const accountOpts = (ctxId: string, amt: number, sign: 1 | -1): SelectFieldOption[] => {
+        const ctx = getContext(ctxId);
+        return (ctx?.accounts || []).map((a) => {
+            const bal = a.balances?.[currency] ?? 0;
+            const projected = bal + sign * amt;
+            return {
+                value: a.id,
+                label: a.name,
+                hint: amt ? `${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : formatMoney(bal, currency),
+            };
+        });
+    };
+    const subOpts = (ctxId: string, accId: string, amt: number, sign: 1 | -1): SelectFieldOption[] => {
+        const acc = getAccount(ctxId, accId);
+        if (!acc) return [{ value: '', label: 'Ninguna' }];
+        return [
+            { value: '', label: 'Ninguna' },
+            ...acc.subAccounts.map((s) => {
+                const bal = s.balances?.[currency] ?? 0;
+                const projected = bal + sign * amt;
+                return {
+                    value: s.id,
+                    label: s.name,
+                    hint: amt ? `${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : formatMoney(bal, currency),
+                };
+            }),
+        ];
+    };
+
     return (
         <Modal isOpen={true} onClose={onClose} title="Ejecutar Transferencia">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-1">
                 <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
                 <div className="grid grid-cols-3 gap-4">
                     <div className="col-span-2">
                         <Input type="number" label="Monto a Transferir" required min="0.01" max="999999999" step="0.01" value={amount} onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
-                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
-                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                    </Select>
+                    <SelectField
+                        label="Moneda"
+                        value={currency}
+                        options={CURRENCIES.map((c) => ({ value: c.code, label: c.code, hint: c.symbol }))}
+                        onChange={setCurrency}
+                        searchable
+                    />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-stone p-6 border border-black/5">
-                    <div>
-                        <h4 className="font-display font-bold text-red-900 mb-4 text-xs uppercase tracking-widest border-b border-red-900/20 pb-2">Origen (Sale)</h4>
-                        <Select label="Espacio" value={fromContext} onChange={(e: any) => setFromContext(e.target.value)}>
-                            {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </Select>
-                        <Select label="Cuenta" value={fromAccount} onChange={(e: any) => setFromAccount(e.target.value)}>
-                            <option value="">Seleccionar Cuenta</option>
-                            {getContext(fromContext)?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </Select>
-                         <Select label="Sub (Opcional)" value={fromSub} onChange={(e: any) => setFromSub(e.target.value)}>
-                            <option value="">Ninguna</option>
-                            {getAccount(fromContext, fromAccount)?.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </Select>
+                <div className="bg-stone/40 p-4 rounded-2xl border border-black/5">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-700 mb-3 flex items-center gap-2">
+                        <Icons.ArrowUp className="w-3 h-3" /> Origen (sale)
                     </div>
+                    <SelectField
+                        label="Espacio"
+                        value={fromContext}
+                        options={state.contexts.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(v) => { setFromContext(v); setFromAccount(''); setFromSub(''); }}
+                    />
+                    <SelectField
+                        label="Cuenta"
+                        placeholder="Seleccionar cuenta"
+                        value={fromAccount}
+                        options={accountOpts(fromContext, Number(amount || 0), -1)}
+                        onChange={(v) => { setFromAccount(v); setFromSub(''); }}
+                    />
+                    {getAccount(fromContext, fromAccount)?.subAccounts.length! > 0 && (
+                        <SelectField
+                            label="Sub-cuenta (opcional)"
+                            value={fromSub}
+                            options={subOpts(fromContext, fromAccount, Number(amount || 0), -1)}
+                            onChange={setFromSub}
+                        />
+                    )}
+                </div>
 
-                    <div>
-                        <h4 className="font-display font-bold text-green-900 mb-4 text-xs uppercase tracking-widest border-b border-green-900/20 pb-2">Destino (Entra)</h4>
-                        <Select label="Espacio" value={toContext} onChange={(e: any) => setToContext(e.target.value)}>
-                            {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </Select>
-                        <Select label="Cuenta" value={toAccount} onChange={(e: any) => setToAccount(e.target.value)}>
-                            <option value="">Seleccionar Cuenta</option>
-                            {getContext(toContext)?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </Select>
-                         <Select label="Sub (Opcional)" value={toSub} onChange={(e: any) => setToSub(e.target.value)}>
-                            <option value="">Ninguna</option>
-                            {getAccount(toContext, toAccount)?.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </Select>
+                <div className="bg-stone/40 p-4 rounded-2xl border border-black/5 mt-3">
+                    <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-emerald-700 mb-3 flex items-center gap-2">
+                        <Icons.ArrowDown className="w-3 h-3" /> Destino (entra)
                     </div>
+                    <SelectField
+                        label="Espacio"
+                        value={toContext}
+                        options={state.contexts.map((c) => ({ value: c.id, label: c.name }))}
+                        onChange={(v) => { setToContext(v); setToAccount(''); setToSub(''); }}
+                    />
+                    <SelectField
+                        label="Cuenta"
+                        placeholder="Seleccionar cuenta"
+                        value={toAccount}
+                        options={accountOpts(toContext, Number(amount || 0), 1)}
+                        onChange={(v) => { setToAccount(v); setToSub(''); }}
+                    />
+                    {getAccount(toContext, toAccount)?.subAccounts.length! > 0 && (
+                        <SelectField
+                            label="Sub-cuenta (opcional)"
+                            value={toSub}
+                            options={subOpts(toContext, toAccount, Number(amount || 0), 1)}
+                            onChange={setToSub}
+                        />
+                    )}
                 </div>
 
                 <Input type="text" label="Nota de Referencia" maxLength={200} value={notes} onChange={(e: any) => setNotes(e.target.value)} />
-                <button type="submit" className="w-full py-4 bg-onyx hover:bg-graphite text-white font-display font-bold uppercase tracking-widest text-sm transition-all">Ejecutar Transferencia</button>
+                <button type="submit" className="w-full h-14 bg-sky-700 hover:bg-sky-800 text-white font-display font-bold uppercase tracking-widest text-sm transition-all active:scale-[0.98] rounded-xl mt-3 flex items-center justify-center gap-2">
+                    <Icons.Transfer className="w-4 h-4" />
+                    Ejecutar Transferencia
+                </button>
             </form>
         </Modal>
     );
@@ -609,20 +744,28 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
         onClose();
     }
 
+    const parentCtx = state.contexts.find((c: any) => c.id === contextId);
+
     return (
         <Modal isOpen={true} onClose={onClose} title="Nueva Sub-Cuenta / Meta">
             <form onSubmit={handleSubmit}>
-                <Select label="Espacio" value={contextId} onChange={(e: any) => setContextId(e.target.value)}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-                <Select label="Cuenta Padre" value={accountId} onChange={(e: any) => setAccountId(e.target.value)}>
-                    <option value="">Seleccionar Padre</option>
-                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a:any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Espacio"
+                    value={contextId}
+                    options={state.contexts.map((c: any) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => { setContextId(v); setAccountId(''); }}
+                />
+                <SelectField
+                    label="Cuenta padre"
+                    placeholder="Seleccionar cuenta"
+                    value={accountId}
+                    options={(parentCtx?.accounts || []).map((a: any) => ({ value: a.id, label: a.name }))}
+                    onChange={setAccountId}
+                />
                 <Input type="text" label="Nombre Sub-Cuenta" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Meta / Target (Opcional)" min="0.01" max="999999999" step="0.01" placeholder="Dejar vacío para sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
+                <Input type="number" label="Meta / Target (opcional)" min="0.01" max="999999999" step="0.01" placeholder="Vacío = sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
                 <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} />
-                <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">Crear Entidad</button>
+                <button type="submit" className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] mt-3">Crear Sub-Cuenta</button>
             </form>
         </Modal>
     );
@@ -659,24 +802,32 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                 }); 
                 onClose(); 
             }}>
-                <Select label="Espacio Asociado" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setAccountId(''); }}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-                
-                <Select label="Cuenta Asociada (Predeterminada)" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
-                    <option value="">Seleccionar Cuenta</option>
-                    {activeContext?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Espacio"
+                    value={contextId}
+                    options={state.contexts.map((c: any) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => { setContextId(v); setAccountId(''); }}
+                />
 
-                <Select 
-                    label="Sub-Cuenta Asociada (Opcional)" 
-                    value={subAccountId} 
-                    onChange={(e: any) => setSubAccountId(e.target.value)}
-                    disabled={!activeAccount || activeAccount.subAccounts.length === 0}
-                >
-                    <option value="">{(!activeAccount) ? 'Selecciona una cuenta primero' : (activeAccount.subAccounts.length === 0 ? 'No hay sub-cuentas' : 'Ninguna')}</option>
-                    {activeAccount?.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Cuenta asociada (predeterminada)"
+                    placeholder="Seleccionar cuenta"
+                    value={accountId}
+                    options={(activeContext?.accounts || []).map((a) => ({ value: a.id, label: a.name }))}
+                    onChange={(v) => { setAccountId(v); setSubAccountId(''); }}
+                />
+
+                {activeAccount && activeAccount.subAccounts.length > 0 && (
+                    <SelectField
+                        label="Sub-cuenta (opcional)"
+                        value={subAccountId}
+                        options={[
+                            { value: '', label: 'Ninguna' },
+                            ...activeAccount.subAccounts.map((s: any) => ({ value: s.id, label: s.name })),
+                        ]}
+                        onChange={setSubAccountId}
+                    />
+                )}
 
                 <Input type="text" label="Nombre Categoría" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
                 
@@ -721,6 +872,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [active, setActive] = useState(initialData ? initialData.active : true);
     const [reminderValue, setReminderValue] = useState<string>(initialData?.reminderValue?.toString() || '');
     const [reminderUnit, setReminderUnit] = useState<'minutes' | 'hours' | 'days'>(initialData?.reminderUnit || 'days');
+    const [notifyIfOverdue, setNotifyIfOverdue] = useState<boolean>(initialData?.notifyIfOverdue !== false);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
@@ -743,6 +895,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
             paymentMethod: 'Card',
             reminderValue: reminderValue ? Number(reminderValue) : undefined,
             reminderUnit: reminderValue ? reminderUnit : undefined,
+            notifyIfOverdue,
         });
         onClose();
     };
@@ -755,44 +908,68 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                     <div className="col-span-2">
                         <Input type="number" label="Monto" required min="0.01" max="999999999" step="0.01" value={amount} onChange={(e: any) => setAmount(e.target.value)} />
                     </div>
-                    <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
-                        {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
-                    </Select>
+                    <SelectField
+                        label="Moneda"
+                        value={currency}
+                        options={CURRENCIES.map((c) => ({ value: c.code, label: c.code, hint: c.symbol }))}
+                        onChange={setCurrency}
+                        searchable
+                    />
                 </div>
-                <Select label="Frecuencia" value={frequency} onChange={(e: any) => setFrequency(e.target.value)}>
-                    <option value="WEEKLY">Semanal</option>
-                    <option value="MONTHLY">Mensual</option>
-                    <option value="QUARTERLY">Trimestral</option>
-                    <option value="ANNUAL">Anual</option>
-                </Select>
-                
-                {/* Condition: If paused, date is optional. If active, date is required. */}
-                <Input 
-                    type="date" 
+                <SelectField
+                    label="Frecuencia"
+                    value={frequency}
+                    options={[
+                        { value: 'WEEKLY', label: 'Semanal' },
+                        { value: 'MONTHLY', label: 'Mensual' },
+                        { value: 'QUARTERLY', label: 'Trimestral' },
+                        { value: 'ANNUAL', label: 'Anual' },
+                    ]}
+                    onChange={(v) => setFrequency(v as any)}
+                />
+
+                <Input
+                    type="date"
                     label={`Próxima Renovación ${active ? '*' : '(Opcional)'}`}
-                    value={nextRenewal} 
-                    required={active} 
+                    value={nextRenewal}
+                    required={active}
                     onChange={(e: any) => setNextRenewal(e.target.value)}
                 />
 
-                <Select label="Espacio de Pago" value={contextId} onChange={(e: any) => setContextId(e.target.value)}>
-                    {state.contexts.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
-                <Select label="Cuenta de Pago" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
-                    <option value="">Seleccionar Cuenta</option>
-                    {state.contexts.find((c:any) => c.id === contextId)?.accounts.map((a:any) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Espacio de pago"
+                    value={contextId}
+                    options={state.contexts.map((c: any) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => { setContextId(v); setAccountId(''); }}
+                />
+                <SelectField
+                    label="Cuenta de pago"
+                    placeholder="Seleccionar cuenta"
+                    value={accountId}
+                    options={(state.contexts.find((c: any) => c.id === contextId)?.accounts || []).map((a: any) => ({ value: a.id, label: a.name }))}
+                    onChange={(v) => { setAccountId(v); setSubAccountId(''); }}
+                />
                 {activeAccount && activeAccount.subAccounts.length > 0 && (
-                     <Select label="Sub-Cuenta de Pago (Opcional)" value={subAccountId} onChange={(e: any) => setSubAccountId(e.target.value)}>
-                        <option value="">Ninguna</option>
-                        {activeAccount.subAccounts.map((s:any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </Select>
+                    <SelectField
+                        label="Sub-cuenta de pago (opcional)"
+                        value={subAccountId}
+                        options={[
+                            { value: '', label: 'Ninguna' },
+                            ...activeAccount.subAccounts.map((s: any) => ({ value: s.id, label: s.name })),
+                        ]}
+                        onChange={setSubAccountId}
+                    />
                 )}
 
-                <Select label="Categoría (Opcional)" value={categoryId} onChange={(e: any) => setCategoryId(e.target.value)}>
-                    <option value="">Sin categoría</option>
-                    {state.categories.filter((c: any) => c.contextId === contextId).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Categoría (opcional)"
+                    value={categoryId}
+                    options={[
+                        { value: '', label: 'Sin categoría' },
+                        ...state.categories.filter((c: any) => c.contextId === contextId).map((c: any) => ({ value: c.id, label: c.name, swatch: c.color })),
+                    ]}
+                    onChange={setCategoryId}
+                />
 
                 <div className="mb-5">
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Últimos 4 dígitos de tarjeta (Opcional)</label>
@@ -822,28 +999,45 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
 
                 {/* Per-subscription renewal reminder */}
                 <div className="mb-5">
-                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Aviso de Renovación</label>
-                    <p className="text-[10px] text-graphite mb-2">Te avisaremos cuando falte este tiempo para la próxima renovación. Deja vacío si no quieres aviso.</p>
-                    <div className="grid grid-cols-2 gap-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-graphite mb-2">Aviso de Renovación</label>
+                    <p className="text-[11px] text-graphite mb-3">Te avisaremos cuando falte este tiempo para la próxima renovación. Deja vacío para no recibir aviso.</p>
+                    <div className="grid grid-cols-5 gap-3">
                         <input
                             type="number"
                             min="0"
                             max="999"
-                            placeholder="Ej. 3"
+                            placeholder="3"
                             value={reminderValue}
                             onChange={(e) => setReminderValue(e.target.value)}
-                            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
+                            className="col-span-2 w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none text-center font-display font-bold"
                         />
-                        <select
-                            value={reminderUnit}
-                            onChange={(e) => setReminderUnit(e.target.value as any)}
-                            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
-                        >
-                            <option value="minutes">Minutos antes</option>
-                            <option value="hours">Horas antes</option>
-                            <option value="days">Días antes</option>
-                        </select>
+                        <div className="col-span-3">
+                            <SelectField
+                                value={reminderUnit}
+                                options={[
+                                    { value: 'minutes', label: 'Minutos antes' },
+                                    { value: 'hours', label: 'Horas antes' },
+                                    { value: 'days', label: 'Días antes' },
+                                ]}
+                                onChange={(v) => setReminderUnit(v as any)}
+                            />
+                        </div>
                     </div>
+                </div>
+
+                {/* Overdue notification toggle */}
+                <div className="mb-5 p-4 bg-stone/40 rounded-2xl border border-black/5 flex items-start gap-3">
+                    <input
+                        type="checkbox"
+                        id="notifyIfOverdue"
+                        checked={notifyIfOverdue}
+                        onChange={(e) => setNotifyIfOverdue(e.target.checked)}
+                        className="mt-1 accent-onyx w-4 h-4 cursor-pointer"
+                    />
+                    <label htmlFor="notifyIfOverdue" className="text-sm cursor-pointer flex-1">
+                        <span className="block font-display font-bold text-onyx">Avisarme si no la pago a tiempo</span>
+                        <span className="text-xs text-graphite">Notificación diaria cuando la fecha de cobro haya pasado y aún no haya registrado el gasto.</span>
+                    </label>
                 </div>
 
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl">
@@ -878,9 +1072,14 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                 </div>
                 <Input type="text" label="Nombre del Negocio" required maxLength={100} placeholder="Ej. Agencia Diseño LLC" value={name} onChange={(e: any) => setName(e.target.value)} />
 
-                <Select label="Moneda" value={currency} onChange={(e: any) => setCurrency(e.target.value)}>
-                    {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code} - {c.name}</option>)}
-                </Select>
+                <SelectField
+                    label="Moneda"
+                    value={currency}
+                    options={CURRENCIES.map((c) => ({ value: c.code, label: `${c.code} · ${c.name}`, hint: c.symbol }))}
+                    onChange={setCurrency}
+                    searchable
+                />
+
 
                 <div className="mb-6">
                     <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>

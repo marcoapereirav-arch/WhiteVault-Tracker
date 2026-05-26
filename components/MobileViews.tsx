@@ -17,6 +17,7 @@ import {
   haptic,
 } from './Mobile';
 import { balanceEntries } from '../utils/balances';
+import { isSubscriptionOverdue, daysOverdue } from '../utils/subscriptions';
 import { CURRENCIES } from '../constants';
 import {
   isPushSupported,
@@ -67,6 +68,15 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
   );
 
   const upcoming = useMemo(() => p.dashboardFilteredSubs.slice(0, 3), [p.dashboardFilteredSubs]);
+
+  // Overdue subscriptions across all contexts that match the user's filter
+  const overdueSubs = useMemo(
+    () => p.state.subscriptions
+      .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
+      .filter((s) => isSubscriptionOverdue(s))
+      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime()),
+    [p.state.subscriptions, p.contextFilter]
+  );
 
   const balanceTotal = Object.entries(p.totalsByCurrency);
   const primaryCurrency = balanceTotal[0]?.[0] ?? p.currencyCode;
@@ -126,6 +136,44 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
           <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
         </div>
       </section>
+
+      {/* Subscriptions por pagar (overdue) — top priority alert */}
+      {overdueSubs.length > 0 && (
+        <section className="px-3 lg:px-8 mt-5">
+          <div className="px-2 lg:px-1 mb-2 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-700 flex items-center gap-1.5">
+              <Icons.Warning className="w-3 h-3" />
+              Suscripciones por pagar
+            </h3>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700">{overdueSubs.length}</span>
+          </div>
+          <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden divide-y divide-rose-100">
+            {overdueSubs.slice(0, 5).map((s) => {
+              const days = daysOverdue(s);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => { haptic('selection'); p.onSubscriptionClick(s); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 active:bg-rose-50 cursor-pointer text-left"
+                >
+                  <IconCircle tone="expense" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-display font-bold text-onyx truncate">{s.name}</div>
+                    <div className="text-[11px] text-rose-700 font-medium">
+                      Vencida {days === 0 ? 'hoy' : days === 1 ? 'hace 1 día' : `hace ${days} días`}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-display font-bold text-rose-700 tabular">{p.formatCurrency(s.amount, s.currency)}</div>
+                    <div className="text-[10px] text-graphite uppercase tracking-widest">Pagar →</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* Desktop: 2-column layout for upcoming + recent activity */}
       <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8 lg:mt-6">
@@ -443,45 +491,59 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                 return (
                   <div key={acc.id}>
                     <div
-                      className="flex items-center gap-3 p-4 active:bg-stone cursor-pointer transition-colors"
+                      className="px-4 py-3.5 active:bg-stone cursor-pointer transition-colors"
                       onClick={() => { haptic('selection'); onAccountHistory(ctx.id, acc.id); }}
                     >
-                      <div className="w-2 h-2 bg-onyx rotate-45 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-display font-semibold text-onyx truncate">{acc.name}</span>
-                          {target !== undefined && target > 0 && (
-                            <span className="px-1.5 py-0.5 text-[9px] bg-stone border border-black/10 text-graphite font-bold rounded">{target}%</span>
-                          )}
-                          <RecentBadge indicator={recentTx} formatCurrency={formatCurrency} />
-                        </div>
-                        <div className="text-[10px] text-graphite uppercase tracking-widest mt-0.5">
-                          {acc.type === 'INCOME' ? 'Ingresos' : acc.type === 'EXPENSE' ? 'Gasto' : 'Holding'}{hasSubs ? ` · ${acc.subAccounts.length} sub` : ''}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        {entries.length > 0 ? entries.map((e) => (
-                          <div key={e.currency} className="text-sm font-display font-bold text-onyx tabular">
-                            {formatCurrency(e.amount, e.currency)}
+                      <div className="flex items-center gap-3">
+                        <div className="w-1.5 h-1.5 bg-onyx rotate-45 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[15px] font-display font-semibold text-onyx truncate">{acc.name}</span>
+                            {target !== undefined && target > 0 && (
+                              <span className="px-1.5 py-0.5 text-[9px] bg-stone text-graphite font-bold rounded">{target}%</span>
+                            )}
                           </div>
-                        )) : <div className="text-sm font-display font-bold text-graphite tabular">{formatCurrency(0)}</div>}
-                        {hasSubBalance && combinedEntries.map((e) => (
-                          <div key={`total-${e.currency}`} className="text-[10px] text-graphite/80 tabular">
-                            <span className="uppercase tracking-widest text-[8px] mr-1">Total</span>{formatCurrency(e.amount, e.currency)}
+                          <div className="text-[10px] text-graphite uppercase tracking-widest mt-0.5">
+                            {acc.type === 'INCOME' ? 'Ingresos' : acc.type === 'EXPENSE' ? 'Gasto' : 'Holding'}{hasSubs ? ` · ${acc.subAccounts.length} sub` : ''}
                           </div>
-                        ))}
-                        {recentlyAdded && (
-                          <div className="text-[10px] font-bold text-emerald-700 wv-fade-in">+{formatCurrency(recentlyAdded, primary?.currency)}</div>
+                        </div>
+                        <div className="text-right">
+                          {entries.length > 0 ? entries.map((e) => (
+                            <div key={e.currency} className="text-base font-display font-bold text-onyx tabular leading-tight">
+                              {formatCurrency(e.amount, e.currency)}
+                            </div>
+                          )) : <div className="text-base font-display font-bold text-graphite tabular leading-tight">{formatCurrency(0)}</div>}
+                        </div>
+                        {hasSubs && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggle(acc.id); }}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone active:scale-95 transition-all flex-shrink-0 -mr-1"
+                            aria-label={isOpen ? 'Colapsar' : 'Expandir'}
+                          >
+                            <Icons.ChevronDown className={`w-4 h-4 text-graphite transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                          </button>
                         )}
                       </div>
-                      {hasSubs && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); toggle(acc.id); }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone active:scale-95 transition-all"
-                          aria-label={isOpen ? 'Colapsar' : 'Expandir'}
-                        >
-                          <Icons.ChevronDown className={`w-4 h-4 text-graphite transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                      {/* Secondary info row — only renders if there is something to show */}
+                      {(hasSubBalance || recentTx || recentlyAdded) && (
+                        <div className="mt-1.5 flex items-center justify-between gap-2 pl-4">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            {recentTx && <RecentBadge indicator={recentTx} formatCurrency={formatCurrency} />}
+                            {recentlyAdded && (
+                              <span className="text-[10px] font-bold text-emerald-700 wv-fade-in tabular">
+                                +{formatCurrency(recentlyAdded, primary?.currency)}
+                              </span>
+                            )}
+                          </div>
+                          {hasSubBalance && (
+                            <div className="text-[10px] text-graphite tabular text-right flex flex-wrap gap-x-2 justify-end">
+                              <span className="uppercase tracking-widest text-[9px] text-graphite/70">Total con subs:</span>
+                              {combinedEntries.map((e) => (
+                                <span key={`total-${e.currency}`} className="font-medium">{formatCurrency(e.amount, e.currency)}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                     {hasSubs && isOpen && (
@@ -747,6 +809,15 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
       });
   }, [state.subscriptions, contextFilter, subscriptionStatusFilter]);
 
+  // Overdue subscriptions ("por pagar")
+  const overdueSubs = useMemo(
+    () => state.subscriptions
+      .filter((s) => contextFilter === 'ALL' || s.contextId === contextFilter)
+      .filter((s) => isSubscriptionOverdue(s))
+      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime()),
+    [state.subscriptions, contextFilter]
+  );
+
   // Monthly total (active only)
   const monthlyTotalByCurrency = useMemo(() => {
     const map: Record<string, number> = {};
@@ -762,6 +833,44 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
 
   return (
     <div className="pb-tabbar">
+      {/* Por pagar (overdue) */}
+      {overdueSubs.length > 0 && (
+        <section className="px-3 lg:px-8 pt-2 mb-4">
+          <div className="px-2 lg:px-1 mb-2 flex items-center justify-between">
+            <h3 className="text-[10px] font-bold uppercase tracking-[0.25em] text-rose-700 flex items-center gap-1.5">
+              <Icons.Warning className="w-3 h-3" />
+              Por pagar
+            </h3>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700">{overdueSubs.length}</span>
+          </div>
+          <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden divide-y divide-rose-100">
+            {overdueSubs.map((s) => {
+              const days = daysOverdue(s);
+              return (
+                <button
+                  key={`overdue-${s.id}`}
+                  type="button"
+                  onClick={() => { haptic('selection'); onSubClick(s); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 active:bg-rose-50 cursor-pointer text-left"
+                >
+                  <IconCircle tone="expense" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-display font-bold text-onyx truncate">{s.name}</div>
+                    <div className="text-[11px] text-rose-700 font-medium">
+                      Vencida {days === 0 ? 'hoy' : days === 1 ? 'hace 1 día' : `hace ${days} días`}
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-display font-bold text-rose-700 tabular">{formatCurrency(s.amount, s.currency)}</div>
+                    <div className="text-[10px] text-graphite uppercase tracking-widest">Pagar →</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       <section className="px-5 lg:px-8 pt-2 mb-4 grid grid-cols-1 lg:grid-cols-3 lg:gap-4">
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 relative overflow-hidden lg:col-span-2">
           <div className="absolute top-0 left-0 w-1 h-full bg-gold" />

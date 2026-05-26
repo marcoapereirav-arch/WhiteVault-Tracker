@@ -551,6 +551,131 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className = '' }) =
   <div className={`bg-concrete/40 animate-pulse rounded-md ${className}`} />
 );
 
+// ─── SELECT FIELD (native-feel bottom-sheet picker) ────────────────────
+export interface SelectFieldOption {
+  value: string;
+  label: string;
+  hint?: string;       // secondary text shown to the right (e.g. balance)
+  swatch?: string;     // optional left color dot
+  iconBg?: string;     // optional left icon background
+  group?: string;      // section header in the picker
+  disabled?: boolean;
+}
+interface SelectFieldProps {
+  label?: string;
+  placeholder?: string;
+  value: string;
+  options: SelectFieldOption[];
+  onChange: (value: string) => void;
+  required?: boolean;
+  title?: string;      // sheet title (defaults to label)
+  subtitle?: string;
+  searchable?: boolean;
+  emptyText?: string;
+}
+export const SelectField: React.FC<SelectFieldProps> = ({ label, placeholder = 'Seleccionar', value, options, onChange, title, subtitle, searchable, emptyText }) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const selected = options.find((o) => o.value === value);
+
+  const filtered = useMemo(() => {
+    if (!search) return options;
+    const q = search.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q) || (o.hint?.toLowerCase().includes(q)));
+  }, [options, search]);
+
+  // Group filtered options
+  const grouped = useMemo(() => {
+    const map = new Map<string, SelectFieldOption[]>();
+    filtered.forEach((o) => {
+      const g = o.group ?? '';
+      if (!map.has(g)) map.set(g, []);
+      map.get(g)!.push(o);
+    });
+    return Array.from(map.entries());
+  }, [filtered]);
+
+  return (
+    <div className="mb-4">
+      {label && <label className="block text-[10px] font-bold uppercase tracking-widest text-graphite mb-2">{label}</label>}
+      <button
+        type="button"
+        onClick={() => { haptic('selection'); setOpen(true); }}
+        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl flex items-center justify-between gap-3 text-left active:scale-[0.99] hover:border-onyx transition-all"
+      >
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          {selected?.swatch && (
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: selected.swatch }} />
+          )}
+          <span className={`text-sm truncate ${selected ? 'text-onyx font-medium' : 'text-graphite/60'}`}>
+            {selected?.label || placeholder}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {selected?.hint && <span className="text-xs text-graphite tabular">{selected.hint}</span>}
+          <Icons.ChevronDown className="w-4 h-4 text-graphite" />
+        </div>
+      </button>
+
+      <BottomSheet open={open} onClose={() => { setOpen(false); setSearch(''); }} title={title || label || 'Seleccionar'} subtitle={subtitle} size={options.length > 8 ? 'full' : 'auto'}>
+        {searchable && options.length > 6 && (
+          <div className="relative mb-3">
+            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-graphite" />
+            <input
+              type="text"
+              placeholder="Buscar…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full h-11 pl-9 pr-4 bg-white border border-black/10 rounded-xl text-sm"
+              autoFocus
+            />
+          </div>
+        )}
+        {grouped.length === 0 ? (
+          <div className="text-center text-sm text-graphite py-8">{emptyText || 'Sin opciones'}</div>
+        ) : (
+          <div className="space-y-4">
+            {grouped.map(([groupName, opts]) => (
+              <div key={groupName || '_'}>
+                {groupName && (
+                  <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-2 px-1">{groupName}</div>
+                )}
+                <div className="space-y-1.5">
+                  {opts.map((o) => {
+                    const isActive = o.value === value;
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        disabled={o.disabled}
+                        onClick={() => { haptic('selection'); onChange(o.value); setOpen(false); setSearch(''); }}
+                        className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left active:scale-[0.99] ${
+                          isActive ? 'bg-onyx text-white' : o.disabled ? 'bg-stone/40 text-graphite/40 cursor-not-allowed' : 'bg-white border border-black/5 hover:border-onyx'
+                        }`}
+                      >
+                        {o.swatch && (
+                          <span className="w-3 h-3 rounded-full flex-shrink-0 border border-black/10" style={{ backgroundColor: o.swatch }} />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${isActive ? 'text-white' : 'text-onyx'}`}>{o.label}</div>
+                        </div>
+                        {o.hint && (
+                          <span className={`text-xs tabular flex-shrink-0 ${isActive ? 'text-gold' : 'text-graphite'}`}>{o.hint}</span>
+                        )}
+                        {isActive && <Icons.Check className="w-4 h-4 text-gold flex-shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </BottomSheet>
+    </div>
+  );
+};
+
 // ─── ICON CIRCLE ────────────────────────────────────────────────────────
 export const IconCircle: React.FC<{ children: ReactNode; tone?: 'default' | 'income' | 'expense' | 'transfer' | 'gold' | 'dark'; size?: 'sm' | 'md' | 'lg'; bgColor?: string }> = ({ children, tone = 'default', size = 'md', bgColor }) => {
   const sizes = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' };

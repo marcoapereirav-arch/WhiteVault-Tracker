@@ -85,6 +85,8 @@ export interface Subscription {
   // Payment history (incremented every time a subscription is "paid" from a tx)
   paymentsCount?: number;
   lastPaidAt?: string; // ISO timestamp
+  // Whether to send "overdue" notifications when nextRenewal has passed without payment
+  notifyIfOverdue?: boolean; // default true
 }
 
 export interface AppState {
