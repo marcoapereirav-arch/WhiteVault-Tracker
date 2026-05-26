@@ -77,8 +77,14 @@ export interface Subscription {
   subAccountId?: string;
   categoryId?: string;
   paymentMethod: string;
-  cardLastFour?: string; // Last 4 digits of payment card
+  cardLastFour?: string;
   active: boolean;
+  // Notification reminder (per-subscription, set in the subscription form)
+  reminderValue?: number;
+  reminderUnit?: 'minutes' | 'hours' | 'days';
+  // Payment history (incremented every time a subscription is "paid" from a tx)
+  paymentsCount?: number;
+  lastPaidAt?: string; // ISO timestamp
 }
 
 export interface AppState {

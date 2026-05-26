@@ -41,6 +41,7 @@ import {
   TrashSheet,
 } from './components/MobileDetails';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
+import { advanceSubscriptionRenewal } from './utils/subscriptions';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -67,7 +68,7 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
   const [contextFilter, setContextFilter] = useState<string>('ALL');
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
-  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ALL');
+  const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ACTIVE');
   
   // Sidebar States
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -118,6 +119,22 @@ function App() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState('');
   const nameInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Recent transaction indicators — shown next to accounts/sub-accounts for 30s
+  // Key: `${accountId}:${subAccountId ?? ''}`
+  type RecentTxIndicator = { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' };
+  const [recentTxByAccount, setRecentTxByAccount] = useState<Record<string, RecentTxIndicator>>({});
+  const recentTxTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashRecent = React.useCallback((entries: { accountId: string; subAccountId?: string; amount: number; currency: string; kind: RecentTxIndicator['kind'] }[]) => {
+      const map: Record<string, RecentTxIndicator> = {};
+      entries.forEach((e) => {
+          const key = `${e.accountId}:${e.subAccountId ?? ''}`;
+          map[key] = { amount: e.amount, currency: e.currency, kind: e.kind };
+      });
+      setRecentTxByAccount(map);
+      if (recentTxTimerRef.current) clearTimeout(recentTxTimerRef.current);
+      recentTxTimerRef.current = setTimeout(() => setRecentTxByAccount({}), 30_000);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -739,6 +756,24 @@ function App() {
     }));
     logAudit(newTx.id, 'CREATE', null, newTx);
 
+    flashRecent([{
+        accountId: data.accountId,
+        subAccountId: data.subAccountId || undefined,
+        amount: data.amount,
+        currency: cur,
+        kind: data.type === 'INCOME' ? 'INCOME' : 'EXPENSE',
+    }]);
+
+    // If this expense was linked to a subscription, advance its nextRenewal + counter
+    if (data.linkedSubscriptionId) {
+        setState(prev => ({
+            ...prev,
+            subscriptions: prev.subscriptions.map(s =>
+                s.id === data.linkedSubscriptionId ? advanceSubscriptionRenewal(s) : s
+            ),
+        }));
+    }
+
     if (data.type === 'INCOME' && data.distribute) {
         setTimeout(() => distributeIncome(data.contextId, cur, data.amount), 50);
     }
@@ -763,6 +798,11 @@ function App() {
       updateBal(data.toContextId, data.toAccountId, data.toSubAccountId, data.amount);
       const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
       setState(prev => ({ ...prev, contexts: newContexts, transactions: [newTx, ...prev.transactions] }));
+      logAudit(newTx.id, 'CREATE', null, newTx);
+      flashRecent([
+          { accountId: data.accountId, subAccountId: data.subAccountId || undefined, amount: data.amount, currency: cur, kind: 'TRANSFER_OUT' },
+          { accountId: data.toAccountId, subAccountId: data.toSubAccountId || undefined, amount: data.amount, currency: cur, kind: 'TRANSFER_IN' },
+      ]);
   };
 
   const handleNewSubAccount = (data: any) => {
@@ -1282,6 +1322,7 @@ function App() {
               onUndoDistribution={undoLastDistribution}
               canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
               recentDistributions={recentDistributions}
+              recentTxByAccount={recentTxByAccount}
               onAccountHistory={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
             />
           )}
@@ -1310,6 +1351,7 @@ function App() {
             <MobileSubscriptions
               state={state}
               contextFilter={contextFilter}
+              setContextFilter={setContextFilter}
               subscriptionStatusFilter={subscriptionStatusFilter}
               setSubscriptionStatusFilter={setSubscriptionStatusFilter}
               formatCurrency={formatCurrency}
@@ -1325,6 +1367,7 @@ function App() {
             <MobileCategories
               state={state}
               contextFilter={contextFilter}
+              setContextFilter={setContextFilter}
               formatCurrency={formatCurrency}
               onCategoryClick={(c) => { setSelectedCategory(c); setActiveModal('VIEW_CATEGORY'); }}
               onCategoryEdit={(c) => { setSelectedCategory(c); setActiveModal('EDIT_CATEGORY'); }}

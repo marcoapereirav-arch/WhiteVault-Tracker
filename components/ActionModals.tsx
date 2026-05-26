@@ -5,6 +5,20 @@ import { CURRENCIES } from '../constants';
 import { BottomSheet } from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
 
+// Compact money formatter for select options (no decimals if integer to save space).
+const formatMoney = (n: number, currency: string): string => {
+    try {
+        return new Intl.NumberFormat('es-ES', {
+            style: 'currency',
+            currency,
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(n);
+    } catch {
+        return `${n.toFixed(2)} ${currency}`;
+    }
+};
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -305,7 +319,11 @@ interface TransactionFormProps {
     initialData?: any;
 }
 
-export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, onSubmit, onClose, initialData }) => {
+interface TransactionFormPropsExt extends TransactionFormProps {
+    subscriptionPaymentChoice?: (sub: Subscription) => void;
+}
+
+export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state, onSubmit, onClose, initialData }) => {
     const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id || '');
     const [accountId, setAccountId] = useState(initialData?.accountId || '');
     const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
@@ -320,6 +338,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     const [notes, setNotes] = useState(initialData?.notes || '');
     const [comments, setComments] = useState(initialData?.comments || '');
     const [distribute, setDistribute] = useState(false);
+    const [linkedSubscriptionId, setLinkedSubscriptionId] = useState<string>('');
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
@@ -338,6 +357,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
 
     const availableCategories = state.categories.filter(c => c.contextId === contextId);
 
+    // When user picks an active subscription, autofill all fields from it.
+    const activeSubscriptions = type === 'EXPENSE'
+        ? state.subscriptions.filter(s => s.active && s.contextId === contextId)
+        : [];
+
+    const applySubscription = (sub: Subscription) => {
+        setLinkedSubscriptionId(sub.id);
+        setAmount(String(sub.amount));
+        setCurrency(sub.currency);
+        setAccountId(sub.accountId);
+        setSubAccountId(sub.subAccountId || '');
+        setCategoryId(sub.categoryId || '');
+        if (!notes) setNotes(sub.name);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const isoDate = localPickerStringToIso(dateTime, state.user.timezone);
@@ -347,7 +381,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
             type, contextId, accountId, subAccountId,
             amount: Number(amount), currency, categoryId, date: isoDate, notes,
             comments: comments || undefined,
-            distribute
+            distribute,
+            linkedSubscriptionId: linkedSubscriptionId || undefined,
         });
         onClose();
     };
@@ -355,8 +390,41 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     return (
         <Modal isOpen={true} onClose={onClose} title={initialData ? `Editar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}` : `Registrar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}>
             <form onSubmit={handleSubmit}>
+                {/* Subscription quick-pay (only for new EXPENSE, not edit) */}
+                {type === 'EXPENSE' && !initialData && activeSubscriptions.length > 0 && (
+                    <div className="mb-5 p-4 bg-gold/10 border border-gold/30 rounded-2xl">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-2">Pagar Suscripción</div>
+                        <p className="text-[11px] text-graphite mb-3">Selecciona una para rellenar los campos automáticamente. Al guardar, la fecha de cobro avanzará al siguiente ciclo.</p>
+                        <div className="flex flex-wrap gap-2">
+                            {activeSubscriptions.map((s) => {
+                                const selected = linkedSubscriptionId === s.id;
+                                return (
+                                    <button
+                                        key={s.id}
+                                        type="button"
+                                        onClick={() => applySubscription(s)}
+                                        className={`flex items-center gap-2 px-3 h-9 rounded-full border text-[11px] font-medium transition-all active:scale-95 ${selected ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
+                                    >
+                                        <span className="font-display font-bold">{s.name}</span>
+                                        <span className="font-mono tabular">{new Intl.NumberFormat('es-ES', { style: 'currency', currency: s.currency, maximumFractionDigits: 2 }).format(s.amount)}</span>
+                                    </button>
+                                );
+                            })}
+                            {linkedSubscriptionId && (
+                                <button
+                                    type="button"
+                                    onClick={() => { setLinkedSubscriptionId(''); }}
+                                    className="px-3 h-9 rounded-full border border-rose-200 bg-rose-50 text-rose-700 text-[11px] font-bold uppercase tracking-widest"
+                                >
+                                    Quitar
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
-                    <Select label="Espacio (Contexto)" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setCategoryId(''); }}>
+                    <Select label="Espacio (Contexto)" value={contextId} onChange={(e: any) => { setContextId(e.target.value); setCategoryId(''); setLinkedSubscriptionId(''); }}>
                         {state.contexts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </Select>
                     <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
@@ -371,16 +439,28 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
                     </Select>
                 </div>
                 <Input type="text" label="Descripción" required maxLength={200} value={notes} placeholder="Ej. Pago Cliente, Renta" onChange={(e: any) => setNotes(e.target.value)} />
-                
+
                 <Select label="Cuenta" value={accountId} onChange={(e: any) => { setAccountId(e.target.value); setSubAccountId(''); }}>
                     <option value="">Seleccionar Cuenta</option>
-                    {activeContext?.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    {activeContext?.accounts.map(a => {
+                        const bal = a.balances?.[currency] ?? 0;
+                        const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
+                        const projected = bal + delta;
+                        const label = amount ? `${a.name} · ${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : `${a.name} · ${formatMoney(bal, currency)}`;
+                        return <option key={a.id} value={a.id}>{label}</option>;
+                    })}
                 </Select>
 
                 {activeAccount && activeAccount.subAccounts.length > 0 && (
                     <Select label="Sub-Cuenta (Opcional)" value={subAccountId} onChange={(e: any) => setSubAccountId(e.target.value)}>
                         <option value="">Ninguna</option>
-                        {activeAccount.subAccounts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        {activeAccount.subAccounts.map(s => {
+                            const bal = s.balances?.[currency] ?? 0;
+                            const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
+                            const projected = bal + delta;
+                            const label = amount ? `${s.name} · ${formatMoney(bal, currency)} → ${formatMoney(projected, currency)}` : `${s.name} · ${formatMoney(bal, currency)}`;
+                            return <option key={s.id} value={s.id}>{label}</option>;
+                        })}
                     </Select>
                 )}
 
@@ -639,6 +719,8 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [cardLastFour, setCardLastFour] = useState(initialData?.cardLastFour || '');
     const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
     const [active, setActive] = useState(initialData ? initialData.active : true);
+    const [reminderValue, setReminderValue] = useState<string>(initialData?.reminderValue?.toString() || '');
+    const [reminderUnit, setReminderUnit] = useState<'minutes' | 'hours' | 'days'>(initialData?.reminderUnit || 'days');
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
@@ -658,7 +740,9 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
             cardLastFour: cardLastFour || undefined,
             categoryId: categoryId || undefined,
             active,
-            paymentMethod: 'Card'
+            paymentMethod: 'Card',
+            reminderValue: reminderValue ? Number(reminderValue) : undefined,
+            reminderUnit: reminderValue ? reminderUnit : undefined,
         });
         onClose();
     };
@@ -735,8 +819,34 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                          <button type="button" onClick={() => setActive(false)} className={`px-4 py-2 text-xs font-bold uppercase ${!active ? 'bg-red-100 text-red-800' : 'bg-stone text-gray-500'}`}>Pausado</button>
                      </div>
                 </div>
-                
-                <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">
+
+                {/* Per-subscription renewal reminder */}
+                <div className="mb-5">
+                    <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Aviso de Renovación</label>
+                    <p className="text-[10px] text-graphite mb-2">Te avisaremos cuando falte este tiempo para la próxima renovación. Deja vacío si no quieres aviso.</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <input
+                            type="number"
+                            min="0"
+                            max="999"
+                            placeholder="Ej. 3"
+                            value={reminderValue}
+                            onChange={(e) => setReminderValue(e.target.value)}
+                            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
+                        />
+                        <select
+                            value={reminderUnit}
+                            onChange={(e) => setReminderUnit(e.target.value as any)}
+                            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
+                        >
+                            <option value="minutes">Minutos antes</option>
+                            <option value="hours">Horas antes</option>
+                            <option value="days">Días antes</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl">
                     {initialData ? 'Actualizar Suscripción' : 'Añadir Suscripción'}
                 </button>
             </form>

@@ -349,9 +349,27 @@ interface AccountsProps {
   onUndoDistribution: () => void;
   canUndo: boolean;
   recentDistributions: { [accountId: string]: number };
+  recentTxByAccount: Record<string, { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }>;
   onAccountHistory: (ctxId: string, accId: string, subId?: string) => void;
 }
-export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, onAccountHistory }) => {
+
+const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }; formatCurrency: (n: number, c?: string) => string }> = ({ indicator, formatCurrency }) => {
+  if (!indicator) return null;
+  const isIn = indicator.kind === 'INCOME' || indicator.kind === 'TRANSFER_IN';
+  const isOut = indicator.kind === 'EXPENSE' || indicator.kind === 'TRANSFER_OUT';
+  const isTransfer = indicator.kind === 'TRANSFER_IN' || indicator.kind === 'TRANSFER_OUT';
+  const sign = isIn ? '+' : '-';
+  const cls = isTransfer ? 'text-sky-700 bg-sky-50 border-sky-200'
+    : isIn ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+    : 'text-rose-700 bg-rose-50 border-rose-200';
+  return (
+    <span className={`inline-flex items-center text-[10px] font-display font-bold tabular px-2 py-0.5 rounded-full border wv-pop-in ${cls}`}>
+      {sign}{formatCurrency(indicator.amount, indicator.currency)}
+    </span>
+  );
+};
+
+export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
@@ -400,7 +418,27 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                 const hasSubs = acc.subAccounts.length > 0;
                 const isOpen = expanded.has(acc.id);
                 const recentlyAdded = recentDistributions[acc.id];
+                const recentTx = recentTxByAccount[`${acc.id}:`];
                 const target = acc.percentageTarget;
+
+                // Compute totals: own (account balances only) vs combined (account + sub-accounts)
+                const subTotalsByCurrency: Record<string, number> = {};
+                acc.subAccounts.forEach((sub) => {
+                  balanceEntries(sub.balances).forEach((e) => {
+                    subTotalsByCurrency[e.currency] = (subTotalsByCurrency[e.currency] || 0) + e.amount;
+                  });
+                });
+                const combinedEntries = entries.map((e) => ({
+                  currency: e.currency,
+                  amount: e.amount + (subTotalsByCurrency[e.currency] || 0),
+                }));
+                // Add currencies that exist only in subs
+                Object.keys(subTotalsByCurrency).forEach((cur) => {
+                  if (!combinedEntries.find((e) => e.currency === cur)) {
+                    combinedEntries.push({ currency: cur, amount: subTotalsByCurrency[cur] });
+                  }
+                });
+                const hasSubBalance = Object.values(subTotalsByCurrency).some((v) => v !== 0);
 
                 return (
                   <div key={acc.id}>
@@ -410,11 +448,12 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                     >
                       <div className="w-2 h-2 bg-onyx rotate-45 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-sm font-display font-semibold text-onyx truncate">{acc.name}</span>
                           {target !== undefined && target > 0 && (
                             <span className="px-1.5 py-0.5 text-[9px] bg-stone border border-black/10 text-graphite font-bold rounded">{target}%</span>
                           )}
+                          <RecentBadge indicator={recentTx} formatCurrency={formatCurrency} />
                         </div>
                         <div className="text-[10px] text-graphite uppercase tracking-widest mt-0.5">
                           {acc.type === 'INCOME' ? 'Ingresos' : acc.type === 'EXPENSE' ? 'Gasto' : 'Holding'}{hasSubs ? ` · ${acc.subAccounts.length} sub` : ''}
@@ -426,6 +465,11 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                             {formatCurrency(e.amount, e.currency)}
                           </div>
                         )) : <div className="text-sm font-display font-bold text-graphite tabular">{formatCurrency(0)}</div>}
+                        {hasSubBalance && combinedEntries.map((e) => (
+                          <div key={`total-${e.currency}`} className="text-[10px] text-graphite/80 tabular">
+                            <span className="uppercase tracking-widest text-[8px] mr-1">Total</span>{formatCurrency(e.amount, e.currency)}
+                          </div>
+                        ))}
                         {recentlyAdded && (
                           <div className="text-[10px] font-bold text-emerald-700 wv-fade-in">+{formatCurrency(recentlyAdded, primary?.currency)}</div>
                         )}
@@ -446,15 +490,19 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                           const subEntries = balanceEntries(sub.balances);
                           const subAmount = subEntries[0]?.amount || 0;
                           const progress = sub.target ? Math.min(100, (subAmount / sub.target) * 100) : null;
+                          const subRecent = recentTxByAccount[`${acc.id}:${sub.id}`];
                           return (
                             <div
                               key={sub.id}
                               onClick={() => { haptic('selection'); onAccountHistory(ctx.id, acc.id, sub.id); }}
                               className="bg-white border border-black/5 rounded-xl p-3 cursor-pointer active:scale-[0.99] hover:border-alloy transition-all"
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="text-xs font-medium text-onyx truncate">{sub.name}</span>
-                                <span className="text-xs font-display font-bold text-onyx tabular">
+                              <div className="flex items-center justify-between mb-1 gap-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <span className="text-xs font-medium text-onyx truncate">{sub.name}</span>
+                                  <RecentBadge indicator={subRecent} formatCurrency={formatCurrency} />
+                                </div>
+                                <span className="text-xs font-display font-bold text-onyx tabular flex-shrink-0">
                                   {subEntries.length > 0 ? subEntries.map((e) => formatCurrency(e.amount, e.currency)).join(' / ') : formatCurrency(0)}
                                 </span>
                               </div>
@@ -649,10 +697,34 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
   );
 };
 
+// ─── SPACE FILTER CHIPS (inline filter by workspace) ────────────────────
+const SpaceFilterChips: React.FC<{ contexts: FinancialContext[]; value: string; onChange: (id: string) => void }> = ({ contexts, value, onChange }) => (
+  <div className="flex items-center gap-1.5 flex-wrap">
+    <button
+      type="button"
+      onClick={() => { haptic('selection'); onChange('ALL'); }}
+      className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === 'ALL' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
+    >
+      Todos
+    </button>
+    {contexts.map((c) => (
+      <button
+        key={c.id}
+        type="button"
+        onClick={() => { haptic('selection'); onChange(c.id); }}
+        className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === c.id ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
+      >
+        {c.name}
+      </button>
+    ))}
+  </div>
+);
+
 // ─── SUBSCRIPTIONS ──────────────────────────────────────────────────────
 interface SubsProps {
   state: AppState;
   contextFilter: string;
+  setContextFilter: (id: string) => void;
   subscriptionStatusFilter: 'ALL' | 'ACTIVE' | 'PAUSED';
   setSubscriptionStatusFilter: (f: any) => void;
   formatCurrency: (n: number, c?: string) => string;
@@ -663,7 +735,7 @@ interface SubsProps {
   getAccountName: (cId: string, aId: string) => string;
   getSubAccountName: (cId: string, aId: string, sId: string) => string;
 }
-export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
+export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter, setContextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
   const list = useMemo(() => {
     return state.subscriptions
       .filter((s) => contextFilter === 'ALL' || s.contextId === contextFilter)
@@ -729,16 +801,22 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
         </div>
       </section>
 
-      <div className="px-5 lg:px-8 mb-3 lg:mb-4 max-w-[480px] lg:max-w-none">
+      <div className="px-5 lg:px-8 mb-3 lg:mb-4 max-w-[480px] lg:max-w-none space-y-3">
         <Segmented
           options={[
-            { id: 'ALL', label: 'Todas' },
             { id: 'ACTIVE', label: 'Activas' },
+            { id: 'ALL', label: 'Todas' },
             { id: 'PAUSED', label: 'Pausadas' },
           ]}
           activeId={subscriptionStatusFilter}
           onChange={(id) => setSubscriptionStatusFilter(id as any)}
         />
+        {state.contexts.length > 1 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">Espacio:</span>
+            <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
+          </div>
+        )}
       </div>
 
       {list.length === 0 ? (
@@ -804,29 +882,44 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
 interface CatProps {
   state: AppState;
   contextFilter: string;
+  setContextFilter: (id: string) => void;
   formatCurrency: (n: number, c?: string) => string;
   onCategoryClick: (c: Category) => void;
   onCategoryEdit: (c: Category) => void;
   onAddCategory: () => void;
   getAccountName: (cId: string, aId: string) => string;
 }
-export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
+export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, setContextFilter, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
   const list = state.categories.filter((c) => contextFilter === 'ALL' || c.contextId === contextFilter);
+  const showSpaceFilter = state.contexts.length > 1;
+
+  const totalByCategory = (catId: string) => {
+    return state.transactions.filter((tx) => tx.categoryId === catId && !tx.deletedAt).reduce((sum, tx) => sum + tx.amount, 0);
+  };
 
   if (list.length === 0) {
     return (
       <div className="pb-tabbar">
+        {showSpaceFilter && (
+          <div className="px-5 lg:px-8 pt-2 pb-3 flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">Espacio:</span>
+            <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
+          </div>
+        )}
         <EmptyState icon={Icons.Category} title="Sin categorías" description="Crea categorías para organizar tus gastos." action={{ label: 'Nueva categoría', onClick: onAddCategory }} />
       </div>
     );
   }
 
-  const totalByCategory = (catId: string) => {
-    return state.transactions.filter((tx) => tx.categoryId === catId).reduce((sum, tx) => sum + tx.amount, 0);
-  };
-
   return (
-    <div className="pb-tabbar px-3 lg:px-8 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 mt-2">
+    <div className="pb-tabbar">
+      {showSpaceFilter && (
+        <div className="px-5 lg:px-8 pt-2 pb-3 flex items-center gap-2 flex-wrap">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">Espacio:</span>
+          <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
+        </div>
+      )}
+      <div className="px-3 lg:px-8 space-y-3 lg:space-y-0 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 mt-2">
       {list.map((c) => {
         const ctx = state.contexts.find((x) => x.id === c.contextId);
         const total = totalByCategory(c.id);
@@ -882,6 +975,7 @@ export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, for
         <Icons.Plus className="w-4 h-4" />
         Nueva Categoría
       </button>
+      </div>
     </div>
   );
 };
@@ -1235,12 +1329,8 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
     if (!userId) return;
     supabase.from('notification_preferences').select('*').eq('user_id', userId).maybeSingle().then(({ data }) => {
       setPrefs(data || {
-        renewals_enabled: true, renewals_days_before: 3,
-        budget_alerts_enabled: true, budget_threshold: 90,
-        income_received_enabled: true, account_status_enabled: true,
         weekly_summary_enabled: true,
-        quiet_hours_enabled: true,
-        quiet_hours_start: 22, quiet_hours_end: 8
+        weekly_summary_day: 1, // Monday
       });
       setLoading(false);
     });
@@ -1304,60 +1394,50 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
         )}
       </div>
 
-      {/* Categorías */}
+      {/* Notification settings (only when push is active) */}
       {!loading && prefs && pushSubscribed && (
         <>
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite px-2">Tipos de Aviso</div>
-          <div className="bg-white border border-black/5 rounded-2xl divide-y divide-black/5">
-            <ToggleRow label="Renovaciones próximas" desc={`Aviso ${prefs.renewals_days_before ?? 3} días antes + 1 día + el día`} value={prefs.renewals_enabled} onChange={(v) => update({ renewals_enabled: v })} />
-            <ToggleRow label="Alertas de presupuesto" desc={`Cuando una categoría alcanza ${prefs.budget_threshold ?? 90}%`} value={prefs.budget_alerts_enabled} onChange={(v) => update({ budget_alerts_enabled: v })} />
-            <ToggleRow label="Pago recibido" desc="Confirmaciones de ingresos" value={prefs.income_received_enabled} onChange={(v) => update({ income_received_enabled: v })} />
-            <ToggleRow label="Estado de cuenta" desc="Pausas, reactivaciones, errores de pago" value={prefs.account_status_enabled} onChange={(v) => update({ account_status_enabled: v })} />
-            <ToggleRow label="Resumen semanal" desc="Cada lunes, repaso financiero" value={prefs.weekly_summary_enabled} onChange={(v) => update({ weekly_summary_enabled: v })} />
-          </div>
-
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite px-2 mt-4">Aviso de Renovación</div>
-          <div className="bg-white border border-black/5 rounded-2xl p-4">
-            <div className="text-sm text-onyx mb-3">Avisar primero <span className="font-display font-bold text-gold">{prefs.renewals_days_before ?? 3}</span> días antes</div>
-            <input
-              type="range"
-              min="1" max="14"
-              value={prefs.renewals_days_before ?? 3}
-              onChange={(e) => update({ renewals_days_before: Number(e.target.value) })}
-              className="w-full accent-onyx"
-            />
-            <div className="flex justify-between text-[10px] text-graphite mt-1"><span>1d</span><span>7d</span><span>14d</span></div>
-          </div>
-
-          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite px-2 mt-4">Modo Silencioso</div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite px-2">Resumen Semanal</div>
           <div className="bg-white border border-black/5 rounded-2xl divide-y divide-black/5">
             <ToggleRow
-              label="Activar modo silencioso"
-              desc={prefs.quiet_hours_enabled === false ? 'Recibirás avisos a cualquier hora' : `No te molestaremos entre ${String(prefs.quiet_hours_start ?? 22).padStart(2, '0')}:00 y ${String(prefs.quiet_hours_end ?? 8).padStart(2, '0')}:00`}
-              value={prefs.quiet_hours_enabled !== false}
-              onChange={(v) => update({ quiet_hours_enabled: v })}
+              label="Activar resumen semanal"
+              desc="Te enviaremos un repaso de tus finanzas cada semana"
+              value={prefs.weekly_summary_enabled !== false}
+              onChange={(v) => update({ weekly_summary_enabled: v })}
             />
-            {prefs.quiet_hours_enabled !== false && (
-              <div className="p-4 grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Inicio</label>
-                  <select value={prefs.quiet_hours_start ?? 22} onChange={(e) => update({ quiet_hours_start: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
-                    {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] uppercase tracking-widest text-graphite block mb-1">Fin</label>
-                  <select value={prefs.quiet_hours_end ?? 8} onChange={(e) => update({ quiet_hours_end: Number(e.target.value) })} className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm">
-                    {Array.from({ length: 24 }, (_, i) => i).map((h) => <option key={h} value={h}>{String(h).padStart(2, '0')}:00</option>)}
-                  </select>
-                </div>
+            {prefs.weekly_summary_enabled !== false && (
+              <div className="p-4">
+                <label className="text-[10px] uppercase tracking-widest text-graphite font-bold block mb-2">Día de envío</label>
+                <select
+                  value={prefs.weekly_summary_day ?? 1}
+                  onChange={(e) => update({ weekly_summary_day: Number(e.target.value) })}
+                  className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm"
+                >
+                  <option value={1}>Lunes</option>
+                  <option value={2}>Martes</option>
+                  <option value={3}>Miércoles</option>
+                  <option value={4}>Jueves</option>
+                  <option value={5}>Viernes</option>
+                  <option value={6}>Sábado</option>
+                  <option value={0}>Domingo</option>
+                </select>
               </div>
             )}
           </div>
 
+          <div className="p-4 bg-gold/10 border border-gold/30 rounded-2xl flex items-start gap-3 mt-4">
+            <IconCircle tone="gold" size="sm"><Icons.Subscription className="w-3.5 h-3.5" /></IconCircle>
+            <div>
+              <div className="text-sm font-display font-bold text-onyx">Avisos de Renovación</div>
+              <div className="text-[11px] text-graphite mt-0.5">
+                Se configuran <strong>en cada suscripción</strong>: al crear o editar una suscripción, define cuántos minutos/horas/días antes quieres recibir el aviso.
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={() => { haptic('medium'); showLocalTest('Notificación de Prueba', 'Las notificaciones funcionan correctamente'); }}
-            className="w-full h-12 bg-stone border border-black/5 rounded-2xl text-sm font-display font-bold uppercase tracking-widest text-onyx active:scale-[0.98]"
+            className="w-full h-12 bg-stone border border-black/5 rounded-2xl text-sm font-display font-bold uppercase tracking-widest text-onyx active:scale-[0.98] mt-4"
           >
             Enviar Notificación de Prueba
           </button>
