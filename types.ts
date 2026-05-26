@@ -51,6 +51,18 @@ export interface Transaction {
   toContextId?: string;
   toAccountId?: string;
   toSubAccountId?: string;
+  // Soft delete — null/undefined = active, ISO timestamp = deleted at that time
+  deletedAt?: string | null;
+}
+
+export interface TransactionAudit {
+  id: string;
+  transactionId: string;
+  userId: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
+  dataBefore?: any;
+  dataAfter?: any;
+  performedAt: string;
 }
 
 export interface Subscription {

@@ -37,6 +37,8 @@ import {
   DashboardSummarySheet,
   DeleteConfirmSheet,
   PasswordSetupSheet,
+  AccountHistorySheet,
+  TrashSheet,
 } from './components/MobileDetails';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 
@@ -166,7 +168,8 @@ function App() {
           categoryId: t.category_id,
           toContextId: t.to_context_id,
           toAccountId: t.to_account_id,
-          toSubAccountId: t.to_sub_account_id
+          toSubAccountId: t.to_sub_account_id,
+          deletedAt: t.deleted_at,
         }));
 
         // Check if account is paused
@@ -182,6 +185,14 @@ function App() {
           setNeedsOnboarding(false);
         }
 
+        // Resolve timezone with safe fallback chain: db → browser → UTC
+        const browserTz = (() => {
+          try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { return ''; }
+        })();
+        const resolvedTz = p.timezone && p.timezone !== 'UTC' ? p.timezone
+          : (browserTz && browserTz !== 'UTC') ? browserTz
+          : (p.timezone || 'UTC');
+
         setState(migrateState({
           user: {
             name: p.name || INITIAL_STATE.user.name,
@@ -189,7 +200,7 @@ function App() {
             currency: userCurrency,
             darkMode: p.dark_mode || INITIAL_STATE.user.darkMode,
             language: p.language || INITIAL_STATE.user.language,
-            timezone: p.timezone || INITIAL_STATE.user.timezone,
+            timezone: resolvedTz,
             avatarUrl: p.avatar_url,
           },
           contexts,
@@ -253,7 +264,8 @@ function App() {
         category_id: t.categoryId,
         to_context_id: t.toContextId,
         to_account_id: t.toAccountId,
-        to_sub_account_id: t.toSubAccountId
+        to_sub_account_id: t.toSubAccountId,
+        deleted_at: t.deletedAt ?? null,
       }));
 
       if (toUpsert.length > 0) {
@@ -350,12 +362,61 @@ function App() {
       }
   };
 
+  const tz = state.user.timezone;
+
   const formatDateTime = (isoString: string) => {
       try {
           return new Intl.DateTimeFormat('es-ES', {
               year: 'numeric', month: '2-digit', day: '2-digit',
               hour: '2-digit', minute: '2-digit',
-              timeZone: state.user.timezone
+              timeZone: tz
+          }).format(new Date(isoString));
+      } catch (e) {
+          return isoString;
+      }
+  };
+
+  // Time only (HH:MM) in user's timezone
+  const formatTime = (isoString: string) => {
+      try {
+          return new Intl.DateTimeFormat('es-ES', {
+              hour: '2-digit', minute: '2-digit',
+              timeZone: tz
+          }).format(new Date(isoString));
+      } catch (e) {
+          return '';
+      }
+  };
+
+  // Day key (YYYY-MM-DD) in user's timezone — used for grouping transactions by day
+  const getDayKey = (isoString: string) => {
+      try {
+          const parts = new Intl.DateTimeFormat('en-CA', {
+              year: 'numeric', month: '2-digit', day: '2-digit',
+              timeZone: tz
+          }).formatToParts(new Date(isoString));
+          const y = parts.find(p => p.type === 'year')?.value;
+          const m = parts.find(p => p.type === 'month')?.value;
+          const d = parts.find(p => p.type === 'day')?.value;
+          return `${y}-${m}-${d}`;
+      } catch (e) {
+          return isoString.split('T')[0];
+      }
+  };
+
+  // Friendly day label in user's timezone
+  const formatDayLabel = (isoString: string) => {
+      try {
+          const now = new Date();
+          const today = getDayKey(now.toISOString());
+          const yesterday = new Date(now.getTime() - 86_400_000);
+          const yKey = getDayKey(yesterday.toISOString());
+          const key = getDayKey(isoString);
+          if (key === today) return 'Hoy';
+          if (key === yKey) return 'Ayer';
+          return new Intl.DateTimeFormat('es-ES', {
+              weekday: 'long', day: 'numeric', month: 'long',
+              timeZone: tz
           }).format(new Date(isoString));
       } catch (e) {
           return isoString;
@@ -418,8 +479,19 @@ function App() {
       setIsFilterOpen(false); // Close filter after selection
   };
 
+  // Active transactions only (exclude soft-deleted)
+  const activeTransactions = useMemo(
+      () => state.transactions.filter(t => !t.deletedAt),
+      [state.transactions]
+  );
+  const deletedTransactions = useMemo(
+      () => state.transactions.filter(t => !!t.deletedAt)
+          .sort((a, b) => new Date(b.deletedAt!).getTime() - new Date(a.deletedAt!).getTime()),
+      [state.transactions]
+  );
+
   // --- Calculations for Dashboard ---
-  const filteredTransactions = state.transactions.filter(t => 
+  const filteredTransactions = activeTransactions.filter(t =>
       contextFilter === 'ALL' || t.contextId === contextFilter
   );
 
@@ -665,6 +737,7 @@ function App() {
         transactions: [newTx, ...prev.transactions],
         contexts: newContexts
     }));
+    logAudit(newTx.id, 'CREATE', null, newTx);
 
     if (data.type === 'INCOME' && data.distribute) {
         setTimeout(() => distributeIncome(data.contextId, cur, data.amount), 50);
@@ -720,49 +793,84 @@ function App() {
       setState(prev => ({ ...prev, subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s) }));
   };
 
-  const handleDeleteTransaction = (txId: string) => {
-      const tx = state.transactions.find(t => t.id === txId);
-      if (!tx) return;
-      const newContexts = [...state.contexts];
-
-      // Reverse balance effect
+  // Apply (or reverse, with sign = -1) a transaction's effect on context balances.
+  const applyTxEffect = (contexts: FinancialContext[], tx: Transaction, sign: 1 | -1): FinancialContext[] => {
+      const newContexts = [...contexts];
       const ctxIdx = newContexts.findIndex(c => c.id === tx.contextId);
       if (ctxIdx > -1) {
           const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === tx.accountId);
           if (accIdx > -1) {
               const acc = newContexts[ctxIdx].accounts[accIdx];
-              const reverseDelta = tx.type === 'INCOME' ? -tx.amount : tx.amount;
+              const delta = sign * (tx.type === 'INCOME' ? tx.amount : -tx.amount);
               if (tx.subAccountId) {
                   const subIdx = acc.subAccounts.findIndex(s => s.id === tx.subAccountId);
-                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, reverseDelta);
+                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, delta);
               } else {
-                  acc.balances = addToBalance(acc.balances, tx.currency, reverseDelta);
+                  acc.balances = addToBalance(acc.balances, tx.currency, delta);
               }
           }
       }
-
-      // For transfers, also reverse the destination
       if (tx.type === 'TRANSFER' && tx.toContextId && tx.toAccountId) {
           const toCtxIdx = newContexts.findIndex(c => c.id === tx.toContextId);
           if (toCtxIdx > -1) {
               const toAccIdx = newContexts[toCtxIdx].accounts.findIndex(a => a.id === tx.toAccountId);
               if (toAccIdx > -1) {
                   const acc = newContexts[toCtxIdx].accounts[toAccIdx];
+                  const delta = sign * tx.amount;
                   if (tx.toSubAccountId) {
                       const subIdx = acc.subAccounts.findIndex(s => s.id === tx.toSubAccountId);
-                      if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, -tx.amount);
+                      if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, delta);
                   } else {
-                      acc.balances = addToBalance(acc.balances, tx.currency, -tx.amount);
+                      acc.balances = addToBalance(acc.balances, tx.currency, delta);
                   }
               }
           }
       }
+      return newContexts;
+  };
 
+  // Audit log helper — fire-and-forget insert.
+  const logAudit = (txId: string, action: 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE', before?: any, after?: any) => {
+      const uid = session?.user?.id;
+      if (!uid) return;
+      supabase.from('transaction_audit').insert({
+          transaction_id: txId,
+          user_id: uid,
+          action,
+          data_before: before ?? null,
+          data_after: after ?? null,
+      }).then(({ error }) => { if (error) console.warn('[audit]', error.message); });
+  };
+
+  const handleDeleteTransaction = (txId: string) => {
+      const tx = state.transactions.find(t => t.id === txId);
+      if (!tx || tx.deletedAt) return;
+
+      // Reverse balance, soft-mark as deleted, log audit
+      const reverted = applyTxEffect(state.contexts, tx, -1);
+      const deletedAt = new Date().toISOString();
       setState(prev => ({
           ...prev,
-          transactions: prev.transactions.filter(t => t.id !== txId),
-          contexts: newContexts
+          transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt } : t),
+          contexts: reverted,
       }));
+      logAudit(txId, 'DELETE', tx, { ...tx, deletedAt });
+  };
+
+  const handleRestoreTransaction = (txId: string) => {
+      const tx = state.transactions.find(t => t.id === txId);
+      if (!tx || !tx.deletedAt) return;
+
+      // Re-apply balance, clear deletedAt, log audit
+      const reapplied = applyTxEffect(state.contexts, tx, 1);
+      const before = { ...tx };
+      const after = { ...tx, deletedAt: null };
+      setState(prev => ({
+          ...prev,
+          transactions: prev.transactions.map(t => t.id === txId ? { ...t, deletedAt: null } : t),
+          contexts: reapplied,
+      }));
+      logAudit(txId, 'RESTORE', before, after);
   };
 
   const handleBulkDeleteTransactions = (txIds: Set<string>) => {
@@ -809,11 +917,13 @@ function App() {
           }
       }
 
+      const updatedTx = { ...oldTx, ...data, currency: cur };
       setState(prev => ({
           ...prev,
-          transactions: prev.transactions.map(t => t.id === data.id ? { ...t, ...data, currency: cur } : t),
+          transactions: prev.transactions.map(t => t.id === data.id ? updatedTx : t),
           contexts: newContexts
       }));
+      logAudit(oldTx.id, 'UPDATE', oldTx, updatedTx);
   };
 
   const handleNewBusiness = (data: any) => {
@@ -897,6 +1007,8 @@ function App() {
 
   // ─── Mobile-only state ─────────────────────────────────────────────
   const [moreOpen, setMoreOpen] = useState(false);
+  const [accountHistoryTarget, setAccountHistoryTarget] = useState<{ contextId: string; accountId: string; subAccountId?: string } | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   // ─── PWA / Push bootstrap ──────────────────────────────────────────
   useEffect(() => {
@@ -1147,6 +1259,7 @@ function App() {
               onUndoDistribution={undoLastDistribution}
               canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
               recentDistributions={recentDistributions}
+              onAccountHistory={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
             />
           )}
           {currentView === 'TRANSACTIONS' && (
@@ -1161,6 +1274,9 @@ function App() {
               setBulkSelectedTxIds={setBulkSelectedTxIds}
               formatCurrency={formatCurrency}
               formatDateTime={formatDateTime}
+              formatTime={formatTime}
+              formatDayLabel={formatDayLabel}
+              getDayKey={getDayKey}
               onTxClick={(tx) => setSelectedTransaction(tx)}
               onBulkDelete={() => {
                 if (confirm(`¿Eliminar ${bulkSelectedTxIds.size} transacción(es)?`)) handleBulkDeleteTransactions(bulkSelectedTxIds);
@@ -1219,6 +1335,8 @@ function App() {
               onNewBusiness={() => setActiveModal('NEW_BIZ')}
               onSignOut={() => { if (confirm('¿Cerrar sesión?')) supabase.auth.signOut(); }}
               onSaveProfile={handleSaveProfile}
+              onOpenTrash={() => setTrashOpen(true)}
+              deletedCount={deletedTransactions.length}
             />
           )}
         </main>
@@ -1371,6 +1489,31 @@ function App() {
             if (error) setPasswordError(error.message);
             else { setShowPasswordModal(false); setNewPassword(''); setConfirmPassword(''); }
           }}
+        />
+
+        <AccountHistorySheet
+          state={state}
+          open={!!accountHistoryTarget}
+          onClose={() => setAccountHistoryTarget(null)}
+          target={accountHistoryTarget}
+          transactions={activeTransactions}
+          onTxClick={(tx) => setSelectedTransaction(tx)}
+          formatCurrency={formatCurrency}
+          formatDateTime={formatDateTime}
+          getAccountName={getAccountName}
+          getSubAccountName={getSubAccountName}
+        />
+
+        <TrashSheet
+          state={state}
+          open={trashOpen}
+          onClose={() => setTrashOpen(false)}
+          deletedTransactions={deletedTransactions}
+          onRestore={(txId) => handleRestoreTransaction(txId)}
+          formatCurrency={formatCurrency}
+          formatDateTime={formatDateTime}
+          getAccountName={getAccountName}
+          getSubAccountName={getSubAccountName}
         />
       </MobileShell>
     </ToastProvider>

@@ -334,6 +334,164 @@ export const PasswordSetupSheet: React.FC<{
   </BottomSheet>
 );
 
+// ─── ACCOUNT HISTORY ────────────────────────────────────────────────────
+export const AccountHistorySheet: React.FC<CommonProps & {
+  open: boolean;
+  onClose: () => void;
+  target: { contextId: string; accountId: string; subAccountId?: string } | null;
+  transactions: Transaction[]; // active only
+  onTxClick: (tx: Transaction) => void;
+}> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, open, onClose, target, transactions, onTxClick }) => {
+  if (!target) return null;
+  const ctx = state.contexts.find((c) => c.id === target.contextId);
+  const accName = getAccountName(target.contextId, target.accountId);
+  const subName = target.subAccountId ? getSubAccountName(target.contextId, target.accountId, target.subAccountId) : null;
+
+  const history = transactions
+    .filter((tx) => {
+      // Outbound: tx originating in this account/subaccount
+      const out = tx.contextId === target.contextId && tx.accountId === target.accountId &&
+        (target.subAccountId ? tx.subAccountId === target.subAccountId : !tx.subAccountId);
+      // Inbound (transfers): tx arriving to this account/subaccount
+      const inbound = tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId &&
+        (target.subAccountId ? tx.toSubAccountId === target.subAccountId : !tx.toSubAccountId);
+      return out || inbound;
+    })
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  // Compute totals (per currency)
+  const totals: Record<string, { income: number; expense: number; net: number }> = {};
+  history.forEach((tx) => {
+    if (!totals[tx.currency]) totals[tx.currency] = { income: 0, expense: 0, net: 0 };
+    const isInbound = tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId;
+    const isOutbound = tx.contextId === target.contextId && tx.accountId === target.accountId && !isInbound;
+    if (tx.type === 'INCOME' && isOutbound) { totals[tx.currency].income += tx.amount; totals[tx.currency].net += tx.amount; }
+    else if (tx.type === 'EXPENSE' && isOutbound) { totals[tx.currency].expense += tx.amount; totals[tx.currency].net -= tx.amount; }
+    else if (tx.type === 'TRANSFER') {
+      if (isInbound) { totals[tx.currency].income += tx.amount; totals[tx.currency].net += tx.amount; }
+      else if (isOutbound) { totals[tx.currency].expense += tx.amount; totals[tx.currency].net -= tx.amount; }
+    }
+  });
+
+  return (
+    <BottomSheet open={open} onClose={onClose} title={subName || accName} subtitle={`${ctx?.name || ''} · Historial`} size="full">
+      {/* Totals header */}
+      {Object.entries(totals).length > 0 && (
+        <div className="space-y-2 mb-4">
+          {Object.entries(totals).map(([cur, t]) => (
+            <div key={cur} className="grid grid-cols-3 gap-2">
+              <div className="bg-white border border-black/5 rounded-2xl p-3 text-center">
+                <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Entradas</div>
+                <div className="text-sm font-display font-bold text-emerald-700 tabular mt-1">+{formatCurrency(t.income, cur)}</div>
+              </div>
+              <div className="bg-white border border-black/5 rounded-2xl p-3 text-center">
+                <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Salidas</div>
+                <div className="text-sm font-display font-bold text-rose-700 tabular mt-1">-{formatCurrency(t.expense, cur)}</div>
+              </div>
+              <div className="bg-white border border-black/5 rounded-2xl p-3 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-gold" />
+                <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Neto</div>
+                <div className={`text-sm font-display font-bold tabular mt-1 ${t.net >= 0 ? 'text-onyx' : 'text-rose-700'}`}>{t.net >= 0 ? '+' : ''}{formatCurrency(t.net, cur)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-2 px-2">
+        {history.length} movimiento{history.length !== 1 ? 's' : ''}
+      </div>
+
+      {history.length === 0 ? (
+        <div className="text-center text-sm text-graphite py-8">Sin movimientos en esta {subName ? 'sub-cuenta' : 'cuenta'}</div>
+      ) : (
+        <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+          {history.map((tx) => {
+            const isInbound = tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId;
+            const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
+            const positive = tx.type === 'INCOME' || isInbound;
+            const tone: any = positive ? 'income' : tx.type === 'TRANSFER' ? 'transfer' : 'expense';
+            const Icon = positive ? Icons.Income : tx.type === 'TRANSFER' ? Icons.Transfer : Icons.Expense;
+            return (
+              <div key={tx.id} onClick={() => { onClose(); onTxClick(tx); }} className="flex items-center gap-3 p-3 active:bg-stone cursor-pointer">
+                <IconCircle tone={tone} bgColor={cat?.color}><Icon className="w-4 h-4" /></IconCircle>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-onyx truncate">{tx.notes || (tx.type === 'TRANSFER' ? (isInbound ? 'Recibido' : 'Enviado') : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</div>
+                  <div className="text-[11px] text-graphite truncate">
+                    {formatDateTime(tx.date)}{cat ? ` · ${cat.name}` : ''}
+                  </div>
+                </div>
+                <span className={`text-sm font-display font-bold tabular ${positive ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {positive ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+};
+
+// ─── PAPELERA / TRASH ───────────────────────────────────────────────────
+export const TrashSheet: React.FC<CommonProps & {
+  open: boolean;
+  onClose: () => void;
+  deletedTransactions: Transaction[];
+  onRestore: (txId: string) => void;
+  onHardDelete?: (txId: string) => void;
+}> = ({ state, formatCurrency, formatDateTime, open, onClose, deletedTransactions, onRestore }) => {
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Papelera" subtitle="Restaurar transacciones eliminadas" size="full">
+      <div className="mb-4 p-3 bg-gold/10 border border-gold/30 rounded-xl flex items-start gap-3">
+        <IconCircle tone="gold" size="sm"><Icons.Info className="w-3.5 h-3.5" /></IconCircle>
+        <div className="text-[11px] text-graphite">
+          Las transacciones eliminadas se conservan <strong className="text-onyx">30 días</strong> para que puedas restaurarlas. Después se borran definitivamente.
+        </div>
+      </div>
+
+      {deletedTransactions.length === 0 ? (
+        <div className="text-center text-sm text-graphite py-8">
+          <IconCircle tone="default" size="lg"><Icons.Trash className="w-5 h-5" /></IconCircle>
+          <div className="mt-3">No hay transacciones eliminadas</div>
+        </div>
+      ) : (
+        <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+          {deletedTransactions.map((tx) => {
+            const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
+            const ctx = state.contexts.find((c) => c.id === tx.contextId);
+            const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
+            const tone: any = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
+            const deletedDaysAgo = tx.deletedAt ? Math.floor((Date.now() - new Date(tx.deletedAt).getTime()) / 86_400_000) : 0;
+            const daysLeft = 30 - deletedDaysAgo;
+            return (
+              <div key={tx.id} className="flex items-center gap-3 p-3">
+                <IconCircle tone={tone} bgColor={cat?.color}><Icon className="w-4 h-4" /></IconCircle>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-onyx truncate">{tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</div>
+                  <div className="text-[11px] text-graphite truncate">
+                    {formatCurrency(tx.amount, tx.currency)} · {ctx?.name}{cat ? ` · ${cat.name}` : ''}
+                  </div>
+                  <div className="text-[10px] text-rose-700 mt-0.5">
+                    Eliminada {deletedDaysAgo === 0 ? 'hoy' : `hace ${deletedDaysAgo} día${deletedDaysAgo !== 1 ? 's' : ''}`} · Se borrará en {daysLeft} día{daysLeft !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => { haptic('medium'); onRestore(tx.id); }}
+                  className="h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-colors flex-shrink-0 flex items-center gap-1.5"
+                >
+                  <Icons.Refresh className="w-3 h-3" />
+                  Restaurar
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+};
+
 // ─── SHARED ROW ─────────────────────────────────────────────────────────
 const DetailRow: React.FC<{ label: string; value: React.ReactNode; mono?: boolean }> = ({ label, value, mono }) => (
   <div className="flex items-center justify-between p-3.5 gap-3">

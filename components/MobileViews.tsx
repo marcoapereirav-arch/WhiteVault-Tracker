@@ -349,8 +349,9 @@ interface AccountsProps {
   onUndoDistribution: () => void;
   canUndo: boolean;
   recentDistributions: { [accountId: string]: number };
+  onAccountHistory: (ctxId: string, accId: string, subId?: string) => void;
 }
-export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurrency, onDistributeIncome, onAddSubAccount, recentDistributions }) => {
+export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, onAccountHistory }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => {
@@ -404,8 +405,8 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                 return (
                   <div key={acc.id}>
                     <div
-                      className="flex items-center gap-3 p-4 active:bg-stone cursor-pointer"
-                      onClick={() => hasSubs && toggle(acc.id)}
+                      className="flex items-center gap-3 p-4 active:bg-stone cursor-pointer transition-colors"
+                      onClick={() => { haptic('selection'); onAccountHistory(ctx.id, acc.id); }}
                     >
                       <div className="w-2 h-2 bg-onyx rotate-45 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -429,7 +430,15 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                           <div className="text-[10px] font-bold text-emerald-700 wv-fade-in">+{formatCurrency(recentlyAdded, primary?.currency)}</div>
                         )}
                       </div>
-                      {hasSubs && <Icons.ChevronDown className={`w-4 h-4 text-graphite transition-transform ${isOpen ? 'rotate-180' : ''}`} />}
+                      {hasSubs && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggle(acc.id); }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone active:scale-95 transition-all"
+                          aria-label={isOpen ? 'Colapsar' : 'Expandir'}
+                        >
+                          <Icons.ChevronDown className={`w-4 h-4 text-graphite transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                      )}
                     </div>
                     {hasSubs && isOpen && (
                       <div className="bg-stone/50 px-5 py-3 space-y-2 border-t border-black/5">
@@ -438,7 +447,11 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                           const subAmount = subEntries[0]?.amount || 0;
                           const progress = sub.target ? Math.min(100, (subAmount / sub.target) * 100) : null;
                           return (
-                            <div key={sub.id} className="bg-white border border-black/5 rounded-xl p-3">
+                            <div
+                              key={sub.id}
+                              onClick={() => { haptic('selection'); onAccountHistory(ctx.id, acc.id, sub.id); }}
+                              className="bg-white border border-black/5 rounded-xl p-3 cursor-pointer active:scale-[0.99] hover:border-alloy transition-all"
+                            >
                               <div className="flex items-center justify-between mb-1">
                                 <span className="text-xs font-medium text-onyx truncate">{sub.name}</span>
                                 <span className="text-xs font-display font-bold text-onyx tabular">
@@ -495,10 +508,13 @@ interface TxProps {
   setBulkSelectedTxIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   formatCurrency: (n: number, c?: string) => string;
   formatDateTime: (s: string) => string;
+  formatTime: (s: string) => string;
+  formatDayLabel: (s: string) => string;
+  getDayKey: (s: string) => string;
   onTxClick: (tx: Transaction) => void;
   onBulkDelete: () => void;
 }
-export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatDateTime, onTxClick, onBulkDelete }) => {
+export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatTime, formatDayLabel, getDayKey, onTxClick, onBulkDelete }) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     return filteredTransactions
@@ -507,15 +523,16 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [filteredTransactions, transactionTypeFilter, search]);
 
+  // Group by day in user's timezone (not UTC)
   const grouped = useMemo(() => {
     const map = new Map<string, Transaction[]>();
     filtered.forEach((tx) => {
-      const day = new Date(tx.date).toISOString().split('T')[0];
+      const day = getDayKey(tx.date);
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(tx);
     });
     return Array.from(map.entries());
-  }, [filtered]);
+  }, [filtered, getDayKey]);
 
   return (
     <div className="pb-tabbar">
@@ -569,10 +586,8 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
       ) : (
         <div className="px-3 lg:px-8 mt-2 space-y-4">
           {grouped.map(([day, txs]) => {
-            const date = new Date(day);
-            const today = new Date(); today.setHours(0,0,0,0);
-            const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-            const label = date.getTime() === today.getTime() ? 'Hoy' : date.getTime() === yesterday.getTime() ? 'Ayer' : new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+            // Use any tx of that day for label (already in user tz via getDayKey)
+            const label = formatDayLabel(txs[0].date);
             return (
               <div key={day}>
                 <div className="px-3 mb-2 flex items-center justify-between">
@@ -615,7 +630,7 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-onyx truncate">{tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</div>
                           <div className="text-xs text-graphite truncate">
-                            {new Intl.DateTimeFormat('es-ES', { hour: '2-digit', minute: '2-digit' }).format(new Date(tx.date))}{cat ? ` · ${cat.name}` : ''}
+                            {formatTime(tx.date)}{cat ? ` · ${cat.name}` : ''}
                           </div>
                         </div>
                         <span className={`text-sm font-display font-bold tabular ${tx.type === 'INCOME' ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : 'text-onyx'}`}>
@@ -892,6 +907,8 @@ interface SettingsProps {
   onNewBusiness: () => void;
   onSignOut: () => void;
   onSaveProfile: () => Promise<void>;
+  onOpenTrash: () => void;
+  deletedCount: number;
 }
 export const MobileSettings: React.FC<SettingsProps> = (p) => {
   const [section, setSection] = useState<'profile' | 'currency' | 'timezone' | 'distribution' | 'notifications' | 'security' | null>(null);
@@ -992,6 +1009,13 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
             <ListRow leading={<IconCircle tone="gold"><Icons.Chart className="w-4 h-4" /></IconCircle>} title="Distribución (Profit First)" subtitle={`${p.state.contexts.length} ${p.state.contexts.length === 1 ? 'espacio' : 'espacios'}`} onClick={() => setSection('distribution')} />
             <ListRow leading={<IconCircle><Icons.Building className="w-4 h-4" /></IconCircle>} title="Iniciar Nuevo Negocio" subtitle="Crear espacio Profit First" onClick={p.onNewBusiness} />
             <ListRow leading={<IconCircle><Icons.Lock className="w-4 h-4" /></IconCircle>} title="Cambiar contraseña" onClick={() => setSection('security')} />
+            <ListRow
+              leading={<IconCircle tone={p.deletedCount > 0 ? 'expense' : 'default'}><Icons.Trash className="w-4 h-4" /></IconCircle>}
+              title="Papelera"
+              subtitle={p.deletedCount === 0 ? 'Sin transacciones eliminadas' : `${p.deletedCount} eliminada${p.deletedCount !== 1 ? 's' : ''} — se restauran en 30 días`}
+              trailing={p.deletedCount > 0 ? <span className="px-2 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-700 rounded-full">{p.deletedCount}</span> : undefined}
+              onClick={p.onOpenTrash}
+            />
           </ListSection>
 
           <ListSection>
