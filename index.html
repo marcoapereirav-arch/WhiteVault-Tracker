@@ -90,10 +90,24 @@
     <div id="root"></div>
 
     <script>
-      // Register service worker (PWA + push)
+      // Register service worker (PWA + push) with auto-update
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function (err) {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function (reg) {
+            // Check for updates whenever the user returns to the app
+            const checkForUpdate = function () { reg.update().catch(function () {}); };
+            window.addEventListener('focus', checkForUpdate);
+            document.addEventListener('visibilitychange', function () {
+              if (document.visibilityState === 'visible') checkForUpdate();
+            });
+            // When a new SW takes over, reload once so the new bundle is in use
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+              if (refreshing) return;
+              refreshing = true;
+              window.location.reload();
+            });
+          }).catch(function (err) {
             console.warn('[wv] SW registration failed', err);
           });
         });

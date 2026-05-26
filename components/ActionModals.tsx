@@ -3,6 +3,7 @@ import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
 import { BottomSheet } from './Mobile';
+import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
 
 interface ModalProps {
   isOpen: boolean;
@@ -192,24 +193,23 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
 export const Input = (props: any) => {
     const isDate = props.type === 'date' || props.type === 'datetime-local';
     const [pickerOpen, setPickerOpen] = useState(false);
-    
-    // Format value for display (User Friendly)
+
+    // Format value for display (in user's timezone, fallback to UTC if no tz prop)
     const displayValue = React.useMemo(() => {
         if (!isDate || !props.value) return props.value;
         try {
-            const date = new Date(props.value);
-            if (isNaN(date.getTime())) return props.value;
-            
-            const options: Intl.DateTimeFormatOptions = {
-                year: 'numeric', month: '2-digit', day: '2-digit'
-            };
-            
-            if (props.type === 'datetime-local') {
-                options.hour = '2-digit';
-                options.minute = '2-digit';
+            // props.value is either "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM" (picker string,
+            // already in the user's timezone). Render it directly as a human label
+            // without re-parsing through Date() — that would re-apply browser tz.
+            const v = String(props.value);
+            const [datePart, timePart] = v.split('T');
+            if (!datePart) return props.value;
+            const [y, m, d] = datePart.split('-');
+            const formattedDate = `${d}/${m}/${y}`;
+            if (props.type === 'datetime-local' && timePart) {
+                return `${formattedDate} ${timePart.slice(0, 5)}`;
             }
-            
-            return new Intl.DateTimeFormat('es-ES', options).format(date);
+            return formattedDate;
         } catch (e) {
             return props.value;
         }
@@ -312,7 +312,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
     const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
     const [currency, setCurrency] = useState(initialData?.currency || state.user.currency);
     const [categoryId, setCategoryId] = useState(initialData?.categoryId || '');
-    const [dateTime, setDateTime] = useState(initialData?.date ? new Date(initialData.date).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16));
+    const [dateTime, setDateTime] = useState(
+        initialData?.date
+            ? isoToLocalPickerString(initialData.date, state.user.timezone)
+            : nowAsPickerString(state.user.timezone)
+    );
     const [notes, setNotes] = useState(initialData?.notes || '');
     const [comments, setComments] = useState(initialData?.comments || '');
     const [distribute, setDistribute] = useState(false);
@@ -336,7 +340,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({ type, state, o
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const isoDate = new Date(dateTime).toISOString();
+        const isoDate = localPickerStringToIso(dateTime, state.user.timezone);
 
         onSubmit({
             ...(initialData ? { id: initialData.id } : {}),
@@ -439,11 +443,11 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState(state.user.currency);
     const [notes, setNotes] = useState('');
-    const [dateTime, setDateTime] = useState(new Date().toISOString().slice(0, 16));
+    const [dateTime, setDateTime] = useState(nowAsPickerString(state.user.timezone));
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const isoDate = new Date(dateTime).toISOString();
+        const isoDate = localPickerStringToIso(dateTime, state.user.timezone);
         onSubmit({
             type: 'TRANSFER',
             amount: Number(amount), currency, date: isoDate, notes,
@@ -513,7 +517,7 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
     const [accountId, setAccountId] = useState(initialAccountId || '');
     const [name, setName] = useState('');
     const [target, setTarget] = useState('');
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(nowAsPickerString(state.user.timezone).split('T')[0]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
