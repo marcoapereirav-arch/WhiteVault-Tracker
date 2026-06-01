@@ -127,15 +127,29 @@ button, [role="button"], nav, header, footer { -webkit-user-select: none; user-s
 button, a, [role="button"] { touch-action: manipulation; }
 
 /* Recharts: kill focus outlines + tap highlights on every interactive SVG
-   element (bars, pie slices, area paths). Browsers add a blue focus ring
-   when an SVG element receives focus on tap — that was the "rectángulo
-   azul" appearing on chart click. */
+   element (bars, pie slices, area paths). In addition to passing
+   accessibilityLayer={false} on each chart, this CSS catches any
+   tabindex-focusable wrapper Recharts may inject. */
 .recharts-wrapper,
 .recharts-wrapper *,
 .recharts-wrapper *:focus,
 .recharts-wrapper *:focus-visible,
-.recharts-wrapper *:active {
+.recharts-wrapper *:active,
+.recharts-surface,
+.recharts-surface *,
+[class*="recharts-"] {
+  outline: none !important;
+  outline-style: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+/* Catch ANY tabindex-bearing element from any chart lib */
+[tabindex]:focus,
+[tabindex]:focus-visible,
+[tabindex]:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+svg, svg * {
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
 }
-.recharts-surface { outline: none !important; }
