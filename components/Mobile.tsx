@@ -698,7 +698,10 @@ export const IconCircle: React.FC<{ children: ReactNode; tone?: 'default' | 'inc
 };
 
 // ─── METRIC CARD ────────────────────────────────────────────────────────
-export const MetricCard: React.FC<{ label: string; value: string; sublabel?: string; tone?: 'default' | 'income' | 'expense' | 'gold'; onClick?: () => void; trend?: { value: string; positive: boolean } }> = ({ label, value, sublabel, tone = 'default', onClick, trend }) => {
+// `values` lets you pass multiple currency lines (each rendered on its own
+// row, never mixed). When only one currency is present, looks like a single
+// big number. When >1, each shows separately with its currency code.
+export const MetricCard: React.FC<{ label: string; value?: string; values?: { amount: string; currency?: string }[]; sublabel?: string; tone?: 'default' | 'income' | 'expense' | 'gold'; onClick?: () => void; trend?: { value: string; positive: boolean } }> = ({ label, value, values, sublabel, tone = 'default', onClick, trend }) => {
   const accent =
     tone === 'income' ? 'border-l-emerald-700' :
     tone === 'expense' ? 'border-l-rose-700' :
@@ -708,13 +711,26 @@ export const MetricCard: React.FC<{ label: string; value: string; sublabel?: str
     tone === 'income' ? 'text-emerald-700' :
     tone === 'expense' ? 'text-rose-700' :
     'text-onyx';
+  const list = values && values.length > 0 ? values : (value ? [{ amount: value }] : []);
   return (
     <div
       onClick={onClick ? () => { haptic('selection'); onClick(); } : undefined}
-      className={`min-w-[160px] bg-white border border-black/5 border-l-4 ${accent} p-4 ${onClick ? 'active:scale-[0.98] cursor-pointer' : ''} transition-transform`}
+      className={`min-w-[170px] bg-white border border-black/5 border-l-4 ${accent} p-4 ${onClick ? 'active:scale-[0.98] cursor-pointer' : ''} transition-transform`}
     >
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-graphite mb-2">{label}</div>
-      <div className={`text-xl font-display font-bold tracking-tight ${valueColor} truncate`}>{value}</div>
+      <div className="space-y-0.5">
+        {list.length === 0 && (
+          <div className={`text-xl font-display font-bold tracking-tight ${valueColor}`}>—</div>
+        )}
+        {list.map((v, i) => (
+          <div key={i} className="flex items-baseline gap-1.5">
+            <div className={`text-xl font-display font-bold tracking-tight ${valueColor} truncate tabular`}>{v.amount}</div>
+            {v.currency && list.length > 1 && (
+              <span className="text-[10px] font-bold uppercase tracking-widest text-graphite">{v.currency}</span>
+            )}
+          </div>
+        ))}
+      </div>
       <div className="flex items-center gap-2 mt-1.5">
         {sublabel && <div className="text-[11px] text-graphite truncate">{sublabel}</div>}
         {trend && (

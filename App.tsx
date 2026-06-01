@@ -39,6 +39,7 @@ import {
   PasswordSetupSheet,
   AccountHistorySheet,
   TrashSheet,
+  ChartDrillSheet,
 } from './components/MobileDetails';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
@@ -821,6 +822,14 @@ function App() {
       setState(prev => ({ ...prev, categories: [...prev.categories, { id: `c_${Date.now()}`, ...data, icon: 'Tags' }]}));
   };
 
+  // Same as handleNewCategory but returns the created Category synchronously
+  // for inline-creation flows (e.g. "+ Nueva categoría" from TransactionForm).
+  const createCategoryAndReturn = (data: any): Category => {
+      const newCat: Category = { id: `c_${Date.now()}`, icon: 'Tags', ...data };
+      setState(prev => ({ ...prev, categories: [...prev.categories, newCat] }));
+      return newCat;
+  };
+
   const handleUpdateCategory = (data: any) => {
       setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === data.id ? { ...c, ...data } : c) }));
   };
@@ -896,6 +905,33 @@ function App() {
           };
       });
       if (txSnapshot) logAudit(txId, 'DELETE', txSnapshot, { ...txSnapshot, deletedAt });
+  };
+
+  // Duplicate a transaction — keeps EVERY field identical, only changes id
+  // and appends "(copia)" to the notes for easy identification.
+  const handleDuplicateTransaction = (txId: string) => {
+      const tx = state.transactions.find(t => t.id === txId);
+      if (!tx) return;
+      const dup: Transaction = {
+          ...tx,
+          id: crypto.randomUUID(),
+          notes: tx.notes ? `${tx.notes} (copia)` : '(copia)',
+          deletedAt: null,
+      };
+      // Apply balance effect for the duplicate
+      setState(prev => ({
+          ...prev,
+          transactions: [dup, ...prev.transactions],
+          contexts: applyTxEffect(prev.contexts, dup, 1),
+      }));
+      logAudit(dup.id, 'CREATE', null, dup);
+      flashRecent([
+          { accountId: dup.accountId, subAccountId: dup.subAccountId || undefined, amount: dup.amount, currency: dup.currency,
+            kind: dup.type === 'INCOME' ? 'INCOME' : dup.type === 'EXPENSE' ? 'EXPENSE' : 'TRANSFER_OUT' },
+          ...(dup.type === 'TRANSFER' && dup.toAccountId
+              ? [{ accountId: dup.toAccountId, subAccountId: dup.toSubAccountId || undefined, amount: dup.amount, currency: dup.currency, kind: 'TRANSFER_IN' as const }]
+              : []),
+      ]);
   };
 
   const handleRestoreTransaction = (txId: string) => {
@@ -1072,6 +1108,7 @@ function App() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [accountHistoryTarget, setAccountHistoryTarget] = useState<{ contextId: string; accountId: string; subAccountId?: string } | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
+  const [chartDrill, setChartDrill] = useState<{ title: string; subtitle?: string; transactions: Transaction[]; currency: string } | null>(null);
 
   // ─── PWA / Push bootstrap ──────────────────────────────────────────
   useEffect(() => {
@@ -1310,6 +1347,7 @@ function App() {
               }}
               onTransactionClick={(tx) => setSelectedTransaction(tx)}
               onSubscriptionClick={(s) => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
+              onChartDrill={(d) => setChartDrill(d)}
             />
           )}
           {currentView === 'ACCOUNTS' && (
@@ -1459,8 +1497,8 @@ function App() {
         )}
 
         {/* Form modals (existing components — render above shell) */}
-        {activeModal === 'EXPENSE' && <TransactionForm type="EXPENSE" state={state} onSubmit={handleTransaction} onClose={() => setActiveModal(null)} />}
-        {activeModal === 'INCOME' && <TransactionForm type="INCOME" state={state} onSubmit={handleTransaction} onClose={() => setActiveModal(null)} />}
+        {activeModal === 'EXPENSE' && <TransactionForm type="EXPENSE" state={state} onSubmit={handleTransaction} onClose={() => setActiveModal(null)} onCreateCategory={createCategoryAndReturn} />}
+        {activeModal === 'INCOME' && <TransactionForm type="INCOME" state={state} onSubmit={handleTransaction} onClose={() => setActiveModal(null)} onCreateCategory={createCategoryAndReturn} />}
         {activeModal === 'TRANSFER' && <TransferForm state={state} onSubmit={handleTransfer} onClose={() => setActiveModal(null)} />}
         {activeModal === 'CATEGORY' && <CategoryForm state={state} onSubmit={handleNewCategory} onClose={() => setActiveModal(null)} />}
         {activeModal === 'EDIT_CATEGORY' && selectedCategory && <CategoryForm state={state} initialData={selectedCategory} onSubmit={handleUpdateCategory} onClose={() => setActiveModal(null)} />}
@@ -1486,6 +1524,7 @@ function App() {
           onClose={() => setSelectedTransaction(undefined)}
           onEdit={() => setActiveModal('EDIT_TRANSACTION')}
           onDelete={() => { if (selectedTransaction) { handleDeleteTransaction(selectedTransaction.id); setSelectedTransaction(undefined); } }}
+          onDuplicate={() => { if (selectedTransaction) { handleDuplicateTransaction(selectedTransaction.id); setSelectedTransaction(undefined); } }}
           formatCurrency={formatCurrency}
           formatDateTime={formatDateTime}
           getAccountName={getAccountName}
@@ -1563,6 +1602,18 @@ function App() {
           onClose={() => setAccountHistoryTarget(null)}
           target={accountHistoryTarget}
           transactions={activeTransactions}
+          onTxClick={(tx) => setSelectedTransaction(tx)}
+          formatCurrency={formatCurrency}
+          formatDateTime={formatDateTime}
+          getAccountName={getAccountName}
+          getSubAccountName={getSubAccountName}
+        />
+
+        <ChartDrillSheet
+          state={state}
+          open={!!chartDrill}
+          onClose={() => setChartDrill(null)}
+          data={chartDrill}
           onTxClick={(tx) => setSelectedTransaction(tx)}
           formatCurrency={formatCurrency}
           formatDateTime={formatDateTime}

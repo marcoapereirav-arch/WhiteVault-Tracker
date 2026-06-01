@@ -55,6 +55,7 @@ interface DashboardProps {
   onSummaryClick: (key: string) => void;
   onTransactionClick: (tx: Transaction) => void;
   onSubscriptionClick: (s: Subscription) => void;
+  onChartDrill: (data: { title: string; subtitle?: string; transactions: Transaction[]; currency: string }) => void;
   currencyCode: string;
 }
 
@@ -244,11 +245,11 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
       <section className="px-3 lg:px-8 mt-2 lg:mt-2 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden">
           <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Ingresos vs Gastos</div>
-          <IncomeVsExpenseChart transactions={p.dashboardFilteredTransactions} currency={p.currencyCode} />
+          <IncomeVsExpenseChart transactions={p.dashboardFilteredTransactions} currency={p.currencyCode} onDrill={p.onChartDrill} />
         </div>
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden">
           <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Desglose por Categoría</div>
-          <ExpenseBreakdown transactions={p.dashboardFilteredTransactions} categories={p.state.categories} currency={p.currencyCode} />
+          <ExpenseBreakdown transactions={p.dashboardFilteredTransactions} categories={p.state.categories} currency={p.currencyCode} onDrill={p.onChartDrill} />
         </div>
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden lg:col-span-2">
           <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Cash Flow</div>
@@ -258,11 +259,12 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
             currency={p.currencyCode}
             incomeTotal={p.dashboardIncome}
             expenseTotal={p.dashboardExpense}
+            onDrill={p.onChartDrill}
           />
         </div>
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden lg:col-span-2">
           <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Calendario Financiero</div>
-          <FinancialCalendar transactions={p.filteredTransactions} subscriptions={p.state.subscriptions} currency={p.currencyCode} />
+          <FinancialCalendar transactions={p.filteredTransactions} subscriptions={p.state.subscriptions} currency={p.currencyCode} onDrill={p.onChartDrill} />
         </div>
       </section>
 
@@ -306,37 +308,41 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
 };
 
 // Inner component: the 4 metric cards (used twice — mobile horiz scroll + desktop grid)
-const DashboardStatsMobile: React.FC<{ p: DashboardProps; primaryAmount: number; primaryCurrency: string }> = ({ p, primaryAmount, primaryCurrency }) => (
-  <>
-    <MetricCard
-      label="Ingresos"
-      value={Object.entries(p.monthlyIncomeByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyIncomeByCurrency)[0][1], Object.entries(p.monthlyIncomeByCurrency)[0][0]) : p.formatCurrency(0)}
-      sublabel={Object.keys(p.monthlyIncomeByCurrency).length > 1 ? `+${Object.keys(p.monthlyIncomeByCurrency).length - 1} monedas` : undefined}
-      tone="income"
-      onClick={() => p.onSummaryClick('INCOME')}
-    />
-    <MetricCard
-      label="Gastos"
-      value={Object.entries(p.monthlyExpenseByCurrency)[0] ? p.formatCurrency(Object.entries(p.monthlyExpenseByCurrency)[0][1], Object.entries(p.monthlyExpenseByCurrency)[0][0]) : p.formatCurrency(0)}
-      sublabel={Object.keys(p.monthlyExpenseByCurrency).length > 1 ? `+${Object.keys(p.monthlyExpenseByCurrency).length - 1} monedas` : undefined}
-      tone="expense"
-      onClick={() => p.onSummaryClick('EXPENSE')}
-    />
-    <MetricCard
-      label="Subs"
-      value={String(p.activeSubsCount)}
-      sublabel="activas"
-      tone="gold"
-      onClick={() => p.onSummaryClick('SUBS')}
-    />
-    <MetricCard
-      label="Total"
-      value={p.formatCurrency(primaryAmount, primaryCurrency)}
-      sublabel="balance"
-      onClick={() => p.onSummaryClick('BALANCE')}
-    />
-  </>
-);
+// Each metric shows ALL currencies separately (never mixed).
+const DashboardStatsMobile: React.FC<{ p: DashboardProps; primaryAmount: number; primaryCurrency: string }> = ({ p }) => {
+  const incomeValues = Object.entries(p.monthlyIncomeByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
+  const expenseValues = Object.entries(p.monthlyExpenseByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
+  const balanceValues = Object.entries(p.totalsByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
+  return (
+    <>
+      <MetricCard
+        label="Ingresos"
+        values={incomeValues.length > 0 ? incomeValues : [{ amount: p.formatCurrency(0) }]}
+        tone="income"
+        onClick={() => p.onSummaryClick('INCOME')}
+      />
+      <MetricCard
+        label="Gastos"
+        values={expenseValues.length > 0 ? expenseValues : [{ amount: p.formatCurrency(0) }]}
+        tone="expense"
+        onClick={() => p.onSummaryClick('EXPENSE')}
+      />
+      <MetricCard
+        label="Subs"
+        value={String(p.activeSubsCount)}
+        sublabel="activas"
+        tone="gold"
+        onClick={() => p.onSummaryClick('SUBS')}
+      />
+      <MetricCard
+        label="Total"
+        values={balanceValues.length > 0 ? balanceValues : [{ amount: p.formatCurrency(0) }]}
+        sublabel="patrimonio"
+        onClick={() => p.onSummaryClick('BALANCE')}
+      />
+    </>
+  );
+};
 
 // ─── CONTEXT SWITCHER ───────────────────────────────────────────────────
 export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: string; onChange: (id: string) => void; dark?: boolean }> = ({ contexts, value, onChange, dark }) => {

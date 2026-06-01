@@ -321,9 +321,10 @@ interface TransactionFormProps {
 
 interface TransactionFormPropsExt extends TransactionFormProps {
     subscriptionPaymentChoice?: (sub: Subscription) => void;
+    onCreateCategory?: (data: any) => Category; // creates a new category in global state and returns it
 }
 
-export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state, onSubmit, onClose, initialData }) => {
+export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state, onSubmit, onClose, initialData, onCreateCategory }) => {
     const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id || '');
     const [accountId, setAccountId] = useState(initialData?.accountId || '');
     const [subAccountId, setSubAccountId] = useState(initialData?.subAccountId || '');
@@ -340,6 +341,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const [distribute, setDistribute] = useState(false);
     const [linkedSubscriptionId, setLinkedSubscriptionId] = useState<string>('');
     const [subPickerOpen, setSubPickerOpen] = useState(false);
+    const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
     const activeContext = state.contexts.find(c => c.id === contextId);
     const activeAccount = activeContext?.accounts.find(a => a.id === accountId);
@@ -418,6 +420,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const categoryOptions: SelectFieldOption[] = [
         { value: '', label: type === 'INCOME' ? 'Sin categoría' : 'Seleccionar categoría' },
         ...availableCategories.map((c) => ({ value: c.id, label: c.name, swatch: c.color })),
+        { value: '__new__', label: '+ Nueva categoría', hint: 'Crear ahora' },
     ];
 
     return (
@@ -527,8 +530,12 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                     label={`Categoría${type === 'INCOME' ? ' (opcional)' : ''}`}
                     value={categoryId}
                     options={categoryOptions}
-                    onChange={setCategoryId}
+                    onChange={(v) => {
+                        if (v === '__new__') { setNewCategoryOpen(true); return; }
+                        setCategoryId(v);
+                    }}
                     placeholder="Sin categoría"
+                    searchable
                 />
 
                 <div className="mb-5">
@@ -547,6 +554,20 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                     {initialData ? 'Guardar Cambios' : `Confirmar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}
                 </button>
             </form>
+
+            {/* Inline "new category" form — opens on top of TransactionForm */}
+            {newCategoryOpen && onCreateCategory && (
+                <CategoryForm
+                    state={state}
+                    onSubmit={(data: any) => {
+                        // pre-fill the contextId we're using if user didn't change it
+                        const dataWithCtx = { contextId, ...data };
+                        const created = onCreateCategory(dataWithCtx);
+                        setCategoryId(created.id);
+                    }}
+                    onClose={() => setNewCategoryOpen(false)}
+                />
+            )}
 
             {/* Subscription picker sheet */}
             <BottomSheet open={subPickerOpen} onClose={() => setSubPickerOpen(false)} title="Pagar Suscripción" subtitle="Selecciona y rellena automáticamente" size={activeSubscriptions.length > 6 ? 'full' : 'auto'}>

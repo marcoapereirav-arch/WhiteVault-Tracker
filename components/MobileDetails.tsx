@@ -22,7 +22,8 @@ export const TransactionDetailSheet: React.FC<CommonProps & {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-}> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, tx, open, onClose, onEdit, onDelete }) => {
+  onDuplicate?: () => void;
+}> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, tx, open, onClose, onEdit, onDelete, onDuplicate }) => {
   if (!tx) return null;
   const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
   const ctx = state.contexts.find((c) => c.id === tx.contextId);
@@ -74,7 +75,13 @@ export const TransactionDetailSheet: React.FC<CommonProps & {
         )}
       </div>
 
-      <div className="flex gap-3 mt-5">
+      <div className="grid grid-cols-3 gap-3 mt-5">
+        {onDuplicate && (
+          <PressButton variant="secondary" full onClick={onDuplicate}>
+            <Icons.Copy className="w-4 h-4" />
+            Duplicar
+          </PressButton>
+        )}
         <PressButton variant="secondary" full onClick={onEdit}>
           <Icons.Edit className="w-4 h-4" />
           Editar
@@ -230,33 +237,61 @@ export const DashboardSummarySheet: React.FC<CommonProps & {
           )) : <div className="text-center text-sm text-graphite py-8">Sin saldos registrados</div>}
         </div>
       )}
-      {(type === 'INCOME' || type === 'EXPENSE') && (
-        <div className="space-y-2">
-          {dashboardFilteredTransactions.filter((tx) => tx.type === type).length > 0 ? (
-            <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
-              {dashboardFilteredTransactions.filter((tx) => tx.type === type).slice(0, 30).map((tx) => {
-                const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
-                return (
-                  <div key={tx.id} onClick={() => { onClose(); onTransactionClick(tx); }} className="flex justify-between items-center p-3 active:bg-stone cursor-pointer">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <IconCircle tone={type === 'INCOME' ? 'income' : 'expense'} bgColor={cat?.color}>
-                        {type === 'INCOME' ? <Icons.Income className="w-4 h-4" /> : <Icons.Expense className="w-4 h-4" />}
-                      </IconCircle>
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium text-onyx truncate">{tx.notes || 'Sin descripción'}</div>
-                        <div className="text-[11px] text-graphite truncate">{formatDateTime(tx.date)}{cat ? ` · ${cat.name}` : ''}</div>
-                      </div>
-                    </div>
-                    <span className={`text-sm font-display font-bold tabular ${type === 'INCOME' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                      {type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
-                    </span>
-                  </div>
-                );
-              })}
+      {(type === 'INCOME' || type === 'EXPENSE') && (() => {
+        const filtered = dashboardFilteredTransactions.filter((tx) => tx.type === type);
+        if (filtered.length === 0) return <div className="text-center text-sm text-graphite py-8">Sin movimientos</div>;
+        // Group by currency — never mix
+        const byCur: Record<string, Transaction[]> = {};
+        filtered.forEach((t) => { (byCur[t.currency] ||= []).push(t); });
+        const currencies = Object.keys(byCur).sort();
+        const totalsByCur: Record<string, number> = {};
+        currencies.forEach((cur) => { totalsByCur[cur] = byCur[cur].reduce((s, t) => s + t.amount, 0); });
+        return (
+          <div className="space-y-4">
+            {/* Totals header per currency */}
+            <div className="bg-white border border-black/5 rounded-2xl p-4 space-y-1.5">
+              <div className="text-[10px] uppercase tracking-widest text-graphite font-bold mb-1">Total del periodo</div>
+              {currencies.map((cur) => (
+                <div key={cur} className="flex items-baseline justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-gold">{cur}</span>
+                  <span className={`text-xl font-display font-bold tabular ${type === 'INCOME' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {type === 'INCOME' ? '+' : '-'}{formatCurrency(totalsByCur[cur], cur)}
+                  </span>
+                </div>
+              ))}
             </div>
-          ) : <div className="text-center text-sm text-graphite py-8">Sin movimientos</div>}
-        </div>
-      )}
+            {/* Per-currency lists */}
+            {currencies.map((cur) => (
+              <div key={cur}>
+                {currencies.length > 1 && (
+                  <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-2 px-1">{cur} · {byCur[cur].length} movimiento{byCur[cur].length !== 1 ? 's' : ''}</div>
+                )}
+                <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+                  {byCur[cur].slice(0, 30).map((tx) => {
+                    const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
+                    return (
+                      <div key={tx.id} onClick={() => { onClose(); onTransactionClick(tx); }} className="flex justify-between items-center p-3 active:bg-stone cursor-pointer">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <IconCircle tone={type === 'INCOME' ? 'income' : 'expense'} bgColor={cat?.color}>
+                            {type === 'INCOME' ? <Icons.Income className="w-4 h-4" /> : <Icons.Expense className="w-4 h-4" />}
+                          </IconCircle>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium text-onyx truncate">{tx.notes || 'Sin descripción'}</div>
+                            <div className="text-[11px] text-graphite truncate">{formatDateTime(tx.date)}{cat ? ` · ${cat.name}` : ''}</div>
+                          </div>
+                        </div>
+                        <span className={`text-sm font-display font-bold tabular ${type === 'INCOME' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
       {type === 'SUBS' && (
         <div className="space-y-2">
           {dashboardFilteredSubs.length > 0 ? dashboardFilteredSubs.map((s) => (
@@ -423,6 +458,72 @@ export const AccountHistorySheet: React.FC<CommonProps & {
                 </div>
                 <span className={`text-sm font-display font-bold tabular ${positive ? 'text-emerald-700' : 'text-rose-700'}`}>
                   {positive ? '+' : '-'}{formatCurrency(tx.amount, tx.currency)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </BottomSheet>
+  );
+};
+
+// ─── CHART DRILL-IN ─────────────────────────────────────────────────────
+// Bottom sheet that opens when the user clicks anywhere in a chart. Lists
+// the underlying transactions of the clicked segment, no navigation away.
+export interface ChartDrillInData {
+  title: string;
+  subtitle?: string;
+  transactions: Transaction[];
+  currency: string;
+}
+export const ChartDrillSheet: React.FC<CommonProps & {
+  open: boolean;
+  onClose: () => void;
+  data: ChartDrillInData | null;
+  onTxClick: (tx: Transaction) => void;
+}> = ({ state, formatCurrency, formatDateTime, open, onClose, data, onTxClick }) => {
+  if (!data) return null;
+  const sorted = [...data.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const total = sorted.reduce((s, t) => s + t.amount, 0);
+  const incomeCount = sorted.filter((t) => t.type === 'INCOME').length;
+  const expenseCount = sorted.filter((t) => t.type === 'EXPENSE').length;
+  return (
+    <BottomSheet open={open} onClose={onClose} title={data.title} subtitle={data.subtitle} size="full">
+      <div className="bg-white border border-black/5 rounded-2xl p-4 mb-4 flex items-center justify-between">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Total</div>
+          <div className="text-2xl font-display font-bold text-onyx tabular">{formatCurrency(total, data.currency)}</div>
+        </div>
+        <div className="text-right text-[11px] text-graphite">
+          {incomeCount > 0 && <div><span className="text-emerald-700">●</span> {incomeCount} ingreso{incomeCount !== 1 ? 's' : ''}</div>}
+          {expenseCount > 0 && <div><span className="text-rose-700">●</span> {expenseCount} gasto{expenseCount !== 1 ? 's' : ''}</div>}
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="text-center text-sm text-graphite py-8">Sin movimientos</div>
+      ) : (
+        <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+          {sorted.map((tx) => {
+            const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
+            const positive = tx.type === 'INCOME';
+            const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
+            const tone: any = positive ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
+            const sign = positive ? '+' : tx.type === 'EXPENSE' ? '-' : '';
+            return (
+              <div
+                key={tx.id}
+                onClick={() => { onClose(); onTxClick(tx); }}
+                className="flex items-center gap-3 px-3 py-2.5 active:bg-stone cursor-pointer"
+              >
+                <IconCircle tone={tone} bgColor={cat?.color}><Icon className="w-4 h-4" /></IconCircle>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-onyx truncate">{tx.notes || 'Sin descripción'}</div>
+                  <div className="text-[11px] text-graphite truncate">{formatDateTime(tx.date)}{cat ? ` · ${cat.name}` : ''}</div>
+                </div>
+                <span className={`text-sm font-display font-bold tabular ${positive ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : 'text-onyx'}`}>
+                  {sign}{formatCurrency(tx.amount, tx.currency)}
                 </span>
               </div>
             );
