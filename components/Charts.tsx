@@ -111,7 +111,7 @@ export const IncomeVsExpenseChart: React.FC<{ transactions: Transaction[], curre
               </div>
               <div className="h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data} barSize={48} margin={{ top: 25, right: 8, left: 8, bottom: 5 }} accessibilityLayer={false}>
+                  <BarChart data={data} barSize={48} margin={{ top: 25, right: 8, left: 8, bottom: 5 }} accessibilityLayer={false} tabIndex={-1}>
                     <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis hide />
                     <Tooltip content={<CustomTooltip currency={cur} type="BAR" />} cursor={false} />
@@ -201,6 +201,7 @@ export const CashFlowChart: React.FC<{ transactions: Transaction[], categories: 
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart
                     accessibilityLayer={false}
+                    tabIndex={-1}
                     data={data}
                     onClick={(e: any) => {
                       const idx = e?.activeTooltipIndex;
@@ -296,7 +297,7 @@ export const ExpenseBreakdown: React.FC<{ transactions: Transaction[], categorie
               </div>
               <div className="h-[180px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart accessibilityLayer={false}>
+                  <PieChart accessibilityLayer={false} tabIndex={-1}>
                     <Pie
                       data={data}
                       cx="50%"
