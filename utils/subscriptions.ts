@@ -2,6 +2,38 @@
 
 import { Subscription } from '../types';
 
+// Resolve effective interval — prefers intervalValue+intervalUnit (new flexible
+// flow), falls back to legacy frequency for old subscriptions.
+export const resolveInterval = (sub: Subscription): { value: number; unit: 'days' | 'weeks' | 'months' | 'years' } => {
+  if (sub.intervalValue && sub.intervalUnit && sub.intervalValue > 0) {
+    return { value: sub.intervalValue, unit: sub.intervalUnit };
+  }
+  switch (sub.frequency) {
+    case 'WEEKLY':    return { value: 1, unit: 'weeks' };
+    case 'MONTHLY':   return { value: 1, unit: 'months' };
+    case 'QUARTERLY': return { value: 3, unit: 'months' };
+    case 'ANNUAL':    return { value: 1, unit: 'years' };
+    default:          return { value: 1, unit: 'months' };
+  }
+};
+
+// Friendly label like "Cada 2 meses" or "Mensual" (for common cases).
+export const formatIntervalLabel = (sub: Subscription): string => {
+  const { value, unit } = resolveInterval(sub);
+  if (value === 1) {
+    if (unit === 'weeks')  return 'Semanal';
+    if (unit === 'months') return 'Mensual';
+    if (unit === 'years')  return 'Anual';
+    if (unit === 'days')   return 'Diario';
+  }
+  if (value === 3 && unit === 'months') return 'Trimestral';
+  const noun = unit === 'days' ? (value === 1 ? 'día' : 'días')
+    : unit === 'weeks' ? (value === 1 ? 'semana' : 'semanas')
+    : unit === 'months' ? (value === 1 ? 'mes' : 'meses')
+    : (value === 1 ? 'año' : 'años');
+  return `Cada ${value} ${noun}`;
+};
+
 // Advance a subscription's nextRenewal to the next billing cycle.
 // Uses UTC arithmetic to avoid timezone day-shift edge cases.
 export const advanceSubscriptionRenewal = (sub: Subscription): Subscription => {
@@ -9,19 +41,12 @@ export const advanceSubscriptionRenewal = (sub: Subscription): Subscription => {
   const d = new Date(sub.nextRenewal);
   if (isNaN(d.getTime())) return sub;
 
-  switch (sub.frequency) {
-    case 'WEEKLY':
-      d.setUTCDate(d.getUTCDate() + 7);
-      break;
-    case 'MONTHLY':
-      d.setUTCMonth(d.getUTCMonth() + 1);
-      break;
-    case 'QUARTERLY':
-      d.setUTCMonth(d.getUTCMonth() + 3);
-      break;
-    case 'ANNUAL':
-      d.setUTCFullYear(d.getUTCFullYear() + 1);
-      break;
+  const { value, unit } = resolveInterval(sub);
+  switch (unit) {
+    case 'days':   d.setUTCDate(d.getUTCDate() + value); break;
+    case 'weeks':  d.setUTCDate(d.getUTCDate() + 7 * value); break;
+    case 'months': d.setUTCMonth(d.getUTCMonth() + value); break;
+    case 'years':  d.setUTCFullYear(d.getUTCFullYear() + value); break;
   }
 
   return {

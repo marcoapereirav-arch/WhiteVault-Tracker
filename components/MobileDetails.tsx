@@ -6,6 +6,7 @@ import React from 'react';
 import { AppState, Transaction, Subscription, Category } from '../types';
 import { Icons } from './Icons';
 import { BottomSheet, IconCircle, PressButton, haptic } from './Mobile';
+import { formatIntervalLabel } from '../utils/subscriptions';
 
 interface CommonProps {
   state: AppState;
@@ -101,7 +102,8 @@ export const SubscriptionDetailSheet: React.FC<CommonProps & {
   open: boolean;
   onClose: () => void;
   onEdit: () => void;
-}> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, sub, open, onClose, onEdit }) => {
+  onTxClick?: (tx: Transaction) => void;
+}> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, sub, open, onClose, onEdit, onTxClick }) => {
   if (!sub) return null;
   const ctx = state.contexts.find((c) => c.id === sub.contextId);
   const days = sub.nextRenewal ? Math.ceil((new Date(sub.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
@@ -113,7 +115,7 @@ export const SubscriptionDetailSheet: React.FC<CommonProps & {
           {formatCurrency(sub.amount, sub.currency)}
         </div>
         <div className="text-xs text-graphite mt-1">
-          {sub.frequency === 'WEEKLY' ? 'Semanal' : sub.frequency === 'MONTHLY' ? 'Mensual' : sub.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}
+          {formatIntervalLabel(sub)}
           {sub.active ? ' · Activa' : ' · Pausada'}
         </div>
       </div>
@@ -134,6 +136,62 @@ export const SubscriptionDetailSheet: React.FC<CommonProps & {
         {sub.subAccountId && <DetailRow label="Sub-Cuenta" value={getSubAccountName(sub.contextId, sub.accountId, sub.subAccountId)} />}
         {sub.cardLastFour && <DetailRow label="Tarjeta" value={`•••• ${sub.cardLastFour}`} mono />}
       </div>
+
+      {/* Payment history — transactions linked to this subscription */}
+      {(() => {
+        const payments = state.transactions
+          .filter((t) => t.linkedSubscriptionId === sub.id && !t.deletedAt)
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const totalPaid = payments.reduce((s, t) => s + t.amount, 0);
+        const lastPaidAt = payments[0]?.date;
+        return (
+          <div className="mt-5">
+            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-2 px-1">Historial de pagos</div>
+            <div className="bg-white border border-black/5 rounded-2xl p-4 mb-3 grid grid-cols-3 gap-2 text-center">
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-graphite font-bold">Pagos</div>
+                <div className="text-xl font-display font-bold text-onyx tabular mt-0.5">{payments.length}</div>
+              </div>
+              <div className="border-x border-black/5">
+                <div className="text-[9px] uppercase tracking-widest text-graphite font-bold">Total pagado</div>
+                <div className="text-base font-display font-bold text-onyx tabular mt-0.5">{formatCurrency(totalPaid, sub.currency)}</div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-widest text-graphite font-bold">Último</div>
+                <div className="text-[11px] font-mono text-onyx mt-1.5 truncate">{lastPaidAt ? formatDateTime(lastPaidAt).split(',')[0] : '—'}</div>
+              </div>
+            </div>
+            {payments.length === 0 ? (
+              <div className="text-center text-xs text-graphite py-4 bg-stone/40 rounded-xl">
+                Aún no has registrado pagos de esta suscripción
+              </div>
+            ) : (
+              <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+                {payments.slice(0, 12).map((tx) => (
+                  <div
+                    key={tx.id}
+                    onClick={() => { if (onTxClick) { onClose(); onTxClick(tx); } }}
+                    className={`flex items-center justify-between px-3 py-2.5 ${onTxClick ? 'active:bg-stone cursor-pointer' : ''}`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-onyx truncate">{tx.notes || 'Pago'}</div>
+                      <div className="text-[11px] text-graphite font-mono">{formatDateTime(tx.date)}</div>
+                    </div>
+                    <span className="text-sm font-display font-bold text-rose-700 tabular flex-shrink-0">
+                      -{formatCurrency(tx.amount, tx.currency)}
+                    </span>
+                  </div>
+                ))}
+                {payments.length > 12 && (
+                  <div className="text-center text-[10px] text-graphite py-2 bg-stone/30">
+                    +{payments.length - 12} más
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <PressButton full onClick={onEdit} size="lg">
         <Icons.Edit className="w-4 h-4" />
@@ -301,7 +359,7 @@ export const DashboardSummarySheet: React.FC<CommonProps & {
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-onyx truncate">{s.name}</div>
                   <div className="text-[11px] text-graphite">
-                    {s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'} · Próx: {s.nextRenewal ? formatDateTime(s.nextRenewal).split(',')[0] : '-'}
+                    {formatIntervalLabel(s)} · Próx: {s.nextRenewal ? formatDateTime(s.nextRenewal).split(',')[0] : '-'}
                   </div>
                 </div>
               </div>

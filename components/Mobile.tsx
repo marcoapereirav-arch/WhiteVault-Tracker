@@ -320,17 +320,24 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
           >
             <div className="w-10 h-1 bg-graphite/30 rounded-full" />
           </div>
-          {(title || trailing) && (
-            <div className="flex items-start justify-between px-6 pt-2 pb-3 border-b border-black/5">
-              <div>
-                {subtitle && (
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold mb-1">{subtitle}</div>
-                )}
-                {title && <h2 className="text-xl font-display font-bold text-onyx tracking-tight">{title}</h2>}
-              </div>
-              {trailing}
+          <div className="flex items-center gap-3 px-3 pt-1 pb-2 border-b border-black/5">
+            <button
+              type="button"
+              onClick={() => { haptic('light'); onClose(); }}
+              className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center hover:bg-stone active:scale-95 transition-all flex-shrink-0"
+              aria-label="Atrás"
+            >
+              <Icons.ChevronLeft className="w-5 h-5 text-onyx" />
+            </button>
+            <div className="flex-1 min-w-0">
+              {subtitle && (
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold mb-0.5 truncate">{subtitle}</div>
+              )}
+              {title && <h2 className="text-base font-display font-bold text-onyx tracking-tight truncate">{title}</h2>}
             </div>
-          )}
+            {trailing && <div className="flex-shrink-0">{trailing}</div>}
+          </div>
+
           <div className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6">{children}</div>
         </div>
       </div>

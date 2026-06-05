@@ -17,7 +17,7 @@ import {
   haptic,
 } from './Mobile';
 import { balanceEntries } from '../utils/balances';
-import { isSubscriptionOverdue, daysOverdue } from '../utils/subscriptions';
+import { isSubscriptionOverdue, daysOverdue, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
 import { CURRENCIES } from '../constants';
 import {
   isPushSupported,
@@ -829,9 +829,15 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
     const map: Record<string, number> = {};
     list.filter((s) => s.active).forEach((s) => {
       let monthly = s.amount;
-      if (s.frequency === 'WEEKLY') monthly *= 4.33;
-      else if (s.frequency === 'QUARTERLY') monthly /= 3;
-      else if (s.frequency === 'ANNUAL') monthly /= 12;
+      // Normalize amount to "per month" using the resolved interval (supports
+      // the flexible "cada N units" subscriptions, not just MONTHLY/etc).
+      const { value, unit } = resolveInterval(s);
+      const daysInInterval =
+          unit === 'days'   ? value
+        : unit === 'weeks'  ? 7 * value
+        : unit === 'months' ? 30.42 * value
+        : /* years */         365.25 * value;
+      monthly = (monthly * 30.42) / daysInInterval;
       map[s.currency] = (map[s.currency] || 0) + monthly;
     });
     return map;
@@ -953,7 +959,7 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
                     <div>
                       <div className="text-base font-display font-bold text-onyx">{s.name}</div>
                       <div className="text-[10px] text-graphite uppercase tracking-widest">
-                        {s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}
+                        {formatIntervalLabel(s)}
                       </div>
                     </div>
                   </div>

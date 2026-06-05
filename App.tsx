@@ -67,7 +67,34 @@ function App() {
   const [isAccountPaused, setIsAccountPaused] = useState(false);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [currentView, setCurrentView] = useState<View>('DASHBOARD');
-  const [contextFilter, setContextFilter] = useState<string>('ALL');
+  // Per-view context filters — each section keeps its own selection so
+  // filtering in Subscriptions doesn't bleed into Bóvedas, etc.
+  const [dashboardContextFilter, setDashboardContextFilter] = useState<string>('ALL');
+  const [accountsContextFilter, setAccountsContextFilter] = useState<string>('ALL');
+  const [transactionsContextFilter, setTransactionsContextFilter] = useState<string>('ALL');
+  const [subscriptionsContextFilter, setSubscriptionsContextFilter] = useState<string>('ALL');
+  const [categoriesContextFilter, setCategoriesContextFilter] = useState<string>('ALL');
+
+  // Resolver — returns the filter for the currently active view.
+  const contextFilter = (() => {
+    switch (currentView) {
+      case 'DASHBOARD':     return dashboardContextFilter;
+      case 'ACCOUNTS':      return accountsContextFilter;
+      case 'TRANSACTIONS':  return transactionsContextFilter;
+      case 'SUBSCRIPTIONS': return subscriptionsContextFilter;
+      case 'CATEGORIES':    return categoriesContextFilter;
+      default:              return 'ALL';
+    }
+  })();
+  const setContextFilter = (id: string) => {
+    switch (currentView) {
+      case 'DASHBOARD':     return setDashboardContextFilter(id);
+      case 'ACCOUNTS':      return setAccountsContextFilter(id);
+      case 'TRANSACTIONS':  return setTransactionsContextFilter(id);
+      case 'SUBSCRIPTIONS': return setSubscriptionsContextFilter(id);
+      case 'CATEGORIES':    return setCategoriesContextFilter(id);
+    }
+  };
   const [transactionTypeFilter, setTransactionTypeFilter] = useState<'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER'>('ALL');
   const [subscriptionStatusFilter, setSubscriptionStatusFilter] = useState<'ALL' | 'ACTIVE' | 'PAUSED'>('ACTIVE');
   
@@ -188,6 +215,7 @@ function App() {
           toAccountId: t.to_account_id,
           toSubAccountId: t.to_sub_account_id,
           deletedAt: t.deleted_at,
+          linkedSubscriptionId: t.linked_subscription_id,
         }));
 
         // Check if account is paused
@@ -284,6 +312,7 @@ function App() {
         to_account_id: t.toAccountId,
         to_sub_account_id: t.toSubAccountId,
         deleted_at: t.deletedAt ?? null,
+        linked_subscription_id: t.linkedSubscriptionId ?? null,
       }));
 
       if (toUpsert.length > 0) {
@@ -835,11 +864,30 @@ function App() {
   };
 
   const handleNewSubscription = (data: any) => {
-      setState(prev => ({ ...prev, subscriptions: [...prev.subscriptions, { id: `s_${Date.now()}`, ...data }]}));
+      const uid = session?.user?.id;
+      setState(prev => {
+          const newSubs = [...prev.subscriptions, { id: `s_${Date.now()}`, ...data }];
+          // Force immediate sync to BD so quick close doesn't lose the create
+          if (uid) {
+              supabase.from('profiles').update({ subscriptions: newSubs, updated_at: new Date().toISOString() }).eq('id', uid)
+                  .then(({ error }) => { if (error) console.warn('[sync sub create]', error.message); });
+          }
+          return { ...prev, subscriptions: newSubs };
+      });
   };
 
   const handleUpdateSubscription = (data: any) => {
-      setState(prev => ({ ...prev, subscriptions: prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s) }));
+      const uid = session?.user?.id;
+      setState(prev => {
+          const newSubs = prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s);
+          // Force immediate sync — the debounced sync would also do it eventually
+          // but quick close (esp. on iOS PWA) could lose changes mid-debounce.
+          if (uid) {
+              supabase.from('profiles').update({ subscriptions: newSubs, updated_at: new Date().toISOString() }).eq('id', uid)
+                  .then(({ error }) => { if (error) console.warn('[sync sub update]', error.message); });
+          }
+          return { ...prev, subscriptions: newSubs };
+      });
   };
 
   // Apply (or reverse, with sign = -1) a transaction's effect on context balances.
@@ -1536,6 +1584,7 @@ function App() {
           open={activeModal === 'VIEW_SUBSCRIPTION' && !!selectedSubscription}
           onClose={() => { setActiveModal(null); setSelectedSubscription(undefined); }}
           onEdit={() => setActiveModal('EDIT_SUBSCRIPTION')}
+          onTxClick={(tx) => { setActiveModal(null); setSelectedSubscription(undefined); setSelectedTransaction(tx); }}
           formatCurrency={formatCurrency}
           formatDateTime={formatDateTime}
           getAccountName={getAccountName}

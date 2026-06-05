@@ -53,6 +53,9 @@ export interface Transaction {
   toSubAccountId?: string;
   // Soft delete — null/undefined = active, ISO timestamp = deleted at that time
   deletedAt?: string | null;
+  // If this transaction was created via subscription quick-pay, links back
+  // to the subscription so we can show payment history.
+  linkedSubscriptionId?: string | null;
 }
 
 export interface TransactionAudit {
@@ -70,7 +73,11 @@ export interface Subscription {
   name: string;
   amount: number;
   currency: string;
+  // Legacy fixed frequency — kept for backward compatibility with old subs.
+  // New flow uses intervalValue + intervalUnit (every N days/weeks/months/years).
   frequency: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  intervalValue?: number;                                  // e.g. 2 for "every 2 months"
+  intervalUnit?: 'days' | 'weeks' | 'months' | 'years';
   nextRenewal: string;
   contextId: string;
   accountId: string;

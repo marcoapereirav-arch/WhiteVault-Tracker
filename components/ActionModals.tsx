@@ -4,6 +4,7 @@ import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
 import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic } from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
+import { formatIntervalLabel } from '../utils/subscriptions';
 
 // Compact money formatter for select options (no decimals if integer to save space).
 const formatMoney = (n: number, currency: string): string => {
@@ -361,8 +362,15 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const availableCategories = state.categories.filter(c => c.contextId === contextId);
 
     // When user picks an active subscription, autofill all fields from it.
+    // Ordered by nextRenewal ascending (the soonest to be paid first).
     const activeSubscriptions = type === 'EXPENSE'
-        ? state.subscriptions.filter(s => s.active && s.contextId === contextId)
+        ? state.subscriptions
+            .filter(s => s.active && s.contextId === contextId)
+            .sort((a, b) => {
+                if (!a.nextRenewal) return 1;
+                if (!b.nextRenewal) return -1;
+                return new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
+            })
         : [];
 
     const applySubscription = (sub: Subscription) => {
@@ -589,7 +597,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                                 <div className="flex-1 min-w-0">
                                     <div className={`text-sm font-display font-bold truncate ${isSelected ? 'text-white' : 'text-onyx'}`}>{s.name}</div>
                                     <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-graphite' : 'text-graphite'}`}>
-                                        {s.frequency === 'WEEKLY' ? 'Semanal' : s.frequency === 'MONTHLY' ? 'Mensual' : s.frequency === 'QUARTERLY' ? 'Trimestral' : 'Anual'}
+                                        {formatIntervalLabel(s)}
                                         {days !== null && ` · Próx. ${days <= 0 ? 'hoy' : days === 1 ? 'mañana' : `en ${days} días`}`}
                                     </div>
                                 </div>
@@ -882,7 +890,22 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
     const [name, setName] = useState(initialData?.name || '');
     const [amount, setAmount] = useState(initialData?.amount?.toString() || '');
     const [currency, setCurrency] = useState(initialData?.currency || state.user.currency);
-    const [frequency, setFrequency] = useState(initialData?.frequency || 'MONTHLY');
+    // Frequency now lives in intervalValue + intervalUnit. We seed from the
+    // sub's existing values, falling back to legacy frequency for old subs.
+    const legacyToInterval = (f: any): { value: number; unit: 'days' | 'weeks' | 'months' | 'years' } => {
+        switch (f) {
+            case 'WEEKLY':    return { value: 1, unit: 'weeks' };
+            case 'MONTHLY':   return { value: 1, unit: 'months' };
+            case 'QUARTERLY': return { value: 3, unit: 'months' };
+            case 'ANNUAL':    return { value: 1, unit: 'years' };
+            default:          return { value: 1, unit: 'months' };
+        }
+    };
+    const seed = initialData?.intervalValue && initialData?.intervalUnit
+        ? { value: initialData.intervalValue, unit: initialData.intervalUnit as 'days' | 'weeks' | 'months' | 'years' }
+        : legacyToInterval(initialData?.frequency);
+    const [intervalValue, setIntervalValue] = useState<string>(String(seed.value));
+    const [intervalUnit, setIntervalUnit] = useState<'days' | 'weeks' | 'months' | 'years'>(seed.unit);
     // Ensure the date is in YYYY-MM-DD format for <input type="date">
     const [nextRenewal, setNextRenewal] = useState(initialData?.nextRenewal?.split('T')[0] || '');
     const [contextId, setContextId] = useState(initialData?.contextId || state.contexts[0]?.id);
@@ -900,12 +923,23 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        const ivNum = Math.max(1, Number(intervalValue) || 1);
+        // Keep `frequency` set to the closest legacy value for back-compat
+        // (charts/calendar code still reads it for old subs).
+        const legacyFreq =
+            ivNum === 1 && intervalUnit === 'weeks'  ? 'WEEKLY'
+          : ivNum === 1 && intervalUnit === 'months' ? 'MONTHLY'
+          : ivNum === 3 && intervalUnit === 'months' ? 'QUARTERLY'
+          : ivNum === 1 && intervalUnit === 'years'  ? 'ANNUAL'
+          : 'MONTHLY';
         onSubmit({
             ...(initialData ? { id: initialData.id } : {}),
             name,
             amount: Number(amount),
             currency,
-            frequency,
+            frequency: legacyFreq,
+            intervalValue: ivNum,
+            intervalUnit,
             nextRenewal,
             contextId,
             accountId,
@@ -937,17 +971,34 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                         searchable
                     />
                 </div>
-                <SelectField
-                    label="Frecuencia"
-                    value={frequency}
-                    options={[
-                        { value: 'WEEKLY', label: 'Semanal' },
-                        { value: 'MONTHLY', label: 'Mensual' },
-                        { value: 'QUARTERLY', label: 'Trimestral' },
-                        { value: 'ANNUAL', label: 'Anual' },
-                    ]}
-                    onChange={(v) => setFrequency(v as any)}
-                />
+                {/* Frecuencia flexible: cada N (días/semanas/meses/años) */}
+                <div className="mb-4">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-graphite mb-2">Frecuencia</label>
+                    <div className="grid grid-cols-5 gap-3 items-center">
+                        <span className="col-span-1 text-xs text-graphite text-center">Cada</span>
+                        <input
+                            type="number"
+                            min="1"
+                            max="999"
+                            value={intervalValue}
+                            onChange={(e) => setIntervalValue(e.target.value)}
+                            className="col-span-1 h-12 px-3 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none text-center font-display font-bold"
+                        />
+                        <div className="col-span-3">
+                            <SelectField
+                                value={intervalUnit}
+                                options={[
+                                    { value: 'days',   label: Number(intervalValue) === 1 ? 'Día' : 'Días' },
+                                    { value: 'weeks',  label: Number(intervalValue) === 1 ? 'Semana' : 'Semanas' },
+                                    { value: 'months', label: Number(intervalValue) === 1 ? 'Mes' : 'Meses' },
+                                    { value: 'years',  label: Number(intervalValue) === 1 ? 'Año' : 'Años' },
+                                ]}
+                                onChange={(v) => setIntervalUnit(v as any)}
+                            />
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-graphite mt-1">Ej: "cada 2 meses" para una suscripción bimensual.</p>
+                </div>
 
                 <Input
                     type="date"
