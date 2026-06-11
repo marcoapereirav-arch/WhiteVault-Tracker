@@ -57,6 +57,9 @@ interface DashboardProps {
   onSubscriptionClick: (s: Subscription) => void;
   onChartDrill: (data: { title: string; subtitle?: string; transactions: Transaction[]; currency: string }) => void;
   currencyCode: string;
+  currencyFilter: string;
+  setCurrencyFilter: (c: string) => void;
+  availableCurrencies: string[];
 }
 
 export const MobileDashboard: React.FC<DashboardProps> = (p) => {
@@ -137,6 +140,13 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
           <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
         </div>
       </section>
+
+      {/* Currency filter (only when user has >1 currency in their data) */}
+      {p.availableCurrencies && p.availableCurrencies.length > 1 && (
+        <section className="px-5 lg:px-8 mt-4">
+          <CurrencyFilterChips currencies={p.availableCurrencies} value={p.currencyFilter} onChange={p.setCurrencyFilter} />
+        </section>
+      )}
 
       {/* Subscriptions por pagar (overdue) — top priority alert */}
       {overdueSubs.length > 0 && (
@@ -618,6 +628,9 @@ interface TxProps {
   filteredTransactions: Transaction[];
   transactionTypeFilter: 'ALL' | 'INCOME' | 'EXPENSE' | 'TRANSFER';
   setTransactionTypeFilter: (f: any) => void;
+  currencyFilter: string;
+  setCurrencyFilter: (c: string) => void;
+  availableCurrencies: string[];
   isBulkMode: boolean;
   setIsBulkMode: (b: boolean) => void;
   bulkSelectedTxIds: Set<string>;
@@ -630,14 +643,15 @@ interface TxProps {
   onTxClick: (tx: Transaction) => void;
   onBulkDelete: () => void;
 }
-export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatTime, formatDayLabel, getDayKey, onTxClick, onBulkDelete }) => {
+export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, currencyFilter, setCurrencyFilter, availableCurrencies, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatTime, formatDayLabel, getDayKey, onTxClick, onBulkDelete }) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     return filteredTransactions
       .filter((t) => transactionTypeFilter === 'ALL' || t.type === transactionTypeFilter)
+      .filter((t) => currencyFilter === 'ALL' || t.currency === currencyFilter)
       .filter((t) => !search || (t.notes || '').toLowerCase().includes(search.toLowerCase()))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [filteredTransactions, transactionTypeFilter, search]);
+  }, [filteredTransactions, transactionTypeFilter, currencyFilter, search]);
 
   // Group by day in user's timezone (not UTC)
   const grouped = useMemo(() => {
@@ -675,6 +689,11 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
           onChange={(id) => setTransactionTypeFilter(id as any)}
         />
         </div>
+        {availableCurrencies.length > 1 && (
+          <div className="mt-3">
+            <CurrencyFilterChips currencies={availableCurrencies} value={currencyFilter} onChange={setCurrencyFilter} />
+          </div>
+        )}
         <div className="flex items-center justify-between mt-3">
           <span className="text-[10px] font-bold uppercase tracking-widest text-graphite">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
           <button
@@ -788,6 +807,38 @@ const SpaceFilterChips: React.FC<{ contexts: FinancialContext[]; value: string; 
   </div>
 );
 
+// ─── CURRENCY FILTER CHIPS (inline filter by currency) ──────────────────
+// `currencies` is the deduped list of currencies actually present in the
+// user's data for this view. When only 1 currency exists, the component
+// renders nothing (no point filtering by a single option).
+export const CurrencyFilterChips: React.FC<{ currencies: string[]; value: string; onChange: (cur: string) => void; label?: string }> = ({ currencies, value, onChange, label = 'Moneda' }) => {
+  if (currencies.length <= 1) return null;
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">{label}:</span>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <button
+          type="button"
+          onClick={() => { haptic('selection'); onChange('ALL'); }}
+          className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === 'ALL' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
+        >
+          Todas
+        </button>
+        {currencies.map((cur) => (
+          <button
+            key={cur}
+            type="button"
+            onClick={() => { haptic('selection'); onChange(cur); }}
+            className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 tabular ${value === cur ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
+          >
+            {cur}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // ─── SUBSCRIPTIONS ──────────────────────────────────────────────────────
 interface SubsProps {
   state: AppState;
@@ -795,6 +846,9 @@ interface SubsProps {
   setContextFilter: (id: string) => void;
   subscriptionStatusFilter: 'ALL' | 'ACTIVE' | 'PAUSED';
   setSubscriptionStatusFilter: (f: any) => void;
+  currencyFilter: string;
+  setCurrencyFilter: (c: string) => void;
+  availableCurrencies: string[];
   formatCurrency: (n: number, c?: string) => string;
   formatDateTime: (s: string) => string;
   onSubClick: (s: Subscription) => void;
@@ -803,17 +857,18 @@ interface SubsProps {
   getAccountName: (cId: string, aId: string) => string;
   getSubAccountName: (cId: string, aId: string, sId: string) => string;
 }
-export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter, setContextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
+export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter, setContextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
   const list = useMemo(() => {
     return state.subscriptions
       .filter((s) => contextFilter === 'ALL' || s.contextId === contextFilter)
+      .filter((s) => currencyFilter === 'ALL' || s.currency === currencyFilter)
       .filter((s) => subscriptionStatusFilter === 'ALL' || (subscriptionStatusFilter === 'ACTIVE' ? s.active : !s.active))
       .sort((a, b) => {
         if (!a.nextRenewal) return 1;
         if (!b.nextRenewal) return -1;
         return new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
       });
-  }, [state.subscriptions, contextFilter, subscriptionStatusFilter]);
+  }, [state.subscriptions, contextFilter, currencyFilter, subscriptionStatusFilter]);
 
   // Overdue subscriptions ("por pagar")
   const overdueSubs = useMemo(
@@ -938,6 +993,7 @@ export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter,
             <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
           </div>
         )}
+        <CurrencyFilterChips currencies={availableCurrencies} value={currencyFilter} onChange={setCurrencyFilter} />
       </div>
 
       {list.length === 0 ? (
@@ -1004,29 +1060,53 @@ interface CatProps {
   state: AppState;
   contextFilter: string;
   setContextFilter: (id: string) => void;
+  currencyFilter: string;
+  setCurrencyFilter: (c: string) => void;
+  availableCurrencies: string[];
   formatCurrency: (n: number, c?: string) => string;
   onCategoryClick: (c: Category) => void;
   onCategoryEdit: (c: Category) => void;
   onAddCategory: () => void;
   getAccountName: (cId: string, aId: string) => string;
 }
-export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, setContextFilter, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
-  const list = state.categories.filter((c) => contextFilter === 'ALL' || c.contextId === contextFilter);
+export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, setContextFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
+  // Categories that have at least one active tx in the selected currency
+  // (when filtering). When 'ALL', no extra filter is applied.
+  const list = useMemo(() => {
+    let cats = state.categories.filter((c) => contextFilter === 'ALL' || c.contextId === contextFilter);
+    if (currencyFilter !== 'ALL') {
+      const usedIds = new Set(
+        state.transactions
+          .filter((tx) => !tx.deletedAt && tx.currency === currencyFilter && tx.categoryId)
+          .map((tx) => tx.categoryId!)
+      );
+      cats = cats.filter((c) => usedIds.has(c.id));
+    }
+    return cats;
+  }, [state.categories, state.transactions, contextFilter, currencyFilter]);
   const showSpaceFilter = state.contexts.length > 1;
 
+  // Total amount in the selected currency (if filtering) or in the user's
+  // primary currency (when 'ALL'). Per-currency, never mixing.
   const totalByCategory = (catId: string) => {
-    return state.transactions.filter((tx) => tx.categoryId === catId && !tx.deletedAt).reduce((sum, tx) => sum + tx.amount, 0);
+    const targetCur = currencyFilter !== 'ALL' ? currencyFilter : state.user.currency;
+    return state.transactions
+      .filter((tx) => tx.categoryId === catId && !tx.deletedAt && tx.currency === targetCur)
+      .reduce((sum, tx) => sum + tx.amount, 0);
   };
 
   if (list.length === 0) {
     return (
       <div className="pb-tabbar">
-        {showSpaceFilter && (
-          <div className="px-5 lg:px-8 pt-2 pb-3 flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">Espacio:</span>
-            <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
-          </div>
-        )}
+        <div className="px-5 lg:px-8 pt-2 pb-3 space-y-2">
+          {showSpaceFilter && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite">Espacio:</span>
+              <SpaceFilterChips contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
+            </div>
+          )}
+          <CurrencyFilterChips currencies={availableCurrencies} value={currencyFilter} onChange={setCurrencyFilter} />
+        </div>
         <EmptyState icon={Icons.Category} title="Sin categorías" description="Crea categorías para organizar tus gastos." action={{ label: 'Nueva categoría', onClick: onAddCategory }} />
       </div>
     );

@@ -75,6 +75,12 @@ function App() {
   const [subscriptionsContextFilter, setSubscriptionsContextFilter] = useState<string>('ALL');
   const [categoriesContextFilter, setCategoriesContextFilter] = useState<string>('ALL');
 
+  // Per-view currency filter (default 'ALL' = show every currency)
+  const [dashboardCurrencyFilter, setDashboardCurrencyFilter] = useState<string>('ALL');
+  const [transactionsCurrencyFilter, setTransactionsCurrencyFilter] = useState<string>('ALL');
+  const [subscriptionsCurrencyFilter, setSubscriptionsCurrencyFilter] = useState<string>('ALL');
+  const [categoriesCurrencyFilter, setCategoriesCurrencyFilter] = useState<string>('ALL');
+
   // Resolver — returns the filter for the currently active view.
   const contextFilter = (() => {
     switch (currentView) {
@@ -531,6 +537,20 @@ function App() {
       () => state.transactions.filter(t => !t.deletedAt),
       [state.transactions]
   );
+
+  // Unique currencies actually used across the user's data (sorted alphabetically,
+  // with the user's primary currency first). Used to drive CurrencyFilterChips.
+  const computeCurrencies = (txs: Transaction[], subs: any[] = [], extra: string[] = []): string[] => {
+      const set = new Set<string>();
+      txs.forEach(t => { if (t.currency) set.add(t.currency); });
+      subs.forEach(s => { if (s.currency) set.add(s.currency); });
+      extra.forEach(c => { if (c) set.add(c); });
+      const list = Array.from(set).sort();
+      const primary = state.user.currency;
+      return primary && list.includes(primary) ? [primary, ...list.filter(c => c !== primary)] : list;
+  };
+  const allTxCurrencies = useMemo(() => computeCurrencies(activeTransactions, state.subscriptions), [activeTransactions, state.subscriptions, state.user.currency]);
+  const subscriptionCurrencies = useMemo(() => computeCurrencies([], state.subscriptions), [state.subscriptions, state.user.currency]);
   const deletedTransactions = useMemo(
       () => state.transactions.filter(t => !!t.deletedAt)
           .sort((a, b) => new Date(b.deletedAt!).getTime() - new Date(a.deletedAt!).getTime()),
@@ -555,19 +575,29 @@ function App() {
       });
   }, [filteredTransactions, dashboardDateRange]);
   
-  // Dashboard Chart Totals (recalculated based on date filter)
-  const dashboardIncome = dashboardFilteredTransactions.filter(t => t.type === 'INCOME').reduce((s,t) => s + t.amount, 0);
-  const dashboardExpense = dashboardFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce((s,t) => s + t.amount, 0);
-
   const filteredContexts = state.contexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter);
-  
-  const totalsByCurrency = getTotalsByCurrency(filteredContexts);
 
-  const monthlyIncomeByCurrency = dashboardFilteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
+  const totalsByCurrencyRaw = getTotalsByCurrency(filteredContexts);
+  // When a currency is selected in the dashboard, narrow totals to that one.
+  const totalsByCurrency = dashboardCurrencyFilter === 'ALL'
+      ? totalsByCurrencyRaw
+      : { [dashboardCurrencyFilter]: totalsByCurrencyRaw[dashboardCurrencyFilter] || 0 };
+
+  // Apply the dashboard's currency filter (if set) on top of date/context.
+  const dashboardCurrencyFilteredTransactions = useMemo(() => {
+      if (dashboardCurrencyFilter === 'ALL') return dashboardFilteredTransactions;
+      return dashboardFilteredTransactions.filter(t => t.currency === dashboardCurrencyFilter);
+  }, [dashboardFilteredTransactions, dashboardCurrencyFilter]);
+
+  // Dashboard Chart Totals (using currency-filtered set)
+  const dashboardIncome = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'INCOME').reduce((s,t) => s + t.amount, 0);
+  const dashboardExpense = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce((s,t) => s + t.amount, 0);
+
+  const monthlyIncomeByCurrency = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
     acc[t.currency] = (acc[t.currency] || 0) + t.amount;
     return acc;
   }, {});
-  const monthlyExpenseByCurrency = dashboardFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
+  const monthlyExpenseByCurrency = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
     acc[t.currency] = (acc[t.currency] || 0) + t.amount;
     return acc;
   }, {});
@@ -595,13 +625,14 @@ function App() {
 
     return state.subscriptions
       .filter(s => s.active && (contextFilter === 'ALL' || s.contextId === contextFilter))
+      .filter(s => dashboardCurrencyFilter === 'ALL' || s.currency === dashboardCurrencyFilter)
       .filter(s => {
         if (!s.nextRenewal) return false;
         const renewal = new Date(s.nextRenewal);
         return renewal >= start && renewal <= periodEnd;
       })
       .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
-  }, [state.subscriptions, contextFilter, dashboardDateRange]);
+  }, [state.subscriptions, contextFilter, dashboardCurrencyFilter, dashboardDateRange]);
   const activeSubsCount = dashboardFilteredSubs.length;
 
   // --- Actions ---
@@ -1377,7 +1408,7 @@ function App() {
               monthlyIncomeByCurrency={monthlyIncomeByCurrency}
               monthlyExpenseByCurrency={monthlyExpenseByCurrency}
               activeSubsCount={activeSubsCount}
-              dashboardFilteredTransactions={dashboardFilteredTransactions}
+              dashboardFilteredTransactions={dashboardCurrencyFilteredTransactions}
               dashboardFilteredSubs={dashboardFilteredSubs}
               dashboardIncome={dashboardIncome}
               dashboardExpense={dashboardExpense}
@@ -1396,6 +1427,9 @@ function App() {
               onTransactionClick={(tx) => setSelectedTransaction(tx)}
               onSubscriptionClick={(s) => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
               onChartDrill={(d) => setChartDrill(d)}
+              currencyFilter={dashboardCurrencyFilter}
+              setCurrencyFilter={setDashboardCurrencyFilter}
+              availableCurrencies={allTxCurrencies}
             />
           )}
           {currentView === 'ACCOUNTS' && (
@@ -1418,6 +1452,9 @@ function App() {
               filteredTransactions={filteredTransactions}
               transactionTypeFilter={transactionTypeFilter}
               setTransactionTypeFilter={setTransactionTypeFilter}
+              currencyFilter={transactionsCurrencyFilter}
+              setCurrencyFilter={setTransactionsCurrencyFilter}
+              availableCurrencies={allTxCurrencies}
               isBulkMode={isBulkMode}
               setIsBulkMode={setIsBulkMode}
               bulkSelectedTxIds={bulkSelectedTxIds}
@@ -1440,6 +1477,9 @@ function App() {
               setContextFilter={setContextFilter}
               subscriptionStatusFilter={subscriptionStatusFilter}
               setSubscriptionStatusFilter={setSubscriptionStatusFilter}
+              currencyFilter={subscriptionsCurrencyFilter}
+              setCurrencyFilter={setSubscriptionsCurrencyFilter}
+              availableCurrencies={subscriptionCurrencies}
               formatCurrency={formatCurrency}
               formatDateTime={formatDateTime}
               onSubClick={(s) => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
@@ -1454,6 +1494,9 @@ function App() {
               state={state}
               contextFilter={contextFilter}
               setContextFilter={setContextFilter}
+              currencyFilter={categoriesCurrencyFilter}
+              setCurrencyFilter={setCategoriesCurrencyFilter}
+              availableCurrencies={allTxCurrencies}
               formatCurrency={formatCurrency}
               onCategoryClick={(c) => { setSelectedCategory(c); setActiveModal('VIEW_CATEGORY'); }}
               onCategoryEdit={(c) => { setSelectedCategory(c); setActiveModal('EDIT_CATEGORY'); }}
