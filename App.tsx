@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { AppState, FinancialContext, Transaction, Subscription, Category, Account } from './types';
 import { INITIAL_STATE, CURRENCIES } from './constants';
 import { Icons } from './components/Icons';
-import { TransactionForm, TransferForm, CategoryForm, SubAccountForm, SubscriptionForm, NewContextForm } from './components/ActionModals';
+import { TransactionForm, TransferForm, CategoryForm, SubAccountForm, SubscriptionForm, NewContextForm, AdjustBalanceForm } from './components/ActionModals';
 import { supabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
@@ -43,6 +43,7 @@ import {
 } from './components/MobileDetails';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
+import { UpdatePopup } from './components/UpdatePopup';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -790,6 +791,40 @@ function App() {
       }
   }
 
+  // Balance reconciliation: user enters the REAL balance they have; we compute
+  // the delta vs the tracked balance and create a signed ADJUSTMENT entry.
+  // Excluded from income/expense metrics — only corrects the balance.
+  const handleAdjustment = (data: { contextId: string; accountId: string; subAccountId?: string; currency: string; realBalance: number; notes?: string }) => {
+      const cur = data.currency || currencyCode;
+      const ctx = state.contexts.find(c => c.id === data.contextId);
+      const acc = ctx?.accounts.find(a => a.id === data.accountId);
+      if (!acc) return;
+      const currentBalance = data.subAccountId
+          ? getBalance(acc.subAccounts.find(s => s.id === data.subAccountId)?.balances || {}, cur)
+          : getBalance(acc.balances, cur);
+      const delta = Number((data.realBalance - currentBalance).toFixed(2));
+      if (delta === 0) return; // nothing to reconcile
+
+      const newTx: Transaction = {
+          id: crypto.randomUUID(),
+          type: 'ADJUSTMENT',
+          amount: delta,
+          currency: cur,
+          date: new Date().toISOString(),
+          notes: data.notes || `Ajuste de saldo (${delta > 0 ? '+' : ''}${delta} ${cur})`,
+          contextId: data.contextId,
+          accountId: data.accountId,
+          subAccountId: data.subAccountId || undefined,
+      };
+      setState(prev => ({
+          ...prev,
+          transactions: [newTx, ...prev.transactions],
+          contexts: applyTxEffect(prev.contexts, newTx, 1),
+      }));
+      logAudit(newTx.id, 'CREATE', null, newTx);
+      flashRecent([{ accountId: data.accountId, subAccountId: data.subAccountId || undefined, amount: Math.abs(delta), currency: cur, kind: delta >= 0 ? 'INCOME' : 'EXPENSE' }]);
+  };
+
   const handleTransaction = (data: any) => {
     const cur = data.currency || currencyCode;
     const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
@@ -929,7 +964,8 @@ function App() {
           const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === tx.accountId);
           if (accIdx > -1) {
               const acc = newContexts[ctxIdx].accounts[accIdx];
-              const delta = sign * (tx.type === 'INCOME' ? tx.amount : -tx.amount);
+              // ADJUSTMENT stores a signed delta → add it directly (like income).
+              const delta = sign * ((tx.type === 'INCOME' || tx.type === 'ADJUSTMENT') ? tx.amount : -tx.amount);
               if (tx.subAccountId) {
                   const subIdx = acc.subAccounts.findIndex(s => s.id === tx.subAccountId);
                   if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, delta);
@@ -1554,6 +1590,7 @@ function App() {
             { id: 'subscription', label: 'Suscripción', description: 'Nuevo pago recurrente', icon: Icons.Subscription, onClick: () => { setSelectedSubscription(undefined); setActiveModal('SUBSCRIPTION'); } },
             { id: 'category', label: 'Categoría', description: 'Crear categoría', icon: Icons.Category, onClick: () => { setSelectedCategory(undefined); setActiveModal('CATEGORY'); } },
             { id: 'sub_account', label: 'Sub-Cuenta', description: 'Añadir sub-cuenta', icon: Icons.Accounts, onClick: () => setActiveModal('SUB_ACCOUNT') },
+            { id: 'adjust', label: 'Ajustar Saldo', description: 'Cuadrar con tu saldo real', icon: Icons.Refresh, onClick: () => setActiveModal('ADJUST') },
           ]}
         />
 
@@ -1606,6 +1643,7 @@ function App() {
           />
         )}
         {activeModal === 'NEW_BIZ' && <NewContextForm onSubmit={handleNewBusiness} onClose={() => setActiveModal(null)} />}
+        {activeModal === 'ADJUST' && <AdjustBalanceForm state={state} onSubmit={handleAdjustment} onClose={() => setActiveModal(null)} />}
 
         {/* Detail bottom sheets */}
         <TransactionDetailSheet
@@ -1724,6 +1762,7 @@ function App() {
           getAccountName={getAccountName}
           getSubAccountName={getSubAccountName}
         />
+        <UpdatePopup />
       </MobileShell>
     </ToastProvider>
   );

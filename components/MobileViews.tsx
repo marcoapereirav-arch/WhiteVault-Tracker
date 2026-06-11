@@ -732,9 +732,10 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
                 <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
                   {txs.map((tx) => {
                     const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
-                    const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
-                    const tone = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
-                    const sign = tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : '';
+                    const isAdj = tx.type === 'ADJUSTMENT';
+                    const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : isAdj ? Icons.Refresh : Icons.Transfer;
+                    const tone = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : isAdj ? 'gold' : 'transfer';
+                    const sign = tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : isAdj ? (tx.amount >= 0 ? '+' : '') : '';
                     const selected = bulkSelectedTxIds.has(tx.id);
                     return (
                       <div
@@ -763,13 +764,13 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
                           <Icon className="w-4 h-4" />
                         </IconCircle>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-onyx truncate">{tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</div>
+                          <div className="text-sm font-medium text-onyx truncate">{tx.notes || (tx.type === 'TRANSFER' ? 'Transferencia' : tx.type === 'INCOME' ? 'Ingreso' : isAdj ? 'Ajuste de saldo' : 'Gasto')}</div>
                           <div className="text-xs text-graphite truncate">
-                            {formatTime(tx.date)}{cat ? ` · ${cat.name}` : ''}
+                            {formatTime(tx.date)}{isAdj ? ' · Ajuste' : cat ? ` · ${cat.name}` : ''}
                           </div>
                         </div>
-                        <span className={`text-sm font-display font-bold tabular ${tx.type === 'INCOME' ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : 'text-onyx'}`}>
-                          {sign}{formatCurrency(tx.amount, tx.currency)}
+                        <span className={`text-sm font-display font-bold tabular ${tx.type === 'INCOME' ? 'text-emerald-700' : tx.type === 'EXPENSE' ? 'text-rose-700' : isAdj ? (tx.amount >= 0 ? 'text-emerald-700' : 'text-rose-700') : 'text-onyx'}`}>
+                          {sign}{formatCurrency(Math.abs(tx.amount), tx.currency)}
                         </span>
                       </div>
                     );

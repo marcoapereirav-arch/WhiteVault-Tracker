@@ -611,6 +611,118 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     );
 };
 
+// ─── ADJUST BALANCE (reconciliation) ────────────────────────────────────
+interface AdjustBalanceFormProps {
+    state: AppState;
+    onSubmit: (data: { contextId: string; accountId: string; subAccountId?: string; currency: string; realBalance: number; notes?: string }) => void;
+    onClose: () => void;
+}
+export const AdjustBalanceForm: React.FC<AdjustBalanceFormProps> = ({ state, onSubmit, onClose }) => {
+    const [contextId, setContextId] = useState(state.contexts[0]?.id || '');
+    const [accountId, setAccountId] = useState('');
+    const [subAccountId, setSubAccountId] = useState('');
+    const [currency, setCurrency] = useState(state.user.currency);
+    const [realBalance, setRealBalance] = useState('');
+    const [notes, setNotes] = useState('');
+
+    const ctx = state.contexts.find(c => c.id === contextId);
+    const acc = ctx?.accounts.find(a => a.id === accountId);
+    const sub = subAccountId ? acc?.subAccounts.find(s => s.id === subAccountId) : null;
+
+    const balances = sub ? sub.balances : acc?.balances;
+    const currentBalance = balances?.[currency] ?? 0;
+    const delta = realBalance !== '' ? Number((Number(realBalance) - currentBalance).toFixed(2)) : null;
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (realBalance === '') return;
+        onSubmit({ contextId, accountId, subAccountId: subAccountId || undefined, currency, realBalance: Number(realBalance), notes: notes || undefined });
+        onClose();
+    };
+
+    return (
+        <Modal isOpen={true} onClose={onClose} title="Ajustar Saldo">
+            <form onSubmit={handleSubmit}>
+                <div className="mb-4 p-4 bg-gold/10 border border-gold/30 rounded-2xl">
+                    <p className="text-[11px] text-graphite">
+                        Introduce el <strong className="text-onyx">saldo real</strong> que tienes en esta cuenta. El sistema creará un <strong className="text-onyx">ajuste</strong> con la diferencia. <span className="text-graphite">No cuenta como ingreso ni gasto en tus métricas.</span>
+                    </p>
+                </div>
+
+                <SelectField
+                    label="Espacio"
+                    value={contextId}
+                    options={state.contexts.map((c) => ({ value: c.id, label: c.name }))}
+                    onChange={(v) => { setContextId(v); setAccountId(''); setSubAccountId(''); }}
+                />
+                <SelectField
+                    label="Cuenta"
+                    placeholder="Seleccionar cuenta"
+                    value={accountId}
+                    options={(ctx?.accounts || []).map((a) => ({ value: a.id, label: a.name, hint: formatMoney(a.balances?.[currency] ?? 0, currency) }))}
+                    onChange={(v) => { setAccountId(v); setSubAccountId(''); }}
+                />
+                {acc && acc.subAccounts.length > 0 && (
+                    <SelectField
+                        label="Sub-cuenta (opcional)"
+                        value={subAccountId}
+                        options={[
+                            { value: '', label: 'Ninguna — cuenta principal' },
+                            ...acc.subAccounts.map((s) => ({ value: s.id, label: s.name, hint: formatMoney(s.balances?.[currency] ?? 0, currency) })),
+                        ]}
+                        onChange={setSubAccountId}
+                    />
+                )}
+                <SelectField
+                    label="Moneda"
+                    value={currency}
+                    options={CURRENCIES.map((c) => ({ value: c.code, label: c.code, hint: c.symbol }))}
+                    onChange={setCurrency}
+                    searchable
+                />
+
+                {accountId && (
+                    <div className="mb-4 grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-stone rounded-xl">
+                            <div className="text-[10px] uppercase tracking-widest text-graphite font-bold mb-1">En WhiteVault</div>
+                            <div className="text-base font-display font-bold text-onyx tabular">{formatMoney(currentBalance, currency)}</div>
+                        </div>
+                        <div className={`p-3 rounded-xl ${delta === null ? 'bg-stone' : delta === 0 ? 'bg-stone' : delta > 0 ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                            <div className="text-[10px] uppercase tracking-widest text-graphite font-bold mb-1">Ajuste</div>
+                            <div className={`text-base font-display font-bold tabular ${delta === null || delta === 0 ? 'text-graphite' : delta > 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                                {delta === null ? '—' : `${delta > 0 ? '+' : ''}${formatMoney(delta, currency)}`}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="mb-4">
+                    <label className="block text-[10px] font-bold uppercase tracking-widest text-graphite mb-2">Saldo real que tienes</label>
+                    <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={realBalance}
+                        onChange={(e) => setRealBalance(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none font-display font-bold text-lg"
+                    />
+                </div>
+
+                <Input type="text" label="Nota (opcional)" maxLength={200} value={notes} placeholder="Ej: dinero que entró sin registrar" onChange={(e: any) => setNotes(e.target.value)} />
+
+                <button
+                    type="submit"
+                    disabled={!accountId || realBalance === '' || delta === 0}
+                    className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] mt-2 disabled:opacity-40 transition-all"
+                >
+                    {delta === 0 ? 'Ya está cuadrado' : 'Aplicar Ajuste'}
+                </button>
+            </form>
+        </Modal>
+    );
+};
+
 interface TransferFormProps {
     state: AppState;
     onSubmit: (data: any) => void;

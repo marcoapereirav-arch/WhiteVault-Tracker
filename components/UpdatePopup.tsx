@@ -1,0 +1,108 @@
+// WhiteVault™ — Update popup.
+// Shows a "what's new" sheet whenever the app version bumps. The user taps
+// "Actualizar" → we store the seen version + reload to pick up the fresh SW.
+//
+// To ship an update entry: bump APP_VERSION and prepend to CHANGELOG.
+
+import React, { useEffect, useState } from 'react';
+import { Icons } from './Icons';
+import { haptic } from './Mobile';
+
+export const APP_VERSION = '2026.06.04';
+
+interface ChangeEntry {
+  version: string;
+  date: string;       // display date
+  items: string[];    // short, to-the-point checklist
+}
+
+// Most recent first. Only the latest entry is shown in the popup, but the
+// list lets us keep history if we ever want a full changelog screen.
+export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.06.04',
+    date: '4 jun 2026',
+    items: [
+      'Ajustar Saldo: cuadra una cuenta con tu saldo real sin contar como ingreso',
+      'Filtro por moneda en Libro, Suscripciones, Categorías y Dashboard',
+      'Flecha atrás en todas las ventanas',
+      'Historial de pagos en cada suscripción',
+      'Frecuencia flexible: cada N días/semanas/meses/años',
+      'Filtros de espacio independientes por sección',
+    ],
+  },
+];
+
+const SEEN_KEY = 'wv_seen_version';
+
+export const UpdatePopup: React.FC = () => {
+  const [open, setOpen] = useState(false);
+  const latest = CHANGELOG[0];
+
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem(SEEN_KEY);
+      // First-ever load: mark as seen silently (don't nag new users).
+      if (!seen) {
+        localStorage.setItem(SEEN_KEY, APP_VERSION);
+        return;
+      }
+      if (seen !== APP_VERSION) {
+        setOpen(true);
+      }
+    } catch {
+      /* localStorage unavailable — skip */
+    }
+  }, []);
+
+  const handleUpdate = () => {
+    haptic('medium');
+    try { localStorage.setItem(SEEN_KEY, APP_VERSION); } catch {}
+    // Reload to ensure the freshest service worker + bundle are active.
+    window.location.reload();
+  };
+
+  if (!open || !latest) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" role="dialog" aria-modal="true">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <div className="relative w-full max-w-[440px] mx-auto bg-stone rounded-t-[28px] sm:rounded-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.3)] wv-pop-in" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}>
+        {/* Header */}
+        <div className="px-6 pt-7 pb-4 text-center">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-onyx flex items-center justify-center mb-4">
+            <Icons.Sparkles className="w-6 h-6 text-gold" />
+          </div>
+          <div className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Actualización · {latest.date}</div>
+          <h2 className="text-2xl font-display font-bold text-onyx tracking-tight mt-1">Novedades</h2>
+        </div>
+
+        {/* Checklist */}
+        <div className="px-6 max-h-[50dvh] overflow-y-auto">
+          <div className="bg-white border border-black/5 rounded-2xl divide-y divide-black/5">
+            {latest.items.map((item, i) => (
+              <div key={i} className="flex items-start gap-3 p-3.5">
+                <div className="w-5 h-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Icons.Check className="w-3 h-3 text-emerald-700" />
+                </div>
+                <span className="text-sm text-onyx leading-snug">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action */}
+        <div className="px-6 pt-5">
+          <button
+            onClick={handleUpdate}
+            className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
+          >
+            <Icons.Refresh className="w-4 h-4" />
+            Actualizar
+          </button>
+          <div className="text-center text-[10px] text-graphite/60 mt-3 uppercase tracking-widest">WhiteVault™ · v{APP_VERSION}</div>
+        </div>
+      </div>
+    </div>
+  );
+};

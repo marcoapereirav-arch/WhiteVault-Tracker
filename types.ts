@@ -37,7 +37,9 @@ export interface Category {
 
 export interface Transaction {
   id: string;
-  type: 'EXPENSE' | 'INCOME' | 'TRANSFER';
+  // ADJUSTMENT = reconciliation entry; corrects an account balance without
+  // counting as income/expense in metrics or charts. amount is signed.
+  type: 'EXPENSE' | 'INCOME' | 'TRANSFER' | 'ADJUSTMENT';
   amount: number;
   date: string; // ISO string with Time
   notes?: string;
