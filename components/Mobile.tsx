@@ -247,21 +247,38 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const startY = useRef<number | null>(null);
   const currentY = useRef<number | null>(null);
+  const dragging = useRef(false);
 
+  // Robust body scroll-lock for iOS: position:fixed on body + restore scroll.
+  // (overflow:hidden alone does NOT stop background scroll on iOS Safari.)
   useEffect(() => {
     if (open) {
       setIsMounted(true);
       requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
-      document.body.style.overflow = 'hidden';
+      const scrollY = window.scrollY;
+      const body = document.body;
+      body.style.position = 'fixed';
+      body.style.top = `-${scrollY}px`;
+      body.style.left = '0';
+      body.style.right = '0';
+      body.style.width = '100%';
+      return () => {
+        const top = body.style.top;
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.width = '';
+        window.scrollTo(0, top ? -parseInt(top, 10) : 0);
+      };
     } else if (isMounted) {
       setIsVisible(false);
       const t = setTimeout(() => setIsMounted(false), 280);
-      document.body.style.overflow = '';
       return () => clearTimeout(t);
     }
-    return () => { document.body.style.overflow = ''; };
   }, [open, isMounted]);
 
   useEffect(() => {
@@ -271,25 +288,36 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Drag-to-close: only engages when the scrollable content is already at the
+  // top (so it doesn't fight with scrolling the list inside the sheet).
   const handleTouchStart = (e: React.TouchEvent) => {
+    const atTop = (scrollRef.current?.scrollTop ?? 0) <= 0;
+    if (!atTop) { startY.current = null; return; }
     startY.current = e.touches[0].clientY;
     currentY.current = startY.current;
+    dragging.current = true;
   };
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (startY.current === null) return;
+    if (startY.current === null || !dragging.current) return;
     currentY.current = e.touches[0].clientY;
     const dy = currentY.current - startY.current;
     if (dy > 0 && sheetRef.current) {
       sheetRef.current.style.transform = `translateY(${dy}px)`;
+      sheetRef.current.style.transition = 'none';
     }
   };
   const handleTouchEnd = () => {
-    if (startY.current === null || currentY.current === null) return;
-    const dy = currentY.current - startY.current;
-    if (sheetRef.current) sheetRef.current.style.transform = '';
-    if (dy > 100) { haptic('light'); onClose(); }
+    if (sheetRef.current) {
+      sheetRef.current.style.transition = '';
+      sheetRef.current.style.transform = '';
+    }
+    if (startY.current !== null && currentY.current !== null) {
+      const dy = currentY.current - startY.current;
+      if (dy > 90) { haptic('light'); onClose(); }
+    }
     startY.current = null;
     currentY.current = null;
+    dragging.current = false;
   };
 
   if (!isMounted) return null;
@@ -305,6 +333,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
       <div
         className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
         onClick={onClose}
+        onTouchStart={(e) => { e.stopPropagation(); }}
       />
       <div className="relative w-full max-w-[480px] mx-auto pointer-events-none">
         <div
@@ -312,33 +341,36 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
           className={`pointer-events-auto bg-stone ${sizeClass} flex flex-col rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
         >
+          {/* Drag zone covers the handle + header so it's easy to grab.
+              A big tap target (close button) sits inside. */}
           <div
-            className="pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing"
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-            <div className="w-10 h-1 bg-graphite/30 rounded-full" />
-          </div>
-          <div className="flex items-center gap-3 px-3 pt-1 pb-2 border-b border-black/5">
-            <button
-              type="button"
-              onClick={() => { haptic('light'); onClose(); }}
-              className="w-10 h-10 -ml-1 rounded-full flex items-center justify-center hover:bg-stone active:scale-95 transition-all flex-shrink-0"
-              aria-label="Atrás"
-            >
-              <Icons.ChevronLeft className="w-5 h-5 text-onyx" />
-            </button>
-            <div className="flex-1 min-w-0">
-              {subtitle && (
-                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold mb-0.5 truncate">{subtitle}</div>
-              )}
-              {title && <h2 className="text-base font-display font-bold text-onyx tracking-tight truncate">{title}</h2>}
+            <div className="pt-3 pb-1.5 flex justify-center cursor-grab active:cursor-grabbing">
+              <div className="w-12 h-1.5 bg-graphite/30 rounded-full" />
             </div>
-            {trailing && <div className="flex-shrink-0">{trailing}</div>}
+            <div className="flex items-center gap-3 px-3 pb-2.5 border-b border-black/5">
+              <button
+                type="button"
+                onClick={() => { haptic('light'); onClose(); }}
+                className="w-11 h-11 rounded-full flex items-center justify-center bg-stone hover:bg-concrete active:scale-95 transition-all flex-shrink-0"
+                aria-label="Cerrar"
+              >
+                <Icons.ChevronLeft className="w-5 h-5 text-onyx" />
+              </button>
+              <div className="flex-1 min-w-0">
+                {subtitle && (
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold mb-0.5 truncate">{subtitle}</div>
+                )}
+                {title && <h2 className="text-base font-display font-bold text-onyx tracking-tight truncate">{title}</h2>}
+              </div>
+              {trailing && <div className="flex-shrink-0">{trailing}</div>}
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6">{children}</div>
+          <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6">{children}</div>
         </div>
       </div>
     </div>
@@ -700,6 +732,47 @@ export const IconCircle: React.FC<{ children: ReactNode; tone?: 'default' | 'inc
       style={bgColor ? { backgroundColor: bgColor + '20', color: bgColor, borderColor: bgColor + '30', borderWidth: 1 } : undefined}
     >
       {children}
+    </div>
+  );
+};
+
+// ─── AUTO-FIT TEXT ──────────────────────────────────────────────────────
+// Shrinks font-size until the text fits its container width (one line, no
+// ellipsis). Re-measures on resize and when the value changes.
+export const AutoFitText: React.FC<{ text: string; max?: number; min?: number; className?: string; weight?: string }> = ({ text, max = 22, min = 11, className = '', weight = 'font-display font-bold' }) => {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const spanRef = useRef<HTMLSpanElement>(null);
+  const [size, setSize] = useState(max);
+
+  useEffect(() => {
+    const fit = () => {
+      const wrap = wrapRef.current;
+      const span = spanRef.current;
+      if (!wrap || !span) return;
+      let lo = min, hi = max, best = min;
+      // Binary search the largest size that fits
+      const avail = wrap.clientWidth;
+      if (avail <= 0) return;
+      for (let i = 0; i < 8; i++) {
+        const mid = (lo + hi) / 2;
+        span.style.fontSize = `${mid}px`;
+        if (span.scrollWidth <= avail) { best = mid; lo = mid; }
+        else { hi = mid; }
+      }
+      span.style.fontSize = '';
+      setSize(Math.floor(best * 10) / 10);
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    if (wrapRef.current) ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, [text, max, min]);
+
+  return (
+    <div ref={wrapRef} className="w-full overflow-hidden">
+      <span ref={spanRef} className={`${weight} ${className} whitespace-nowrap inline-block tabular`} style={{ fontSize: `${size}px`, lineHeight: 1.15 }}>
+        {text}
+      </span>
     </div>
   );
 };

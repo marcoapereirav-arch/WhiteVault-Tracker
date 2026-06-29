@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { Icons } from './Icons';
 import { haptic } from './Mobile';
 
-export const APP_VERSION = '2026.06.04';
+export const APP_VERSION = '2026.06.05';
 
 interface ChangeEntry {
   version: string;
@@ -19,6 +19,20 @@ interface ChangeEntry {
 // Most recent first. Only the latest entry is shown in the popup, but the
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.06.05',
+    date: '5 jun 2026',
+    items: [
+      'Movimiento del Periodo rediseñado, más limpio',
+      'Importes se ajustan solos: nunca más puntos suspensivos',
+      'Cada moneda en su propia línea, ordenadas igual en todo',
+      'Próximas Renovaciones ya no repite las vencidas',
+      'Gráficos: sin popup molesto al tocar en el móvil',
+      'Calendario: al tocar un día ves sus suscripciones',
+      'Ventanas más fáciles de cerrar (sin scroll de fondo)',
+      'Switches arreglados y mejor espaciado en cabeceras',
+    ],
+  },
   {
     version: '2026.06.04',
     date: '4 jun 2026',

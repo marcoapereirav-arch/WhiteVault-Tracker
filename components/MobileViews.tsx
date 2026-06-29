@@ -10,7 +10,7 @@ import {
   ListSection,
   ListRow,
   IconCircle,
-  MetricCard,
+  AutoFitText,
   EmptyState,
   PressButton,
   Skeleton,
@@ -55,7 +55,7 @@ interface DashboardProps {
   onSummaryClick: (key: string) => void;
   onTransactionClick: (tx: Transaction) => void;
   onSubscriptionClick: (s: Subscription) => void;
-  onChartDrill: (data: { title: string; subtitle?: string; transactions: Transaction[]; currency: string }) => void;
+  onChartDrill: (data: { title: string; subtitle?: string; transactions: Transaction[]; subscriptions?: Subscription[]; currency: string }) => void;
   currencyCode: string;
   currencyFilter: string;
   setCurrencyFilter: (c: string) => void;
@@ -71,7 +71,12 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
     [p.dashboardFilteredTransactions]
   );
 
-  const upcoming = useMemo(() => p.dashboardFilteredSubs.slice(0, 3), [p.dashboardFilteredSubs]);
+  // Upcoming = future renewals only. Overdue ones live in "Por pagar" and
+  // must NOT be duplicated here.
+  const upcoming = useMemo(
+    () => p.dashboardFilteredSubs.filter((s) => !isSubscriptionOverdue(s)).slice(0, 3),
+    [p.dashboardFilteredSubs]
+  );
 
   // Overdue subscriptions across all contexts that match the user's filter
   const overdueSubs = useMemo(
@@ -128,17 +133,13 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
         </div>
       </section>
 
-      {/* Stats — mobile horiz scroll, desktop grid 4-col */}
-      <section className="mt-5 lg:mt-6">
-        <div className="px-5 lg:px-8 mb-2 flex items-center justify-between">
+      {/* Movimiento del Periodo — unified mobile-first card.
+          Currency order is consistent across columns (same sorted list). */}
+      <section className="px-3 lg:px-8 mt-5 lg:mt-6">
+        <div className="px-2 lg:px-1 mb-2">
           <h3 className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite">Movimiento del Periodo</h3>
         </div>
-        <div className="flex gap-3 overflow-x-auto no-scrollbar px-5 lg:hidden pb-1">
-          <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
-        </div>
-        <div className="hidden lg:grid lg:grid-cols-4 lg:gap-4 lg:px-8">
-          <DashboardStatsMobile p={p} primaryAmount={primaryAmount} primaryCurrency={primaryCurrency} />
-        </div>
+        <PeriodMovementCard p={p} />
       </section>
 
       {/* Currency filter (only when user has >1 currency in their data) */}
@@ -317,40 +318,95 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
   );
 };
 
-// Inner component: the 4 metric cards (used twice — mobile horiz scroll + desktop grid)
-// Each metric shows ALL currencies separately (never mixed).
-const DashboardStatsMobile: React.FC<{ p: DashboardProps; primaryAmount: number; primaryCurrency: string }> = ({ p }) => {
-  const incomeValues = Object.entries(p.monthlyIncomeByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
-  const expenseValues = Object.entries(p.monthlyExpenseByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
-  const balanceValues = Object.entries(p.totalsByCurrency).map(([cur, amt]) => ({ amount: p.formatCurrency(amt as number, cur), currency: cur }));
+// Unified mobile-first "Movimiento del Periodo" card.
+// Ingresos & Gastos side by side. Currencies render in a CONSISTENT order on
+// matching lines (line 1 = same currency in both columns, etc.). Amounts
+// auto-fit so they never get truncated regardless of digit count.
+const PeriodMovementCard: React.FC<{ p: DashboardProps }> = ({ p }) => {
+  // Build a stable currency order: primary currency first, then alphabetical,
+  // across the union of currencies that appear in income or expense.
+  const currencyOrder = useMemo(() => {
+    const set = new Set<string>([
+      ...Object.keys(p.monthlyIncomeByCurrency),
+      ...Object.keys(p.monthlyExpenseByCurrency),
+    ]);
+    const all = Array.from(set);
+    return all.sort((a, b) => {
+      if (a === p.currencyCode) return -1;
+      if (b === p.currencyCode) return 1;
+      return a.localeCompare(b);
+    });
+  }, [p.monthlyIncomeByCurrency, p.monthlyExpenseByCurrency, p.currencyCode]);
+
+  const lines = currencyOrder.length > 0 ? currencyOrder : [p.currencyCode];
+
   return (
-    <>
-      <MetricCard
-        label="Ingresos"
-        values={incomeValues.length > 0 ? incomeValues : [{ amount: p.formatCurrency(0) }]}
-        tone="income"
-        onClick={() => p.onSummaryClick('INCOME')}
-      />
-      <MetricCard
-        label="Gastos"
-        values={expenseValues.length > 0 ? expenseValues : [{ amount: p.formatCurrency(0) }]}
-        tone="expense"
-        onClick={() => p.onSummaryClick('EXPENSE')}
-      />
-      <MetricCard
-        label="Subs"
-        value={String(p.activeSubsCount)}
-        sublabel="activas"
-        tone="gold"
-        onClick={() => p.onSummaryClick('SUBS')}
-      />
-      <MetricCard
-        label="Total"
-        values={balanceValues.length > 0 ? balanceValues : [{ amount: p.formatCurrency(0) }]}
-        sublabel="patrimonio"
-        onClick={() => p.onSummaryClick('BALANCE')}
-      />
-    </>
+    <div className="bg-white border border-black/5 rounded-2xl overflow-hidden">
+      <div className="grid grid-cols-2 divide-x divide-black/5">
+        {/* Ingresos */}
+        <button
+          type="button"
+          onClick={() => { haptic('selection'); p.onSummaryClick('INCOME'); }}
+          className="relative p-4 text-left active:bg-stone transition-colors"
+        >
+          <div className="absolute top-0 left-0 w-1 h-full bg-emerald-700" />
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-graphite mb-2 pl-1">Ingresos</div>
+          <div className="space-y-1 pl-1">
+            {lines.map((cur) => (
+              <div key={cur} className="flex items-baseline gap-1">
+                <div className="flex-1 min-w-0">
+                  <AutoFitText
+                    text={`+${p.formatCurrency(p.monthlyIncomeByCurrency[cur] || 0, cur)}`}
+                    className="text-emerald-700"
+                    max={20}
+                    min={11}
+                  />
+                </div>
+                {lines.length > 1 && <span className="text-[9px] font-bold uppercase tracking-widest text-graphite flex-shrink-0">{cur}</span>}
+              </div>
+            ))}
+          </div>
+        </button>
+
+        {/* Gastos */}
+        <button
+          type="button"
+          onClick={() => { haptic('selection'); p.onSummaryClick('EXPENSE'); }}
+          className="relative p-4 text-left active:bg-stone transition-colors"
+        >
+          <div className="absolute top-0 left-0 w-1 h-full bg-rose-700" />
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-graphite mb-2 pl-1">Gastos</div>
+          <div className="space-y-1 pl-1">
+            {lines.map((cur) => (
+              <div key={cur} className="flex items-baseline gap-1">
+                <div className="flex-1 min-w-0">
+                  <AutoFitText
+                    text={`-${p.formatCurrency(p.monthlyExpenseByCurrency[cur] || 0, cur)}`}
+                    className="text-rose-700"
+                    max={20}
+                    min={11}
+                  />
+                </div>
+                {lines.length > 1 && <span className="text-[9px] font-bold uppercase tracking-widest text-graphite flex-shrink-0">{cur}</span>}
+              </div>
+            ))}
+          </div>
+        </button>
+      </div>
+
+      {/* Footer: subscriptions */}
+      <button
+        type="button"
+        onClick={() => { haptic('selection'); p.onSummaryClick('SUBS'); }}
+        className="w-full flex items-center justify-between px-4 py-3 border-t border-black/5 active:bg-stone transition-colors"
+      >
+        <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-graphite">
+          <span className="w-1.5 h-1.5 bg-gold rounded-full" />
+          Suscripciones activas
+        </span>
+        <span className="text-sm font-display font-bold text-onyx">{p.activeSubsCount}</span>
+      </button>
+    </div>
   );
 };
 
@@ -1657,10 +1713,11 @@ const ToggleRow: React.FC<{ label: string; desc?: string; value: boolean; onChan
     </div>
     <button
       onClick={() => onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-onyx' : 'bg-concrete'}`}
+      className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-onyx' : 'bg-concrete'}`}
       aria-pressed={value}
     >
-      <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+      {/* knob: track 48px, knob 24px, 2px inset → travel 48-24-4 = 20px */}
+      <span className={`absolute left-0.5 top-0.5 w-6 h-6 bg-white rounded-full shadow-sm transition-transform duration-200 ${value ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   </div>
 );

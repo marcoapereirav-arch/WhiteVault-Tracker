@@ -1260,6 +1260,13 @@ function App() {
     }
   }, [hasFetchedData]);
 
+  // Always reset scroll to the top when switching sections.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [currentView]);
+
   // --- Render ---
 
   if (!isLoaded) {
@@ -1429,7 +1436,7 @@ function App() {
 
         {/* Context switcher row (non-dashboard, non-settings views) */}
         {currentView !== 'DASHBOARD' && currentView !== 'SETTINGS' && state.contexts.length > 1 && (
-          <div className="px-5 pb-3 -mt-1 lg:hidden">
+          <div className="px-5 pt-3 pb-1 lg:hidden">
             <ContextSwitcher contexts={state.contexts} value={contextFilter} onChange={setContextFilter} />
           </div>
         )}
@@ -1745,6 +1752,7 @@ function App() {
           onClose={() => setChartDrill(null)}
           data={chartDrill}
           onTxClick={(tx) => setSelectedTransaction(tx)}
+          onSubClick={(s) => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
           formatCurrency={formatCurrency}
           formatDateTime={formatDateTime}
           getAccountName={getAccountName}

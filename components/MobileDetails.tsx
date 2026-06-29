@@ -533,6 +533,7 @@ export interface ChartDrillInData {
   title: string;
   subtitle?: string;
   transactions: Transaction[];
+  subscriptions?: Subscription[];
   currency: string;
 }
 export const ChartDrillSheet: React.FC<CommonProps & {
@@ -540,28 +541,56 @@ export const ChartDrillSheet: React.FC<CommonProps & {
   onClose: () => void;
   data: ChartDrillInData | null;
   onTxClick: (tx: Transaction) => void;
-}> = ({ state, formatCurrency, formatDateTime, open, onClose, data, onTxClick }) => {
+  onSubClick?: (s: Subscription) => void;
+}> = ({ state, formatCurrency, formatDateTime, open, onClose, data, onTxClick, onSubClick }) => {
   if (!data) return null;
   const sorted = [...data.transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const subs = data.subscriptions || [];
   const total = sorted.reduce((s, t) => s + t.amount, 0);
   const incomeCount = sorted.filter((t) => t.type === 'INCOME').length;
   const expenseCount = sorted.filter((t) => t.type === 'EXPENSE').length;
+  const nothing = sorted.length === 0 && subs.length === 0;
   return (
     <BottomSheet open={open} onClose={onClose} title={data.title} subtitle={data.subtitle} size="full">
-      <div className="bg-white border border-black/5 rounded-2xl p-4 mb-4 flex items-center justify-between">
-        <div>
-          <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Total</div>
-          <div className="text-2xl font-display font-bold text-onyx tabular">{formatCurrency(total, data.currency)}</div>
+      {(sorted.length > 0) && (
+        <div className="bg-white border border-black/5 rounded-2xl p-4 mb-4 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Total</div>
+            <div className="text-2xl font-display font-bold text-onyx tabular">{formatCurrency(total, data.currency)}</div>
+          </div>
+          <div className="text-right text-[11px] text-graphite">
+            {incomeCount > 0 && <div><span className="text-emerald-700">●</span> {incomeCount} ingreso{incomeCount !== 1 ? 's' : ''}</div>}
+            {expenseCount > 0 && <div><span className="text-rose-700">●</span> {expenseCount} gasto{expenseCount !== 1 ? 's' : ''}</div>}
+          </div>
         </div>
-        <div className="text-right text-[11px] text-graphite">
-          {incomeCount > 0 && <div><span className="text-emerald-700">●</span> {incomeCount} ingreso{incomeCount !== 1 ? 's' : ''}</div>}
-          {expenseCount > 0 && <div><span className="text-rose-700">●</span> {expenseCount} gasto{expenseCount !== 1 ? 's' : ''}</div>}
-        </div>
-      </div>
+      )}
 
-      {sorted.length === 0 ? (
+      {/* Subscriptions renewing this day */}
+      {subs.length > 0 && (
+        <div className="mb-4">
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-2 px-1">Renovaciones este día</div>
+          <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
+            {subs.map((s) => (
+              <div
+                key={s.id}
+                onClick={() => { if (onSubClick) { onClose(); onSubClick(s); } }}
+                className={`flex items-center gap-3 px-3 py-2.5 ${onSubClick ? 'active:bg-stone cursor-pointer' : ''}`}
+              >
+                <IconCircle tone="gold"><Icons.Subscription className="w-4 h-4" /></IconCircle>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-onyx truncate">{s.name}</div>
+                  <div className="text-[11px] text-graphite">Renovación</div>
+                </div>
+                <span className="text-sm font-display font-bold text-onyx tabular flex-shrink-0">{formatCurrency(s.amount, s.currency)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {nothing ? (
         <div className="text-center text-sm text-graphite py-8">Sin movimientos</div>
-      ) : (
+      ) : sorted.length === 0 ? null : (
         <div className="bg-white border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
           {sorted.map((tx) => {
             const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;

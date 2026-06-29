@@ -6,6 +6,13 @@ import {
 import { Transaction, Category, Subscription } from '../types';
 import { Icons } from './Icons';
 
+// Coarse pointer (touch) detection — used to disable noisy tap tooltips on
+// bar/pie charts on phones while keeping hover tooltips on desktop.
+const isTouchDevice = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(pointer: coarse)').matches ?? false;
+};
+
 // ─── HELPERS ────────────────────────────────────────────────────────────
 
 const formatExact = (amount: number, currency: string) => {
@@ -65,12 +72,14 @@ export interface ChartDrillIn {
   title: string;
   subtitle?: string;
   transactions: Transaction[];
+  subscriptions?: Subscription[];
   currency: string;
 }
 type OnDrill = (drill: ChartDrillIn) => void;
 
 // ─── INCOME VS EXPENSE (per currency) ───────────────────────────────────
 export const IncomeVsExpenseChart: React.FC<{ transactions: Transaction[], currency: string, onDrill?: OnDrill }> = ({ transactions, currency, onDrill }) => {
+  const touch = isTouchDevice();
   const byCur = groupTxByCurrency(transactions);
   const currencies = Object.keys(byCur).sort((a, b) => (a === currency ? -1 : b === currency ? 1 : a.localeCompare(b)));
 
@@ -114,7 +123,8 @@ export const IncomeVsExpenseChart: React.FC<{ transactions: Transaction[], curre
                   <BarChart data={data} barSize={48} margin={{ top: 25, right: 8, left: 8, bottom: 5 }} accessibilityLayer={false} tabIndex={-1}>
                     <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis hide />
-                    <Tooltip content={<CustomTooltip currency={cur} type="BAR" />} cursor={false} />
+                    {/* Tooltip only on desktop hover — disabled on touch (noisy on scroll) */}
+                    {!touch && <Tooltip content={<CustomTooltip currency={cur} type="BAR" />} cursor={false} />}
                     <Bar
                       dataKey="amount"
                       onClick={(_, idx) => {
@@ -246,6 +256,7 @@ export const CashFlowChart: React.FC<{ transactions: Transaction[], categories: 
 
 // ─── EXPENSE BREAKDOWN (per currency) ───────────────────────────────────
 export const ExpenseBreakdown: React.FC<{ transactions: Transaction[], categories: Category[], currency: string, onDrill?: OnDrill }> = ({ transactions, categories, currency, onDrill }) => {
+  const touch = isTouchDevice();
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth < 768 : true);
 
   useEffect(() => {
@@ -324,7 +335,8 @@ export const ExpenseBreakdown: React.FC<{ transactions: Transaction[], categorie
                         <Cell key={idx} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip content={<CustomTooltip currency={cur} type="DONUT" />} cursor={false} />
+                    {/* Tooltip only on desktop hover — disabled on touch */}
+                    {!touch && <Tooltip content={<CustomTooltip currency={cur} type="DONUT" />} cursor={false} />}
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -382,7 +394,8 @@ export const FinancialCalendar: React.FC<{ transactions: Transaction[], subscrip
   const getDayEvents = (day: number) => {
     const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dayTxs = transactions.filter((t) => t.date.startsWith(dateStr));
-    const daySubs = subscriptions.filter((s) => s.active && s.nextRenewal === dateStr);
+    // nextRenewal may be a full ISO timestamp — compare by date prefix.
+    const daySubs = subscriptions.filter((s) => s.active && s.nextRenewal && s.nextRenewal.startsWith(dateStr));
     return { dayTxs, daySubs, dateStr };
   };
 
@@ -404,9 +417,10 @@ export const FinancialCalendar: React.FC<{ transactions: Transaction[], subscrip
         onClick={() => {
           if (!hasActivity) return;
           onDrill?.({
-            title: `Movimientos del ${dateStr}`,
-            subtitle: 'Calendario',
+            title: `Día ${dateStr}`,
+            subtitle: 'Movimientos y renovaciones',
             transactions: dayTxs,
+            subscriptions: daySubs,
             currency,
           });
         }}
