@@ -7,8 +7,9 @@
 import React, { useEffect, useState } from 'react';
 import { Icons } from './Icons';
 import { haptic } from './Mobile';
+import { BrandLoader } from './BrandLoader';
 
-export const APP_VERSION = '2026.06.05';
+export const APP_VERSION = '2026.06.06';
 
 interface ChangeEntry {
   version: string;
@@ -19,6 +20,18 @@ interface ChangeEntry {
 // Most recent first. Only the latest entry is shown in the popup, but the
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.06.06',
+    date: '6 jun 2026',
+    items: [
+      'Pantalla de carga rediseñada, elegante y on-brand',
+      'Animación de carga al actualizar la app',
+      'Arreglada la franja blanca al abrir en el móvil',
+      'Próximas Renovaciones: ahora muestra los próximos 7 días',
+      'Ventana "Más" se cierra bien (arrastrar / atrás)',
+      'Más espacio entre secciones del inicio',
+    ],
+  },
   {
     version: '2026.06.05',
     date: '5 jun 2026',
@@ -51,6 +64,7 @@ const SEEN_KEY = 'wv_seen_version';
 
 export const UpdatePopup: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const [reloading, setReloading] = useState(false);
   const latest = CHANGELOG[0];
 
   useEffect(() => {
@@ -72,10 +86,12 @@ export const UpdatePopup: React.FC = () => {
   const handleUpdate = () => {
     haptic('medium');
     try { localStorage.setItem(SEEN_KEY, APP_VERSION); } catch {}
-    // Reload to ensure the freshest service worker + bundle are active.
-    window.location.reload();
+    // Show the branded loader, then reload to pick up the freshest SW + bundle.
+    setReloading(true);
+    setTimeout(() => window.location.reload(), 400);
   };
 
+  if (reloading) return <BrandLoader label="Actualizando" fullscreen />;
   if (!open || !latest) return null;
 
   return (

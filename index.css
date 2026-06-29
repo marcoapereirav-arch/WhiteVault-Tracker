@@ -14,6 +14,18 @@ html, body {
   text-rendering: optimizeLegibility;
   overscroll-behavior-y: none;
   background: #F7F7F7;
+  /* Prevent the iOS rubber-band area / safe-area gap from showing the page
+     background (was a white bar at the bottom on phones). */
+  min-height: 100%;
+}
+html {
+  background: #F7F7F7;
+  /* Paint the safe-area / overscroll regions with the app background */
+  background-color: #F7F7F7;
+}
+#root {
+  min-height: 100dvh;
+  background: #F7F7F7;
 }
 
 body {
@@ -68,6 +80,11 @@ button, [role="button"], nav, header, footer { -webkit-user-select: none; user-s
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+@keyframes wv-loader-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1); }
+}
+.wv-loader-breathe { animation: wv-loader-breathe 2.2s ease-in-out infinite; }
 
 /* Use backwards fill-mode so initial state applies before delay,
    and the element returns to its natural (transform-free) state after. */

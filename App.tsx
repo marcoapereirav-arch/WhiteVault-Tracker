@@ -16,6 +16,7 @@ import {
   DesktopSidebar,
   TabItem,
   FabSheet,
+  BottomSheet,
   ToastProvider,
   useToast,
   haptic,
@@ -44,6 +45,7 @@ import {
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
 import { UpdatePopup } from './components/UpdatePopup';
+import { BrandLoader } from './components/BrandLoader';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
 
@@ -1270,15 +1272,7 @@ function App() {
   // --- Render ---
 
   if (!isLoaded) {
-    return (
-      <div className="min-h-[100dvh] marble-dark flex items-center justify-center pt-safe pb-safe">
-        <div className="flex flex-col items-center wv-fade-in">
-          <img src={WHITEVAULT_ISOTYPE} alt="WhiteVault" className="w-14 h-14 mb-5 opacity-90" />
-          <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
-          <p className="mt-4 text-[10px] text-graphite font-bold uppercase tracking-[0.3em]">Cargando Bóveda</p>
-        </div>
-      </div>
-    );
+    return <BrandLoader label="Cargando Bóveda" fullscreen />;
   }
 
   if (!session) {
@@ -1601,35 +1595,26 @@ function App() {
           ]}
         />
 
-        {/* "Más" drawer (Categorías + Settings shortcut) */}
-        {moreOpen && (
-          <div className="fixed inset-0 z-50 flex items-end" onClick={() => setMoreOpen(false)}>
-            <div className="absolute inset-0 bg-black/40" />
-            <div className="relative w-full max-w-[480px] mx-auto bg-stone rounded-t-[28px] pt-2.5 wv-slide-up" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }} onClick={(e) => e.stopPropagation()}>
-              <div className="flex justify-center mb-3"><div className="w-10 h-1 bg-graphite/30 rounded-full" /></div>
-              <div className="px-6 pb-6">
-                <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold mb-1">Más</div>
-                <h2 className="text-xl font-display font-bold text-onyx mb-4">Otras Secciones</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => { setMoreOpen(false); setCurrentView('CATEGORIES'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
-                    <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
-                      <Icons.Category className="w-5 h-5 text-onyx" />
-                    </div>
-                    <div className="text-sm font-display font-bold text-onyx">Categorías</div>
-                    <div className="text-[10px] text-graphite mt-0.5">{state.categories.length} categorías</div>
-                  </button>
-                  <button onClick={() => { setMoreOpen(false); setCurrentView('SETTINGS'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
-                    <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
-                      <Icons.Settings className="w-5 h-5 text-onyx" />
-                    </div>
-                    <div className="text-sm font-display font-bold text-onyx">Configuración</div>
-                    <div className="text-[10px] text-graphite mt-0.5">Cuenta, notif., divisa</div>
-                  </button>
-                </div>
+        {/* "Más" drawer (Categorías + Settings shortcut) — uses BottomSheet
+            so it dismisses reliably (drag/backdrop/back-arrow). */}
+        <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Otras Secciones" subtitle="Más">
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={() => { setMoreOpen(false); setCurrentView('CATEGORIES'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
+              <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
+                <Icons.Category className="w-5 h-5 text-onyx" />
               </div>
-            </div>
+              <div className="text-sm font-display font-bold text-onyx">Categorías</div>
+              <div className="text-[10px] text-graphite mt-0.5">{state.categories.length} categorías</div>
+            </button>
+            <button onClick={() => { setMoreOpen(false); setCurrentView('SETTINGS'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
+              <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
+                <Icons.Settings className="w-5 h-5 text-onyx" />
+              </div>
+              <div className="text-sm font-display font-bold text-onyx">Configuración</div>
+              <div className="text-[10px] text-graphite mt-0.5">Cuenta, notif., divisa</div>
+            </button>
           </div>
-        )}
+        </BottomSheet>
 
         {/* Form modals (existing components — render above shell) */}
         {activeModal === 'EXPENSE' && <TransactionForm type="EXPENSE" state={state} onSubmit={handleTransaction} onClose={() => setActiveModal(null)} onCreateCategory={createCategoryAndReturn} />}

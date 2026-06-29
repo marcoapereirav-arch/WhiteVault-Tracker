@@ -71,12 +71,20 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
     [p.dashboardFilteredTransactions]
   );
 
-  // Upcoming = future renewals only. Overdue ones live in "Por pagar" and
-  // must NOT be duplicated here.
-  const upcoming = useMemo(
-    () => p.dashboardFilteredSubs.filter((s) => !isSubscriptionOverdue(s)).slice(0, 3),
-    [p.dashboardFilteredSubs]
-  );
+  // Upcoming = renewals in the NEXT 7 DAYS (future, not overdue). Independent
+  // of the dashboard date-range filter; only the space (context) filter applies.
+  const upcoming = useMemo(() => {
+    const now = Date.now();
+    const in7days = now + 7 * 24 * 60 * 60 * 1000;
+    return p.state.subscriptions
+      .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
+      .filter((s) => s.active && s.nextRenewal && !isSubscriptionOverdue(s))
+      .filter((s) => {
+        const t = new Date(s.nextRenewal).getTime();
+        return !isNaN(t) && t >= now && t <= in7days;
+      })
+      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
+  }, [p.state.subscriptions, p.contextFilter]);
 
   // Overdue subscriptions across all contexts that match the user's filter
   const overdueSubs = useMemo(
@@ -188,12 +196,12 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
       )}
 
       {/* Desktop: 2-column layout for upcoming + recent activity */}
-      <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8 lg:mt-6">
+      <div className="mt-6 lg:grid lg:grid-cols-3 lg:gap-6 lg:px-8 lg:mt-8">
         {/* Próximas renovaciones */}
         {upcoming.length > 0 && (
           <div className="lg:col-span-1">
             <ListSection
-              title="Próximas Renovaciones"
+              title="Próximas Renovaciones · 7 días"
               trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" onClick={() => p.onSummaryClick('SUBS')}>Ver todas</button>}
             >
               {upcoming.map((s) => {
@@ -253,7 +261,7 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
       </div>
 
       {/* Charts: 2-col grid on desktop */}
-      <section className="px-3 lg:px-8 mt-2 lg:mt-2 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+      <section className="px-3 lg:px-8 mt-6 lg:mt-8 grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <div className="bg-white border border-black/5 rounded-2xl p-4 lg:p-6 overflow-hidden">
           <div className="text-[10px] lg:text-[11px] font-bold uppercase tracking-[0.25em] text-graphite mb-3">Ingresos vs Gastos</div>
           <IncomeVsExpenseChart transactions={p.dashboardFilteredTransactions} currency={p.currencyCode} onDrill={p.onChartDrill} />
