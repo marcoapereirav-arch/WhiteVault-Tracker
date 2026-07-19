@@ -44,6 +44,7 @@ import {
   ChartDrillSheet,
 } from './components/MobileDetails';
 import { ManageSubAccountSheet, GoalCreditSheet, GoalArchiveSheet } from './components/GoalSheets';
+import { GoalsOverview } from './components/GoalsOverview';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
 import { UpdatePopup } from './components/UpdatePopup';
@@ -343,16 +344,20 @@ function App() {
   }, [state, isLoaded, session, hasFetchedData, syncToSupabase]);
 
   // Un Objetivo que llega a 0 restante se marca completado solo y se archiva.
-  // Si vuelve a quedar saldo pendiente (se borra un pago, se sube la meta) se
-  // desmarca y reaparece en el listado activo.
+  //
+  // Sólo marca, NUNCA desmarca. Un objetivo puede estar saldado sin haberlo
+  // pagado entero — si te perdonan la deuda, la das por cerrada con 0 € pagados.
+  // Desmarcarlo automáticamente lo resucitaría e inflaría lo que te falta.
+  // Para reabrirlo hay que hacerlo a mano desde la ficha.
   useEffect(() => {
     if (!hasFetchedData) return;
     const cur = state.user.currency;
     const cambios: Array<{ subId: string; completedAt: string | null }> = [];
     for (const { sub } of collectGoals(state.contexts, 'PAYMENT')) {
-      const saldado = goalRemaining(sub, state.transactions, cur) <= 0.005;
-      if (saldado && !sub.completedAt) cambios.push({ subId: sub.id, completedAt: new Date().toISOString() });
-      else if (!saldado && sub.completedAt) cambios.push({ subId: sub.id, completedAt: null });
+      if (sub.completedAt) continue;
+      if (goalRemaining(sub, state.transactions, cur) <= 0.005) {
+        cambios.push({ subId: sub.id, completedAt: new Date().toISOString() });
+      }
     }
     if (!cambios.length) return;
     setState(prev => ({
@@ -883,6 +888,12 @@ function App() {
   };
 
   // Mueve la sub-cuenta (con su saldo, historial y progreso) a otra cuenta.
+  //
+  // CRÍTICO: hay que reapuntar también las transacciones vinculadas. Las tx
+  // guardan accountId + subAccountId, y applyTxEffect busca primero la cuenta y
+  // luego la sub DENTRO de ella. Si se mueve la sub sin tocar las tx, esa
+  // búsqueda falla en silencio (subIdx = -1) y cualquier reversión de saldo
+  // —borrar o editar un gasto— se descarta sin aviso: descuadre permanente.
   const handleMoveSubAccount = (contextId: string, fromAccountId: string, toAccountId: string, subId: string) => {
       if (fromAccountId === toAccountId) return;
       setState(prev => {
@@ -898,6 +909,18 @@ function App() {
                       if (a.id === toAccountId) return { ...a, subAccounts: [...a.subAccounts, sub] };
                       return a;
                   }),
+              }),
+              transactions: prev.transactions.map(t => {
+                  let next = t;
+                  // Lado origen de la transacción
+                  if (t.contextId === contextId && t.subAccountId === subId && t.accountId === fromAccountId) {
+                      next = { ...next, accountId: toAccountId };
+                  }
+                  // Lado destino (transferencias que entran en esta sub-cuenta)
+                  if (t.toContextId === contextId && t.toSubAccountId === subId && t.toAccountId === fromAccountId) {
+                      next = { ...next, toAccountId: toAccountId };
+                  }
+                  return next;
               }),
           };
       });
@@ -1416,6 +1439,7 @@ function App() {
   const [chartDrill, setChartDrill] = useState<{ title: string; subtitle?: string; transactions: Transaction[]; currency: string } | null>(null);
   const [manageSubTarget, setManageSubTarget] = useState<{ contextId: string; accountId: string; subId: string } | null>(null);
   const [goalArchiveOpen, setGoalArchiveOpen] = useState(false);
+  const [accountsTab, setAccountsTab] = useState<'CUENTAS' | 'GOALS'>('CUENTAS');
   const [creditTarget, setCreditTarget] = useState<{ contextId: string; accountId: string; subId: string; name: string } | null>(null);
 
   // ─── PWA / Push bootstrap ──────────────────────────────────────────
@@ -1661,22 +1685,55 @@ function App() {
             />
           )}
           {currentView === 'ACCOUNTS' && (
-            <MobileAccounts
-              contexts={filteredContexts}
-              transactions={state.transactions}
-              formatCurrency={formatCurrency}
-              baseCurrency={currencyCode}
-              onDistributeIncome={(ctxId, cur) => distributeIncome(ctxId, cur)}
-              onAddSubAccount={(ctxId, accId) => { setSubAccountPreselect({ contextId: ctxId, accountId: accId }); setActiveModal('SUB_ACCOUNT'); }}
-              onUndoDistribution={undoLastDistribution}
-              canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
-              recentDistributions={recentDistributions}
-              recentTxByAccount={recentTxByAccount}
-              onAccountHistory={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
-              onManageSubAccount={(ctxId, accId, subId) => setManageSubTarget({ contextId: ctxId, accountId: accId, subId })}
-              onRenameAccount={handleRenameAccount}
-              onOpenGoalArchive={() => setGoalArchiveOpen(true)}
-            />
+            <>
+              {/* Pestañas de Bóvedas. "Cuentas" es la vista de siempre, intacta.
+                  "Metas y Objetivos" es una vista global ADICIONAL: las sub-cuentas
+                  se siguen viendo dentro de su cuenta, esto no las mueve. */}
+              <div className="px-3 lg:px-8 pt-1 pb-3 lg:max-w-[1200px] lg:mx-auto lg:w-full">
+                <div className="grid grid-cols-2 gap-2">
+                  {([['CUENTAS', 'Cuentas'], ['GOALS', 'Metas y Objetivos']] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      onClick={() => { haptic('selection'); setAccountsTab(id); }}
+                      className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
+                        accountsTab === id ? 'bg-onyx text-white' : 'bg-white border border-onyx/[0.12] text-graphite'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {accountsTab === 'CUENTAS' ? (
+                <MobileAccounts
+                  contexts={filteredContexts}
+                  transactions={state.transactions}
+                  formatCurrency={formatCurrency}
+                  baseCurrency={currencyCode}
+                  onDistributeIncome={(ctxId, cur) => distributeIncome(ctxId, cur)}
+                  onAddSubAccount={(ctxId, accId) => { setSubAccountPreselect({ contextId: ctxId, accountId: accId }); setActiveModal('SUB_ACCOUNT'); }}
+                  onUndoDistribution={undoLastDistribution}
+                  canUndo={!!lastDistribution && lastDistribution.contextId === filteredContexts[0]?.id}
+                  recentDistributions={recentDistributions}
+                  recentTxByAccount={recentTxByAccount}
+                  onAccountHistory={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
+                  onManageSubAccount={(ctxId, accId, subId) => setManageSubTarget({ contextId: ctxId, accountId: accId, subId })}
+                  onRenameAccount={handleRenameAccount}
+                  onOpenGoalArchive={() => setGoalArchiveOpen(true)}
+                  onDeleteContext={(id) => setContextToDelete(id)}
+                />
+              ) : (
+                <GoalsOverview
+                  contexts={filteredContexts}
+                  transactions={state.transactions}
+                  formatCurrency={formatCurrency}
+                  baseCurrency={currencyCode}
+                  onOpenGoal={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
+                  onManageGoal={(ctxId, accId, subId) => setManageSubTarget({ contextId: ctxId, accountId: accId, subId })}
+                  onOpenArchive={() => setGoalArchiveOpen(true)}
+                />
+              )}
+            </>
           )}
           {currentView === 'TRANSACTIONS' && (
             <MobileTransactions

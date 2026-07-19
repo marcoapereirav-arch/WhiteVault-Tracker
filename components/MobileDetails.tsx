@@ -411,14 +411,14 @@ export const PasswordSetupSheet: React.FC<{
         placeholder="Nueva contraseña"
         value={newPassword}
         onChange={(e) => setNewPassword(e.target.value)}
-        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl"
+        className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl"
       />
       <input
         type="password"
         placeholder="Confirmar contraseña"
         value={confirmPassword}
         onChange={(e) => setConfirmPassword(e.target.value)}
-        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl"
+        className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl"
       />
       {passwordError && <p className="text-rose-700 text-xs font-bold text-center">{passwordError}</p>}
       <PressButton full size="lg" disabled={isUpdating || !newPassword || !confirmPassword} onClick={onSubmit}>

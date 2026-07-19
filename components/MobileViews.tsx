@@ -320,13 +320,13 @@ export const MobileDashboard: React.FC<DashboardProps> = (p) => {
               type="date"
               value={p.dashboardDateRange.start}
               onChange={(e) => p.setDashboardDateRange({ ...p.dashboardDateRange, start: e.target.value, preset: 'CUSTOM' })}
-              className="w-full h-12 px-3 bg-white border border-black/10 rounded-xl text-sm"
+              className="w-full h-12 px-3 bg-white border border-onyx/[0.22] rounded-xl text-sm"
             />
             <input
               type="date"
               value={p.dashboardDateRange.end}
               onChange={(e) => p.setDashboardDateRange({ ...p.dashboardDateRange, end: e.target.value, preset: 'CUSTOM' })}
-              className="w-full h-12 px-3 bg-white border border-black/10 rounded-xl text-sm"
+              className="w-full h-12 px-3 bg-white border border-onyx/[0.22] rounded-xl text-sm"
             />
           </div>
           <PressButton full onClick={() => setShowFilter(false)}>Aplicar</PressButton>
@@ -493,6 +493,7 @@ interface AccountsProps {
   onManageSubAccount: (ctxId: string, accId: string, subId: string) => void;
   onRenameAccount: (ctxId: string, accId: string, name: string) => void;
   onOpenGoalArchive: () => void;
+  onDeleteContext: (id: string) => void;
 }
 
 const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }; formatCurrency: (n: number, c?: string) => string }> = ({ indicator, formatCurrency }) => {
@@ -511,9 +512,8 @@ const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; ki
   );
 };
 
-export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions, formatCurrency, baseCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory, onManageSubAccount, onRenameAccount, onOpenGoalArchive }) => {
+export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions, formatCurrency, baseCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory, onManageSubAccount, onRenameAccount, onOpenGoalArchive, onDeleteContext }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState('');
 
@@ -527,64 +527,12 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions
     });
   };
 
-  // Cuánto falta por pagar en total, sumando todos los Objetivos activos.
-  const totals = useMemo(
-    () => paymentGoalTotals(contexts, transactions, baseCurrency),
-    [contexts, transactions, baseCurrency]
-  );
-
   if (contexts.length === 0) {
     return <EmptyState icon={Icons.Accounts} title="Sin bóvedas" description="Configura tus contextos financieros para empezar." />;
   }
 
   return (
     <div className="pb-tabbar lg:px-8 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
-      {/* Resumen global de Objetivos: lo que falta por pagar de un vistazo */}
-      {(totals.count > 0 || totals.completed > 0) && (
-        <section className="mx-3 lg:mx-0 mb-4 lg:col-span-2">
-          <div className="bg-onyx text-white rounded-2xl p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold mb-1">Te falta por pagar</div>
-                <div className="text-3xl font-display font-bold tabular leading-none">
-                  {formatCurrency(totals.remaining, baseCurrency)}
-                </div>
-                <div className="text-[11px] text-white/60 mt-2 tabular">
-                  {formatCurrency(totals.paid, baseCurrency)} pagados de {formatCurrency(totals.target, baseCurrency)}
-                  <span className="mx-1.5">·</span>
-                  {totals.count} {totals.count === 1 ? 'objetivo' : 'objetivos'}
-                </div>
-              </div>
-              {totals.completed > 0 && (
-                <button
-                  onClick={() => { haptic('selection'); onOpenGoalArchive(); }}
-                  className="flex-shrink-0 h-8 px-3 bg-white/10 text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-white/20 transition-all"
-                >
-                  {totals.completed} saldados
-                </button>
-              )}
-            </div>
-            {totals.target > 0 && (
-              <div className="h-1.5 bg-white/15 rounded-full overflow-hidden mt-4">
-                <div className="h-full bg-gold transition-all" style={{ width: `${(totals.paid / totals.target) * 100}%` }} />
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 mt-4 -mb-1 overflow-x-auto no-scrollbar">
-              {['ALL', '1', '2', '3', '4', 'NONE'].map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { haptic('selection'); setPriorityFilter(p); }}
-                  className={`flex-shrink-0 h-7 px-3 rounded-full text-[10px] font-display font-bold uppercase tracking-widest transition-all active:scale-95 ${
-                    priorityFilter === p ? 'bg-gold text-onyx' : 'bg-white/10 text-white/70'
-                  }`}
-                >
-                  {p === 'ALL' ? 'Todas' : p === 'NONE' ? 'Sin prio' : `Prio ${p}`}
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
       {contexts.map((ctx) => {
         const incomeAcc = ctx.accounts.find((a) => a.type === 'INCOME');
         const total = ctx.accounts.reduce((sum, a) => {
@@ -598,15 +546,28 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold">{ctx.type === 'PERSONAL' ? 'Personal' : 'Negocio'}</div>
                 <div className="text-base lg:text-lg font-display font-bold text-onyx">{ctx.name}</div>
               </div>
-              {incomeAcc && balanceEntries(incomeAcc.balances).some((e) => e.amount > 0) && (
-                <button
-                  onClick={() => { haptic('medium'); onDistributeIncome(ctx.id, balanceEntries(incomeAcc.balances)[0]?.currency || 'USD'); }}
-                  className="flex items-center gap-1.5 h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-all"
-                >
-                  <Icons.Zap className="w-3.5 h-3.5 text-gold" />
-                  Distribuir
-                </button>
-              )}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {incomeAcc && balanceEntries(incomeAcc.balances).some((e) => e.amount > 0) && (
+                  <button
+                    onClick={() => { haptic('medium'); onDistributeIncome(ctx.id, balanceEntries(incomeAcc.balances)[0]?.currency || 'USD'); }}
+                    className="flex items-center gap-1.5 h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-all"
+                  >
+                    <Icons.Zap className="w-3.5 h-3.5 text-gold" />
+                    Distribuir
+                  </button>
+                )}
+                {/* Borrar el espacio de negocio desde donde se está mirando, no
+                    enterrado en Ajustes. El Personal no se puede borrar. */}
+                {ctx.type === 'BUSINESS' && (
+                  <button
+                    onClick={() => { haptic('medium'); onDeleteContext(ctx.id); }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center bg-white border border-onyx/[0.12] text-graphite hover:text-rose-700 hover:border-rose-200 active:scale-95 transition-all"
+                    aria-label={`Eliminar espacio ${ctx.name}`}
+                  >
+                    <Icons.Trash className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
             <div className="bg-white mx-3 lg:mx-0 border border-black/5 rounded-2xl overflow-hidden divide-y divide-black/5">
               {ctx.accounts.map((acc) => {
@@ -724,14 +685,10 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions
                     {hasSubs && isOpen && (
                       <div className="bg-stone/50 px-5 py-3 space-y-2 border-t border-black/5">
                         {acc.subAccounts
-                          .filter((sub) => {
-                            // Los Objetivos saldados se archivan: sólo salen en el historial.
-                            if (isPaymentGoal(sub) && isGoalComplete(sub, transactions, baseCurrency)) return false;
-                            if (priorityFilter === 'ALL') return true;
-                            if (!isPaymentGoal(sub)) return true;
-                            if (priorityFilter === 'NONE') return sub.priority == null;
-                            return String(sub.priority ?? '') === priorityFilter;
-                          })
+                          // Se ven TODAS las sub-cuentas de la cuenta: normales, Metas
+                          // y Objetivos. Sólo se ocultan los Objetivos ya saldados, que
+                          // viven en el historial.
+                          .filter((sub) => !(isPaymentGoal(sub) && isGoalComplete(sub, transactions, baseCurrency)))
                           .sort((a, b) => byPriority(a, b, transactions, baseCurrency))
                           .map((sub) => {
                           const subEntries = balanceEntries(sub.balances);
@@ -876,7 +833,7 @@ export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransacti
             placeholder="Buscar transacciones..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-11 pl-9 pr-4 bg-white border border-black/5 rounded-full text-sm placeholder:text-graphite/60 focus:border-onyx focus:outline-none transition-colors"
+            className="w-full h-11 pl-9 pr-4 bg-white border border-onyx/[0.22] rounded-full text-sm placeholder:text-graphite/60 focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 focus:outline-none transition-colors"
           />
         </div>
         <div className="lg:max-w-xl">
@@ -1537,7 +1494,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
               value={p.state.user.name}
               maxLength={50}
               onChange={(e) => p.setState((s) => ({ ...s, user: { ...s.user, name: e.target.value } }))}
-              className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
+              className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl text-onyx focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none"
             />
           </div>
           <div>
@@ -1546,7 +1503,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
               type="email"
               value={p.state.user.email}
               onChange={(e) => p.setState((s) => ({ ...s, user: { ...s.user, email: e.target.value } }))}
-              className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none"
+              className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl text-onyx focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none"
             />
           </div>
           <PressButton full onClick={async () => { await p.onSaveProfile(); setSection(null); }}>Guardar Cambios</PressButton>
@@ -1562,7 +1519,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
             value={p.currencySearch}
             onChange={(e) => p.setCurrencySearch(e.target.value)}
             placeholder="Buscar moneda…"
-            className="w-full h-11 pl-9 pr-4 bg-white border border-black/10 rounded-xl text-sm"
+            className="w-full h-11 pl-9 pr-4 bg-white border border-onyx/[0.22] rounded-xl text-sm"
           />
         </div>
         <div className="space-y-1.5">
@@ -1591,7 +1548,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
             value={p.tzSearch}
             onChange={(e) => p.setTzSearch(e.target.value)}
             placeholder="Buscar ciudad o país…"
-            className="w-full h-11 pl-9 pr-4 bg-white border border-black/10 rounded-xl text-sm"
+            className="w-full h-11 pl-9 pr-4 bg-white border border-onyx/[0.22] rounded-xl text-sm"
           />
         </div>
         <div className="space-y-1.5">
@@ -1625,7 +1582,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
                   <input
                     value={ctx.name}
                     onChange={(e) => p.onUpdateContextName(ctx.id, e.target.value)}
-                    className="flex-1 text-base font-display font-bold text-onyx bg-transparent border-b border-transparent focus:border-onyx outline-none"
+                    className="flex-1 text-base font-display font-bold text-onyx bg-transparent border-b border-transparent focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none"
                   />
                   {ctx.type === 'BUSINESS' && (
                     <button
@@ -1648,7 +1605,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
                           max="100"
                           value={acc.percentageTarget ?? 0}
                           onChange={(e) => p.onUpdateAccountPercentage(ctx.id, acc.id, Number(e.target.value))}
-                          className="w-16 h-9 px-2 text-right bg-white border border-black/10 rounded-lg font-mono font-bold text-sm focus:border-onyx outline-none"
+                          className="w-16 h-9 px-2 text-right bg-white border border-onyx/[0.22] rounded-lg font-mono font-bold text-sm focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none"
                         />
                         <span className="text-graphite text-sm">%</span>
                       </div>
@@ -1685,14 +1642,14 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
             placeholder="Nueva contraseña"
             value={p.newPassword}
             onChange={(e) => p.setNewPassword(e.target.value)}
-            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl"
+            className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl"
           />
           <input
             type="password"
             placeholder="Confirmar contraseña"
             value={p.confirmPassword}
             onChange={(e) => p.setConfirmPassword(e.target.value)}
-            className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl"
+            className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl"
           />
           {p.passwordError && <p className="text-rose-700 text-xs font-bold">{p.passwordError}</p>}
           {p.passwordSuccess && <p className="text-emerald-700 text-xs font-bold">{p.passwordSuccess}</p>}
@@ -1815,7 +1772,7 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
                 <select
                   value={prefs.weekly_summary_day ?? 1}
                   onChange={(e) => update({ weekly_summary_day: Number(e.target.value) })}
-                  className="w-full h-10 px-3 bg-stone border border-black/5 rounded-xl text-sm"
+                  className="w-full h-10 px-3 bg-stone border border-onyx/[0.22] rounded-xl text-sm"
                 >
                   <option value={1}>Lunes</option>
                   <option value={2}>Martes</option>

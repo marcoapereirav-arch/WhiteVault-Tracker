@@ -171,7 +171,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
                                     type="time" 
                                     value={time}
                                     onChange={(e) => setTime(e.target.value)}
-                                    className="w-full p-3 bg-stone border border-black/10 rounded font-mono text-lg text-center font-bold text-onyx outline-none focus:border-alloy focus:bg-white transition-colors"
+                                    className="w-full p-3 bg-stone border border-onyx/[0.22] rounded font-mono text-lg text-center font-bold text-onyx outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 focus:bg-white transition-colors"
                                 />
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                                     <Icons.Calendar className="w-4 h-4 text-graphite" />
@@ -248,19 +248,18 @@ export const Input = (props: any) => {
                 {props.label && <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{props.label}</label>}
                 <div className="relative">
                      {/* Read-only input for display */}
-                    <input 
+                    <input
                         type="text"
                         value={displayValue}
                         readOnly
                         onClick={() => setPickerOpen(true)}
-                        className={`w-full px-4 py-3 bg-white border-b border-black/20 focus:border-alloy outline-none transition-all text-onyx font-sans placeholder:text-gray-300 rounded-none cursor-pointer ${props.className || ''}`}
+                        className={`wv-field font-sans cursor-pointer pr-11 ${props.className || ''}`}
                     />
-                    <div className="absolute bottom-0 left-0 h-[1px] w-0 bg-alloy transition-all duration-300 group-focus-within:w-full"></div>
-                    
-                    <button 
-                        type="button" 
+
+                    <button
+                        type="button"
                         onClick={() => setPickerOpen(true)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-alloy transition-colors z-10 cursor-pointer p-1"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-graphite hover:text-alloy transition-colors z-10 cursor-pointer p-1"
                     >
                         <Icons.Calendar className="w-5 h-5" />
                     </button>
@@ -282,11 +281,10 @@ export const Input = (props: any) => {
         <div className="mb-5 group">
             {props.label && <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{props.label}</label>}
             <div className="relative">
-                <input 
-                    {...props} 
-                    className={`w-full px-4 py-3 bg-white border-b border-black/20 focus:border-alloy outline-none transition-all text-onyx font-sans placeholder:text-gray-300 rounded-none ${props.className || ''}`}
+                <input
+                    {...props}
+                    className={`wv-field font-sans ${props.className || ''}`}
                 />
-                <div className="absolute bottom-0 left-0 h-[1px] w-0 bg-alloy transition-all duration-300 group-focus-within:w-full"></div>
             </div>
         </div>
     );
@@ -296,16 +294,15 @@ export const Select = (props: any) => (
     <div className={`mb-5 group ${props.disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
         {props.label && <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{props.label}</label>}
         <div className="relative">
-            <select 
-                {...props} 
-                className={`w-full px-4 py-3 bg-white border-b border-black/20 focus:border-alloy outline-none transition-all text-onyx font-sans rounded-none appearance-none ${props.disabled ? 'bg-gray-50' : ''} ${props.className || ''}`}
+            <select
+                {...props}
+                className={`wv-field font-sans ${props.className || ''}`}
             >
                 {props.children}
             </select>
             <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <Icons.Expense className="w-4 h-4 text-gray-400" />
+                <Icons.Expense className="w-4 h-4 text-graphite" />
             </div>
-            <div className="absolute bottom-0 left-0 h-[1px] w-0 bg-alloy transition-all duration-300 group-focus-within:w-full"></div>
         </div>
     </div>
 );
@@ -554,7 +551,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                         maxLength={500}
                         rows={2}
                         placeholder="Añade notas adicionales..."
-                        className="w-full p-3 bg-stone border border-black/10 text-sm focus:outline-none focus:border-alloy transition-colors resize-none"
+                        className="w-full p-3 bg-stone border border-onyx/[0.22] text-sm focus:outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 transition-colors resize-none"
                     />
                 </div>
 
@@ -705,7 +702,7 @@ export const AdjustBalanceForm: React.FC<AdjustBalanceFormProps> = ({ state, onS
                         value={realBalance}
                         onChange={(e) => setRealBalance(e.target.value)}
                         placeholder="0.00"
-                        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none font-display font-bold text-lg"
+                        className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl text-onyx focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none font-display font-bold text-lg"
                     />
                 </div>
 
@@ -1146,7 +1143,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                             max="999"
                             value={intervalValue}
                             onChange={(e) => setIntervalValue(e.target.value)}
-                            className="col-span-1 h-12 px-3 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none text-center font-display font-bold"
+                            className="col-span-1 h-12 px-3 bg-white border border-onyx/[0.22] rounded-xl text-onyx focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none text-center font-display font-bold"
                         />
                         <div className="col-span-3">
                             <SelectField
@@ -1220,7 +1217,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                             }}
                             maxLength={4}
                             placeholder="0000"
-                            className="w-24 p-3 bg-stone border border-black/10 text-sm font-mono tracking-widest focus:outline-none focus:border-alloy transition-colors text-center"
+                            className="w-24 p-3 bg-stone border border-onyx/[0.22] text-sm font-mono tracking-widest focus:outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 transition-colors text-center"
                         />
                     </div>
                 </div>
@@ -1245,7 +1242,7 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                             placeholder="3"
                             value={reminderValue}
                             onChange={(e) => setReminderValue(e.target.value)}
-                            className="col-span-2 w-full h-12 px-4 bg-white border border-black/10 rounded-xl text-onyx focus:border-onyx outline-none text-center font-display font-bold"
+                            className="col-span-2 w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl text-onyx focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none text-center font-display font-bold"
                         />
                         <div className="col-span-3">
                             <SelectField
@@ -1333,7 +1330,7 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                                     setDistributed(false);
                                 }}
                                 placeholder="0.00"
-                                className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                className="w-full p-4 pl-8 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                             />
                         </div>
                         {Number(initialBalance) > 0 && !distributed && (

@@ -117,7 +117,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="tu@correo.com"
-                  className="w-full h-13 pl-11 pr-4 py-3 bg-white border border-black/10 rounded-xl focus:outline-none focus:border-onyx transition-colors text-onyx"
+                  className="w-full h-13 pl-11 pr-4 py-3 bg-white border border-onyx/[0.22] rounded-xl focus:outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 transition-colors text-onyx"
                   required
                   autoFocus
                 />
@@ -153,7 +153,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full h-13 pl-11 pr-4 py-3 bg-white border border-black/10 rounded-xl focus:outline-none focus:border-onyx transition-colors text-onyx"
+                    className="w-full h-13 pl-11 pr-4 py-3 bg-white border border-onyx/[0.22] rounded-xl focus:outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 transition-colors text-onyx"
                     placeholder="tu@correo.com"
                     required
                   />
@@ -168,7 +168,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full h-13 pl-11 pr-12 py-3 bg-white border border-black/10 rounded-xl focus:outline-none focus:border-onyx transition-colors text-onyx"
+                    className="w-full h-13 pl-11 pr-12 py-3 bg-white border border-onyx/[0.22] rounded-xl focus:outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 transition-colors text-onyx"
                     placeholder="••••••••"
                     required
                   />

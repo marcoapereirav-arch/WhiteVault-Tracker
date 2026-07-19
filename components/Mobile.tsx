@@ -640,7 +640,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({ label, placeholder = '
       <button
         type="button"
         onClick={() => { haptic('selection'); setOpen(true); }}
-        className="w-full h-12 px-4 bg-white border border-black/10 rounded-xl flex items-center justify-between gap-3 text-left active:scale-[0.99] hover:border-onyx transition-all"
+        className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl flex items-center justify-between gap-3 text-left active:scale-[0.99] hover:border-onyx/[0.34] focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none transition-all"
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {selected?.swatch && (
@@ -665,7 +665,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({ label, placeholder = '
               placeholder="Buscar…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-11 pl-9 pr-4 bg-white border border-black/10 rounded-xl text-sm"
+              className="w-full h-11 pl-9 pr-4 bg-white border border-onyx/[0.22] rounded-xl text-sm"
               autoFocus
             />
           </div>

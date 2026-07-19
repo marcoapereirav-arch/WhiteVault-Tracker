@@ -9,7 +9,10 @@ import { Icons } from './Icons';
 import { haptic } from './Mobile';
 import { BrandLoader } from './BrandLoader';
 
-export const APP_VERSION = '2026.06.06';
+// REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
+// su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
+// novedades y se queda con la versión vieja en caché. No se despliega sin esto.
+export const APP_VERSION = '2026.07.19';
 
 interface ChangeEntry {
   version: string;
@@ -20,6 +23,21 @@ interface ChangeEntry {
 // Most recent first. Only the latest entry is shown in the popup, but the
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.07.19',
+    date: '19 jul 2026',
+    items: [
+      'Nuevo: Metas (subes guardando) y Objetivos (subes pagando)',
+      'Nueva pestaña en Bóvedas para ver todas tus metas y objetivos juntos',
+      'Ya puedes borrar, renombrar y mover sub-cuentas',
+      'Ya puedes renombrar tus cuentas',
+      'Abono sin pago: baja una deuda sin que salga dinero',
+      'Filtro de prioridad para saber qué pagar antes',
+      'Objetivos saldados se archivan solos, con su historial',
+      'Eliminar un espacio de negocio, ahora a la vista en Bóvedas',
+      'Todos los campos de texto se ven mucho mejor',
+    ],
+  },
   {
     version: '2026.06.06',
     date: '6 jun 2026',

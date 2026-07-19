@@ -32,7 +32,7 @@ export const ManageSubAccountSheet: React.FC<{
   formatCurrency: (n: number, c?: string) => string;
   onRename: (name: string) => void;
   onMove: (toAccountId: string) => void;
-  onUpdate: (patch: Partial<Pick<SubAccount, 'target' | 'goalKind' | 'priority'>>) => void;
+  onUpdate: (patch: Partial<Pick<SubAccount, 'target' | 'goalKind' | 'priority' | 'completedAt'>>) => void;
   onAddCredit: () => void;
   onDelete: () => void;
 }> = ({ open, onClose, state, target, formatCurrency, onRename, onMove, onUpdate, onAddCredit, onDelete }) => {
@@ -95,7 +95,7 @@ export const ManageSubAccountSheet: React.FC<{
         onBlur={guardarNombre}
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
         maxLength={100}
-        className="w-full h-12 px-3 bg-stone rounded-xl text-sm text-onyx outline-none focus:ring-2 focus:ring-onyx/20 mb-4"
+        className="wv-field mb-4"
       />
 
       {/* Tipo */}
@@ -131,7 +131,7 @@ export const ManageSubAccountSheet: React.FC<{
             type="number" step="0.01" min="0" value={meta}
             onChange={(e) => setMeta(e.target.value)}
             onBlur={() => { const v = Number(meta); if (v > 0 && v !== sub.target) onUpdate({ target: v }); }}
-            className="w-full h-12 px-3 bg-stone rounded-xl text-sm text-onyx tabular outline-none focus:ring-2 focus:ring-onyx/20 mb-4"
+            className="wv-field mb-4"
           />
         </>
       )}
@@ -156,12 +156,40 @@ export const ManageSubAccountSheet: React.FC<{
         </>
       )}
 
+      {/* Saldado manual — para deudas que se cierran sin pagarlas enteras */}
+      {kind === 'PAYMENT' && (
+        <>
+          <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-1.5">Estado</label>
+          <div className="grid grid-cols-2 gap-2 mb-5">
+            <button
+              onClick={() => { haptic('medium'); onUpdate({ completedAt: null }); }}
+              className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
+                !sub.completedAt ? 'bg-onyx text-white' : 'bg-stone text-graphite'
+              }`}
+            >
+              Pendiente
+            </button>
+            <button
+              onClick={() => { haptic('medium'); onUpdate({ completedAt: new Date().toISOString() }); }}
+              className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
+                sub.completedAt ? 'bg-emerald-700 text-white' : 'bg-stone text-graphite'
+              }`}
+            >
+              Saldado
+            </button>
+          </div>
+          <p className="text-[11px] text-graphite -mt-3 mb-5 leading-snug">
+            Puedes darlo por saldado aunque no esté pagado del todo. Sale del listado y pasa al historial.
+          </p>
+        </>
+      )}
+
       {/* Mover a otra cuenta */}
       <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-1.5">Mover a</label>
       <select
         value={acc.id}
         onChange={(e) => { haptic('medium'); onMove(e.target.value); }}
-        className="w-full h-12 px-3 bg-stone rounded-xl text-sm text-onyx outline-none appearance-none mb-5"
+        className="wv-field mb-5"
       >
         {ctx.accounts.map((a) => (
           <option key={a.id} value={a.id}>{a.name}</option>
@@ -243,18 +271,18 @@ export const GoalCreditSheet: React.FC<{
       <input
         type="number" step="0.01" min="0.01" autoFocus value={amount} placeholder="0.00"
         onChange={(e) => setAmount(e.target.value)}
-        className="w-full h-14 px-3 bg-stone rounded-xl text-2xl font-display font-bold text-onyx tabular outline-none focus:ring-2 focus:ring-onyx/20 mb-4"
+        className="wv-field mb-4"
       />
       <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-1.5">Concepto</label>
       <input
         type="text" maxLength={200} value={note} placeholder="Ej. Mes de julio no cobrado — descontado"
         onChange={(e) => setNote(e.target.value)}
-        className="w-full h-12 px-3 bg-stone rounded-xl text-sm text-onyx outline-none focus:ring-2 focus:ring-onyx/20 mb-4"
+        className="wv-field mb-4"
       />
       <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-1.5">Fecha</label>
       <input
         type="date" value={date} onChange={(e) => setDate(e.target.value)}
-        className="w-full h-12 px-3 bg-stone rounded-xl text-sm text-onyx outline-none focus:ring-2 focus:ring-onyx/20 mb-5"
+        className="wv-field mb-5"
       />
       <PressButton onClick={submit} variant="primary" className="w-full">Registrar abono</PressButton>
     </BottomSheet>

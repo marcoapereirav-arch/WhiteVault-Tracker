@@ -38,6 +38,37 @@ body {
 
 input, textarea, select { font-size: 16px; } /* prevents iOS zoom on focus */
 
+/* ─── CAMPOS RELLENABLES ──────────────────────────────────────────────────
+   REGLA: todo campo donde el usuario escribe o elige TIENE que distinguirse
+   del fondo. Nada de blanco sobre blanco con una rayita.
+   Fondo blanco + borde visible por los 4 lados: se ve tanto sobre superficie
+   clara (#F7F7F7) como sobre blanco. Placeholder legible, foco inequívoco.
+   Si añades un campo nuevo, usa .wv-field. No inventes otro estilo.        */
+.wv-field {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid rgba(14, 14, 15, 0.22);
+  border-radius: 12px;
+  color: #0E0E0F;
+  padding: 0.75rem 0.875rem;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.wv-field::placeholder { color: rgba(75, 75, 77, 0.6); }
+.wv-field:hover:not(:disabled) { border-color: rgba(14, 14, 15, 0.34); }
+.wv-field:focus,
+.wv-field:focus-visible {
+  border-color: #C9A86A;
+  box-shadow: 0 0 0 3px rgba(201, 168, 106, 0.22);
+}
+.wv-field:disabled { background: #F2F2F2; color: rgba(75, 75, 77, 0.6); }
+/* El icono nativo del date/time no se ve sobre blanco en iOS: le damos color */
+.wv-field::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+/* Select necesita hueco a la derecha para su flecha */
+select.wv-field { padding-right: 2.25rem; }
+
 /* Disable text selection on UI chrome (kept on inputs / content) */
 button, [role="button"], nav, header, footer { -webkit-user-select: none; user-select: none; }
 

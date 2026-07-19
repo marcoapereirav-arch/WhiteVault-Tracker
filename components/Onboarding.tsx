@@ -233,7 +233,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="Tu nombre"
-                                    className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                    className="w-full p-4 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                     autoFocus
                                 />
                             </div>
@@ -262,7 +262,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                     value={currencySearch}
                                     onChange={(e) => setCurrencySearch(e.target.value)}
                                     placeholder="Buscar moneda (ej. USD, Euro, Peso...)"
-                                    className="w-full p-4 pl-10 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                    className="w-full p-4 pl-10 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                     autoFocus
                                 />
                             </div>
@@ -315,7 +315,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 value={personalName}
                                 onChange={(e) => setPersonalName(e.target.value)}
                                 placeholder="Finanzas Personales"
-                                className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy mb-6"
+                                className="w-full p-4 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 mb-6"
                             />
 
                             <label className="block text-xs font-bold uppercase tracking-widest text-graphite mb-2">Dinero Disponible (Opcional)</label>
@@ -330,7 +330,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                             setPersonalDistributed(false);
                                         }}
                                         placeholder="0.00"
-                                        className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                        className="w-full p-4 pl-8 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                     />
                                 </div>
                                 {Number(personalInitialBalance) > 0 && !personalDistributed && (
@@ -374,7 +374,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                                 type="number" 
                                                 value={pocket.percentageTarget}
                                                 onChange={(e) => updatePocket(index, 'percentageTarget', Number(e.target.value))}
-                                                className="w-full bg-white border border-black/5 p-2 text-sm text-right outline-none focus:border-alloy"
+                                                className="w-full bg-white border border-onyx/[0.22] p-2 text-sm text-right outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                             />
                                             <span className="text-graphite font-bold">%</span>
                                         </div>
@@ -403,7 +403,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                             type="number" 
                                             value={cashPocket.percentageTarget}
                                             onChange={(e) => setCashPocket({...cashPocket, percentageTarget: Number(e.target.value)})}
-                                            className="w-full bg-stone border border-black/5 p-2 text-sm text-right outline-none focus:border-alloy"
+                                            className="w-full bg-stone border border-onyx/[0.22] p-2 text-sm text-right outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                         />
                                         <span className="text-graphite font-bold">%</span>
                                     </div>
@@ -484,7 +484,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 value={businessName}
                                 onChange={(e) => setBusinessName(e.target.value)}
                                 placeholder="Mi Negocio"
-                                className="w-full p-4 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                className="w-full p-4 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                             />
                         </div>
 
@@ -501,7 +501,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                             setBusinessDistributed(false);
                                         }}
                                         placeholder="0.00"
-                                        className="w-full p-4 pl-8 bg-stone border border-black/5 text-onyx font-sans outline-none focus:border-alloy"
+                                        className="w-full p-4 pl-8 bg-stone border border-onyx/[0.22] text-onyx font-sans outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                     />
                                 </div>
                                 {Number(businessInitialBalance) > 0 && !businessDistributed && (
@@ -545,7 +545,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                                 type="number" 
                                                 value={pocket.percentageTarget}
                                                 onChange={(e) => updateBusinessPocket(index, 'percentageTarget', Number(e.target.value))}
-                                                className="w-full bg-white border border-black/5 p-2 text-sm text-right outline-none focus:border-alloy"
+                                                className="w-full bg-white border border-onyx/[0.22] p-2 text-sm text-right outline-none focus:border-alloy focus:ring-[3px] focus:ring-alloy/20"
                                             />
                                             <span className="text-graphite font-bold">%</span>
                                         </div>
