@@ -868,18 +868,30 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
     );
 };
 
+type SubKind = 'NONE' | 'SAVING' | 'PAYMENT';
+
+const KIND_INFO: Record<SubKind, { label: string; hint: string }> = {
+    NONE:    { label: 'Normal',   hint: 'Sub-cuenta sin barra de progreso.' },
+    SAVING:  { label: 'Meta',     hint: 'Sube cuando GUARDAS. Transfieres dinero y se queda dentro hasta llegar a la cifra.' },
+    PAYMENT: { label: 'Objetivo', hint: 'Sube cuando PAGAS. Cada gasto que asignes aquí descuenta de lo que falta.' },
+};
+
 export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initialContextId, initialAccountId }) => {
     const [contextId, setContextId] = useState(initialContextId || state.contexts[0]?.id || '');
     const [accountId, setAccountId] = useState(initialAccountId || '');
     const [name, setName] = useState('');
+    const [kind, setKind] = useState<SubKind>('NONE');
     const [target, setTarget] = useState('');
+    const [priority, setPriority] = useState('');
     const [startDate, setStartDate] = useState(nowAsPickerString(state.user.timezone).split('T')[0]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSubmit({ 
-            contextId, accountId, name, 
-            target: target ? Number(target) : undefined,
+        onSubmit({
+            contextId, accountId, name,
+            target: kind !== 'NONE' && target ? Number(target) : undefined,
+            goalKind: kind === 'NONE' ? undefined : kind,
+            priority: kind === 'PAYMENT' && priority ? Number(priority) : null,
             startDate
         });
         onClose();
@@ -888,7 +900,7 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
     const parentCtx = state.contexts.find((c: any) => c.id === contextId);
 
     return (
-        <Modal isOpen={true} onClose={onClose} title="Nueva Sub-Cuenta / Meta">
+        <Modal isOpen={true} onClose={onClose} title="Nueva Sub-Cuenta">
             <form onSubmit={handleSubmit}>
                 <SelectField
                     label="Espacio"
@@ -904,7 +916,47 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
                     onChange={setAccountId}
                 />
                 <Input type="text" label="Nombre Sub-Cuenta" required maxLength={100} value={name} onChange={(e: any) => setName(e.target.value)} />
-                <Input type="number" label="Meta / Target (opcional)" min="0.01" max="999999999" step="0.01" placeholder="Vacío = sub-cuenta normal" value={target} onChange={(e: any) => setTarget(e.target.value)} />
+
+                <div className="mb-4">
+                    <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-2">Tipo</label>
+                    <div className="grid grid-cols-3 gap-2">
+                        {(['NONE', 'SAVING', 'PAYMENT'] as SubKind[]).map((k) => (
+                            <button
+                                key={k}
+                                type="button"
+                                onClick={() => setKind(k)}
+                                className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
+                                    kind === k ? 'bg-onyx text-white' : 'bg-stone text-graphite'
+                                }`}
+                            >
+                                {KIND_INFO[k].label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="text-[11px] text-graphite mt-2 leading-snug">{KIND_INFO[kind].hint}</p>
+                </div>
+
+                {kind !== 'NONE' && (
+                    <Input
+                        type="number" label={kind === 'SAVING' ? 'Cuánto quieres reunir' : 'Cuánto tienes que pagar en total'}
+                        required min="0.01" max="999999999" step="0.01" placeholder="0.00"
+                        value={target} onChange={(e: any) => setTarget(e.target.value)}
+                    />
+                )}
+                {kind === 'PAYMENT' && (
+                    <SelectField
+                        label="Prioridad (opcional)"
+                        placeholder="Sin prioridad"
+                        value={priority}
+                        options={[
+                            { value: '1', label: '1 — Primero' },
+                            { value: '2', label: '2' },
+                            { value: '3', label: '3' },
+                            { value: '4', label: '4 — Último' },
+                        ]}
+                        onChange={setPriority}
+                    />
+                )}
                 <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} />
                 <button type="submit" className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] mt-3">Crear Sub-Cuenta</button>
             </form>

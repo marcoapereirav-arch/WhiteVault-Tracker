@@ -7,6 +7,7 @@ import { AppState, Transaction, Subscription, Category } from '../types';
 import { Icons } from './Icons';
 import { BottomSheet, IconCircle, PressButton, haptic } from './Mobile';
 import { formatIntervalLabel } from '../utils/subscriptions';
+import { isPaymentGoal, goalPaid, goalRemaining, goalProgress } from '../utils/goals';
 
 interface CommonProps {
   state: AppState;
@@ -466,8 +467,61 @@ export const AccountHistorySheet: React.FC<CommonProps & {
     }
   });
 
+  // Si la sub-cuenta es un Objetivo, encabezamos con su progreso y listamos los
+  // movimientos que NO son transacciones del libro mayor (histórico migrado y
+  // abonos sin pago) — los gastos vinculados ya salen en la lista de abajo.
+  const subAccount = target.subAccountId
+    ? ctx?.accounts.find((a) => a.id === target.accountId)?.subAccounts.find((s) => s.id === target.subAccountId)
+    : undefined;
+  const objetivo = subAccount && isPaymentGoal(subAccount) ? subAccount : null;
+  const cur = state.user.currency;
+
   return (
     <BottomSheet open={open} onClose={onClose} title={subName || accName} subtitle={`${ctx?.name || ''} · Historial`} size="full">
+      {objetivo && (
+        <div className="bg-onyx text-white rounded-2xl p-4 mb-4">
+          <div className="flex justify-between items-baseline mb-2">
+            <span className="text-[10px] uppercase tracking-widest text-gold font-bold">Te falta</span>
+            <span className="text-2xl font-display font-bold tabular">
+              {formatCurrency(goalRemaining(objetivo, transactions, cur), cur)}
+            </span>
+          </div>
+          <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
+            <div className="h-full bg-gold transition-all" style={{ width: `${goalProgress(objetivo, transactions, cur)}%` }} />
+          </div>
+          <div className="flex justify-between text-[10px] text-white/60 mt-1.5 tabular">
+            <span>{formatCurrency(goalPaid(objetivo, transactions, cur), cur)} de {formatCurrency(objetivo.target || 0, cur)}</span>
+            <span className="font-bold">{goalProgress(objetivo, transactions, cur).toFixed(1)}%</span>
+          </div>
+        </div>
+      )}
+
+      {objetivo && (objetivo.entries || []).length > 0 && (
+        <div className="mb-4">
+          <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-graphite mb-2 px-2">
+            {(objetivo.entries || []).length} pagos anteriores
+          </div>
+          <div className="space-y-1.5">
+            {[...(objetivo.entries || [])].sort((a, b) => b.date.localeCompare(a.date)).map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-3 bg-white border border-black/5 rounded-xl px-3 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-onyx truncate">{e.note || (e.kind === 'CREDIT' ? 'Abono' : 'Pago')}</div>
+                  <div className="text-[10px] text-graphite mt-0.5">
+                    {formatDateTime(e.date)}
+                    <span className="ml-1.5 px-1 py-0.5 bg-stone rounded text-[8px] uppercase tracking-wider font-bold">
+                      {e.kind === 'CREDIT' ? 'Abono' : 'Histórico'}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-xs font-display font-bold text-onyx tabular flex-shrink-0">
+                  {formatCurrency(e.amount, cur)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Totals header */}
       {Object.entries(totals).length > 0 && (
         <div className="space-y-2 mb-4">

@@ -1,10 +1,34 @@
 export type ContextType = 'PERSONAL' | 'BUSINESS';
 
+// Dos formas de tener un target en una sub-cuenta:
+//   SAVING  ("Meta")     — sube GUARDANDO. El dinero entra vía transferencia y se
+//                          queda dentro. Progreso = saldo de la sub-cuenta / target.
+//   PAYMENT ("Objetivo") — sube PAGANDO. El dinero sale como gasto hacia un tercero.
+//                          Progreso = (gastos vinculados + abonos) / target.
+export type GoalKind = 'SAVING' | 'PAYMENT';
+
+// Movimiento de un Objetivo que NO es una transacción del libro mayor: ni mueve
+// saldo ni entra en métricas. Dos casos:
+//   HISTORY — pagos anteriores al tracker (migrados). El dinero salió en su día.
+//   CREDIT  — abono sin movimiento: la deuda baja sin que salga dinero, p.ej. una
+//             compensación con alguien que a su vez te debe.
+export interface GoalEntry {
+  id: string;
+  date: string;   // ISO
+  amount: number;
+  note?: string;
+  kind: 'HISTORY' | 'CREDIT';
+}
+
 export interface SubAccount {
   id: string;
   name: string;
   balances: Record<string, number>;
-  target?: number; // If set, it's a goal
+  target?: number;        // Si está, la sub-cuenta tiene barra de progreso
+  goalKind?: GoalKind;    // Sin valor + target => SAVING (comportamiento legacy)
+  priority?: number | null;   // 1..4 — para ordenar cuál atacar antes
+  entries?: GoalEntry[];      // Solo Objetivos
+  completedAt?: string | null; // ISO cuando llegó al 100% — se archiva
   startDate: string;
 }
 

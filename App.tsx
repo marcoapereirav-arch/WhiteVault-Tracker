@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { AppState, FinancialContext, Transaction, Subscription, Category, Account } from './types';
+import { AppState, FinancialContext, Transaction, Subscription, Category, Account, SubAccount, GoalEntry } from './types';
 import { INITIAL_STATE, CURRENCIES } from './constants';
 import { Icons } from './components/Icons';
 import { TransactionForm, TransferForm, CategoryForm, SubAccountForm, SubscriptionForm, NewContextForm, AdjustBalanceForm } from './components/ActionModals';
@@ -8,6 +8,7 @@ import { Auth } from './components/Auth';
 import { Onboarding } from './components/Onboarding';
 import { getBalance, addToBalance, subtractFromBalance, getTotalsByCurrency, balanceEntries } from './utils/balances';
 import { migrateState } from './utils/migration';
+import { collectGoals, goalRemaining, isPaymentGoal, paymentGoalTotals } from './utils/goals';
 import {
   MobileShell,
   MobileHeader,
@@ -42,6 +43,7 @@ import {
   TrashSheet,
   ChartDrillSheet,
 } from './components/MobileDetails';
+import { ManageSubAccountSheet, GoalCreditSheet, GoalArchiveSheet } from './components/GoalSheets';
 import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
 import { UpdatePopup } from './components/UpdatePopup';
@@ -339,6 +341,34 @@ function App() {
     const timeout = setTimeout(syncToSupabase, 500);
     return () => clearTimeout(timeout);
   }, [state, isLoaded, session, hasFetchedData, syncToSupabase]);
+
+  // Un Objetivo que llega a 0 restante se marca completado solo y se archiva.
+  // Si vuelve a quedar saldo pendiente (se borra un pago, se sube la meta) se
+  // desmarca y reaparece en el listado activo.
+  useEffect(() => {
+    if (!hasFetchedData) return;
+    const cur = state.user.currency;
+    const cambios: Array<{ subId: string; completedAt: string | null }> = [];
+    for (const { sub } of collectGoals(state.contexts, 'PAYMENT')) {
+      const saldado = goalRemaining(sub, state.transactions, cur) <= 0.005;
+      if (saldado && !sub.completedAt) cambios.push({ subId: sub.id, completedAt: new Date().toISOString() });
+      else if (!saldado && sub.completedAt) cambios.push({ subId: sub.id, completedAt: null });
+    }
+    if (!cambios.length) return;
+    setState(prev => ({
+      ...prev,
+      contexts: prev.contexts.map(c => ({
+        ...c,
+        accounts: c.accounts.map(a => ({
+          ...a,
+          subAccounts: a.subAccounts.map(s => {
+            const hit = cambios.find(x => x.subId === s.id);
+            return hit ? { ...s, completedAt: hit.completedAt } : s;
+          }),
+        })),
+      })),
+    }));
+  }, [state.contexts, state.transactions, state.user.currency, hasFetchedData]);
 
   // Sync immediately on page unload
   useEffect(() => {
@@ -793,6 +823,152 @@ function App() {
       }
   }
 
+  // --- Gestión de cuentas y sub-cuentas -------------------------------------
+  // Las CUENTAS nunca se crean ni se borran (regla de la metodología): sólo se
+  // renombran. Las SUB-CUENTAS sí: crear, renombrar, mover y borrar libremente.
+
+  const handleRenameAccount = (contextId: string, accountId: string, newName: string) => {
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id === accountId ? { ...a, name: newName } : a),
+          }),
+      }));
+  };
+
+  const handleRenameSubAccount = (contextId: string, accountId: string, subId: string, newName: string) => {
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id !== accountId ? a : {
+                  ...a,
+                  subAccounts: a.subAccounts.map(s => s.id === subId ? { ...s, name: newName } : s),
+              }),
+          }),
+      }));
+  };
+
+  // Borrar una sub-cuenta NUNCA borra el historial financiero: las transacciones
+  // se quedan en el libro mayor, sólo pierden el vínculo con la sub-cuenta. Si
+  // tenía saldo, se devuelve a la cuenta padre para no descuadrar el total.
+  const handleDeleteSubAccount = (contextId: string, accountId: string, subId: string) => {
+      setState(prev => {
+          const contexts = prev.contexts.map(c => {
+              if (c.id !== contextId) return c;
+              return {
+                  ...c,
+                  accounts: c.accounts.map(a => {
+                      if (a.id !== accountId) return a;
+                      const sub = a.subAccounts.find(s => s.id === subId);
+                      let balances = { ...a.balances };
+                      if (sub) {
+                          for (const [cur, amount] of Object.entries(sub.balances || {})) {
+                              const v = Number(amount) || 0;
+                              if (v) balances = addToBalance(balances, cur, v);
+                          }
+                      }
+                      return { ...a, balances, subAccounts: a.subAccounts.filter(s => s.id !== subId) };
+                  }),
+              };
+          });
+          const transactions = prev.transactions.map(t => (
+              t.subAccountId === subId ? { ...t, subAccountId: undefined } : (
+                  t.toSubAccountId === subId ? { ...t, toSubAccountId: undefined } : t
+              )
+          ));
+          return { ...prev, contexts, transactions };
+      });
+  };
+
+  // Mueve la sub-cuenta (con su saldo, historial y progreso) a otra cuenta.
+  const handleMoveSubAccount = (contextId: string, fromAccountId: string, toAccountId: string, subId: string) => {
+      if (fromAccountId === toAccountId) return;
+      setState(prev => {
+          const ctx = prev.contexts.find(c => c.id === contextId);
+          const sub = ctx?.accounts.find(a => a.id === fromAccountId)?.subAccounts.find(s => s.id === subId);
+          if (!sub) return prev;
+          return {
+              ...prev,
+              contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+                  ...c,
+                  accounts: c.accounts.map(a => {
+                      if (a.id === fromAccountId) return { ...a, subAccounts: a.subAccounts.filter(s => s.id !== subId) };
+                      if (a.id === toAccountId) return { ...a, subAccounts: [...a.subAccounts, sub] };
+                      return a;
+                  }),
+              }),
+          };
+      });
+  };
+
+  // Cambiar meta, tipo (Meta <-> Objetivo), prioridad o estado de completado.
+  const handleUpdateSubAccount = (
+      contextId: string,
+      accountId: string,
+      subId: string,
+      patch: Partial<Pick<SubAccount, 'name' | 'target' | 'goalKind' | 'priority' | 'completedAt'>>
+  ) => {
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id !== accountId ? a : {
+                  ...a,
+                  subAccounts: a.subAccounts.map(s => s.id === subId ? { ...s, ...patch } : s),
+              }),
+          }),
+      }));
+  };
+
+  // Abono a un Objetivo SIN movimiento de dinero: la deuda baja pero no sale
+  // nada de ninguna cuenta. Caso real: alguien que te debe te compensa con un
+  // trabajo o con un cobro que pasó por su cuenta. No toca saldo ni métricas.
+  const handleAddGoalEntry = (
+      contextId: string,
+      accountId: string,
+      subId: string,
+      data: { amount: number; date: string; note?: string; kind?: 'HISTORY' | 'CREDIT' }
+  ) => {
+      const entry: GoalEntry = {
+          id: crypto.randomUUID(),
+          date: data.date || new Date().toISOString(),
+          amount: Number(data.amount),
+          note: data.note,
+          kind: data.kind || 'CREDIT',
+      };
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id !== accountId ? a : {
+                  ...a,
+                  subAccounts: a.subAccounts.map(s => s.id !== subId ? s : {
+                      ...s,
+                      entries: [...(s.entries || []), entry],
+                  }),
+              }),
+          }),
+      }));
+  };
+
+  const handleDeleteGoalEntry = (contextId: string, accountId: string, subId: string, entryId: string) => {
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id !== accountId ? a : {
+                  ...a,
+                  subAccounts: a.subAccounts.map(s => s.id !== subId ? s : {
+                      ...s,
+                      entries: (s.entries || []).filter(e => e.id !== entryId),
+                  }),
+              }),
+          }),
+      }));
+  };
+
   // Balance reconciliation: user enters the REAL balance they have; we compute
   // the delta vs the tracked balance and create a signed ADJUSTMENT entry.
   // Excluded from income/expense metrics — only corrects the balance.
@@ -904,15 +1080,27 @@ function App() {
   };
 
   const handleNewSubAccount = (data: any) => {
-      setState(prev => {
-          const newContexts = [...prev.contexts];
-          const ctx = newContexts.find(c => c.id === data.contextId);
-          const acc = ctx?.accounts.find(a => a.id === data.accountId);
-          if (acc) {
-              acc.subAccounts.push({ id: `sub_${Date.now()}`, name: data.name, balances: {}, target: data.target, startDate: data.startDate });
-          }
-          return { ...prev, contexts: newContexts };
-      });
+      const nueva: SubAccount = {
+          id: `sub_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
+          name: data.name,
+          balances: {},
+          target: data.target,
+          goalKind: data.goalKind,
+          priority: data.priority ?? null,
+          entries: data.goalKind === 'PAYMENT' ? [] : undefined,
+          completedAt: null,
+          startDate: data.startDate,
+      };
+      setState(prev => ({
+          ...prev,
+          contexts: prev.contexts.map(c => c.id !== data.contextId ? c : {
+              ...c,
+              accounts: c.accounts.map(a => a.id !== data.accountId ? a : {
+                  ...a,
+                  subAccounts: [...a.subAccounts, nueva],
+              }),
+          }),
+      }));
   };
 
   const handleNewCategory = (data: any) => {
@@ -1226,6 +1414,9 @@ function App() {
   const [accountHistoryTarget, setAccountHistoryTarget] = useState<{ contextId: string; accountId: string; subAccountId?: string } | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [chartDrill, setChartDrill] = useState<{ title: string; subtitle?: string; transactions: Transaction[]; currency: string } | null>(null);
+  const [manageSubTarget, setManageSubTarget] = useState<{ contextId: string; accountId: string; subId: string } | null>(null);
+  const [goalArchiveOpen, setGoalArchiveOpen] = useState(false);
+  const [creditTarget, setCreditTarget] = useState<{ contextId: string; accountId: string; subId: string; name: string } | null>(null);
 
   // ─── PWA / Push bootstrap ──────────────────────────────────────────
   useEffect(() => {
@@ -1472,6 +1663,7 @@ function App() {
           {currentView === 'ACCOUNTS' && (
             <MobileAccounts
               contexts={filteredContexts}
+              transactions={state.transactions}
               formatCurrency={formatCurrency}
               baseCurrency={currencyCode}
               onDistributeIncome={(ctxId, cur) => distributeIncome(ctxId, cur)}
@@ -1481,6 +1673,9 @@ function App() {
               recentDistributions={recentDistributions}
               recentTxByAccount={recentTxByAccount}
               onAccountHistory={(ctxId, accId, subId) => setAccountHistoryTarget({ contextId: ctxId, accountId: accId, subAccountId: subId })}
+              onManageSubAccount={(ctxId, accId, subId) => setManageSubTarget({ contextId: ctxId, accountId: accId, subId })}
+              onRenameAccount={handleRenameAccount}
+              onOpenGoalArchive={() => setGoalArchiveOpen(true)}
             />
           )}
           {currentView === 'TRANSACTIONS' && (
@@ -1754,6 +1949,41 @@ function App() {
           formatDateTime={formatDateTime}
           getAccountName={getAccountName}
           getSubAccountName={getSubAccountName}
+        />
+        <ManageSubAccountSheet
+          open={!!manageSubTarget}
+          onClose={() => setManageSubTarget(null)}
+          state={state}
+          target={manageSubTarget}
+          formatCurrency={formatCurrency}
+          onRename={(name) => manageSubTarget && handleRenameSubAccount(manageSubTarget.contextId, manageSubTarget.accountId, manageSubTarget.subId, name)}
+          onMove={(toAccountId) => {
+            if (!manageSubTarget) return;
+            handleMoveSubAccount(manageSubTarget.contextId, manageSubTarget.accountId, toAccountId, manageSubTarget.subId);
+            setManageSubTarget({ ...manageSubTarget, accountId: toAccountId });
+          }}
+          onUpdate={(patch) => manageSubTarget && handleUpdateSubAccount(manageSubTarget.contextId, manageSubTarget.accountId, manageSubTarget.subId, patch)}
+          onAddCredit={() => {
+            if (!manageSubTarget) return;
+            const ctx = state.contexts.find(c => c.id === manageSubTarget.contextId);
+            const sub = ctx?.accounts.find(a => a.id === manageSubTarget.accountId)?.subAccounts.find(s => s.id === manageSubTarget.subId);
+            setCreditTarget({ ...manageSubTarget, name: sub?.name || '' });
+            setManageSubTarget(null);
+          }}
+          onDelete={() => manageSubTarget && handleDeleteSubAccount(manageSubTarget.contextId, manageSubTarget.accountId, manageSubTarget.subId)}
+        />
+        <GoalCreditSheet
+          open={!!creditTarget}
+          onClose={() => setCreditTarget(null)}
+          subName={creditTarget?.name || ''}
+          onSubmit={(data) => creditTarget && handleAddGoalEntry(creditTarget.contextId, creditTarget.accountId, creditTarget.subId, { ...data, kind: 'CREDIT' })}
+        />
+        <GoalArchiveSheet
+          open={goalArchiveOpen}
+          onClose={() => setGoalArchiveOpen(false)}
+          state={state}
+          formatCurrency={formatCurrency}
+          formatDateTime={formatDateTime}
         />
         <UpdatePopup />
       </MobileShell>

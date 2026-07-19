@@ -5,6 +5,16 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { AppState, FinancialContext, Transaction, Subscription, Category, Account } from '../types';
 import { Icons } from './Icons';
 import {
+  goalKindOf,
+  isPaymentGoal,
+  goalProgress,
+  goalPaid,
+  goalRemaining,
+  isGoalComplete,
+  paymentGoalTotals,
+  byPriority,
+} from '../utils/goals';
+import {
   BottomSheet,
   Segmented,
   ListSection,
@@ -470,6 +480,7 @@ export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: st
 // ─── ACCOUNTS (Bóvedas) ─────────────────────────────────────────────────
 interface AccountsProps {
   contexts: FinancialContext[];
+  transactions: Transaction[];
   formatCurrency: (n: number, c?: string) => string;
   baseCurrency: string;
   onDistributeIncome: (ctxId: string, currency: string) => void;
@@ -479,6 +490,9 @@ interface AccountsProps {
   recentDistributions: { [accountId: string]: number };
   recentTxByAccount: Record<string, { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }>;
   onAccountHistory: (ctxId: string, accId: string, subId?: string) => void;
+  onManageSubAccount: (ctxId: string, accId: string, subId: string) => void;
+  onRenameAccount: (ctxId: string, accId: string, name: string) => void;
+  onOpenGoalArchive: () => void;
 }
 
 const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }; formatCurrency: (n: number, c?: string) => string }> = ({ indicator, formatCurrency }) => {
@@ -497,8 +511,11 @@ const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; ki
   );
 };
 
-export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory }) => {
+export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions, formatCurrency, baseCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory, onManageSubAccount, onRenameAccount, onOpenGoalArchive }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
+  const [editingAccount, setEditingAccount] = useState<string | null>(null);
+  const [accountDraft, setAccountDraft] = useState('');
 
   const toggle = (id: string) => {
     haptic('selection');
@@ -510,12 +527,64 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
     });
   };
 
+  // Cuánto falta por pagar en total, sumando todos los Objetivos activos.
+  const totals = useMemo(
+    () => paymentGoalTotals(contexts, transactions, baseCurrency),
+    [contexts, transactions, baseCurrency]
+  );
+
   if (contexts.length === 0) {
     return <EmptyState icon={Icons.Accounts} title="Sin bóvedas" description="Configura tus contextos financieros para empezar." />;
   }
 
   return (
     <div className="pb-tabbar lg:px-8 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start">
+      {/* Resumen global de Objetivos: lo que falta por pagar de un vistazo */}
+      {(totals.count > 0 || totals.completed > 0) && (
+        <section className="mx-3 lg:mx-0 mb-4 lg:col-span-2">
+          <div className="bg-onyx text-white rounded-2xl p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold mb-1">Te falta por pagar</div>
+                <div className="text-3xl font-display font-bold tabular leading-none">
+                  {formatCurrency(totals.remaining, baseCurrency)}
+                </div>
+                <div className="text-[11px] text-white/60 mt-2 tabular">
+                  {formatCurrency(totals.paid, baseCurrency)} pagados de {formatCurrency(totals.target, baseCurrency)}
+                  <span className="mx-1.5">·</span>
+                  {totals.count} {totals.count === 1 ? 'objetivo' : 'objetivos'}
+                </div>
+              </div>
+              {totals.completed > 0 && (
+                <button
+                  onClick={() => { haptic('selection'); onOpenGoalArchive(); }}
+                  className="flex-shrink-0 h-8 px-3 bg-white/10 text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-white/20 transition-all"
+                >
+                  {totals.completed} saldados
+                </button>
+              )}
+            </div>
+            {totals.target > 0 && (
+              <div className="h-1.5 bg-white/15 rounded-full overflow-hidden mt-4">
+                <div className="h-full bg-gold transition-all" style={{ width: `${(totals.paid / totals.target) * 100}%` }} />
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 mt-4 -mb-1 overflow-x-auto no-scrollbar">
+              {['ALL', '1', '2', '3', '4', 'NONE'].map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { haptic('selection'); setPriorityFilter(p); }}
+                  className={`flex-shrink-0 h-7 px-3 rounded-full text-[10px] font-display font-bold uppercase tracking-widest transition-all active:scale-95 ${
+                    priorityFilter === p ? 'bg-gold text-onyx' : 'bg-white/10 text-white/70'
+                  }`}
+                >
+                  {p === 'ALL' ? 'Todas' : p === 'NONE' ? 'Sin prio' : `Prio ${p}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
       {contexts.map((ctx) => {
         const incomeAcc = ctx.accounts.find((a) => a.type === 'INCOME');
         const total = ctx.accounts.reduce((sum, a) => {
@@ -578,7 +647,33 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                         <div className="w-1.5 h-1.5 bg-onyx rotate-45 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[15px] font-display font-semibold text-onyx truncate">{acc.name}</span>
+                            {editingAccount === acc.id ? (
+                              // Renombrar cuenta in-situ. Las cuentas no se crean ni se
+                              // borran nunca, pero sí se pueden renombrar.
+                              <input
+                                autoFocus
+                                value={accountDraft}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => setAccountDraft(e.target.value)}
+                                onBlur={() => {
+                                  const v = accountDraft.trim();
+                                  if (v && v !== acc.name) onRenameAccount(ctx.id, acc.id, v);
+                                  setEditingAccount(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                  if (e.key === 'Escape') { setAccountDraft(acc.name); setEditingAccount(null); }
+                                }}
+                                className="text-[15px] font-display font-semibold text-onyx bg-white border border-alloy rounded px-1.5 py-0.5 min-w-0 flex-1 outline-none"
+                              />
+                            ) : (
+                              <span
+                                onClick={(e) => { e.stopPropagation(); haptic('selection'); setAccountDraft(acc.name); setEditingAccount(acc.id); }}
+                                className="text-[15px] font-display font-semibold text-onyx truncate"
+                              >
+                                {acc.name}
+                              </span>
+                            )}
                             {target !== undefined && target > 0 && (
                               <span className="px-1.5 py-0.5 text-[9px] bg-stone text-graphite font-bold rounded">{target}%</span>
                             )}
@@ -628,10 +723,23 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                     </div>
                     {hasSubs && isOpen && (
                       <div className="bg-stone/50 px-5 py-3 space-y-2 border-t border-black/5">
-                        {acc.subAccounts.map((sub) => {
+                        {acc.subAccounts
+                          .filter((sub) => {
+                            // Los Objetivos saldados se archivan: sólo salen en el historial.
+                            if (isPaymentGoal(sub) && isGoalComplete(sub, transactions, baseCurrency)) return false;
+                            if (priorityFilter === 'ALL') return true;
+                            if (!isPaymentGoal(sub)) return true;
+                            if (priorityFilter === 'NONE') return sub.priority == null;
+                            return String(sub.priority ?? '') === priorityFilter;
+                          })
+                          .sort((a, b) => byPriority(a, b, transactions, baseCurrency))
+                          .map((sub) => {
                           const subEntries = balanceEntries(sub.balances);
-                          const subAmount = subEntries[0]?.amount || 0;
-                          const progress = sub.target ? Math.min(100, (subAmount / sub.target) * 100) : null;
+                          const kind = goalKindOf(sub);
+                          const esObjetivo = kind === 'PAYMENT';
+                          const progress = kind ? goalProgress(sub, transactions, baseCurrency) : null;
+                          const pagado = kind ? goalPaid(sub, transactions, baseCurrency) : 0;
+                          const falta = kind ? goalRemaining(sub, transactions, baseCurrency) : 0;
                           const subRecent = recentTxByAccount[`${acc.id}:${sub.id}`];
                           return (
                             <div
@@ -642,20 +750,50 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, formatCurren
                               <div className="flex items-center justify-between mb-1 gap-2">
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <span className="text-xs font-medium text-onyx truncate">{sub.name}</span>
+                                  {kind && (
+                                    <span className={`flex-shrink-0 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded ${
+                                      esObjetivo ? 'bg-onyx text-white' : 'bg-stone text-graphite'
+                                    }`}>
+                                      {esObjetivo ? 'Objetivo' : 'Meta'}
+                                    </span>
+                                  )}
+                                  {esObjetivo && sub.priority != null && (
+                                    <span className="flex-shrink-0 px-1.5 py-0.5 text-[8px] font-bold bg-gold/20 text-onyx rounded">P{sub.priority}</span>
+                                  )}
                                   <RecentBadge indicator={subRecent} formatCurrency={formatCurrency} />
                                 </div>
-                                <span className="text-xs font-display font-bold text-onyx tabular flex-shrink-0">
-                                  {subEntries.length > 0 ? subEntries.map((e) => formatCurrency(e.amount, e.currency)).join(' / ') : formatCurrency(0)}
-                                </span>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <span className="text-xs font-display font-bold text-onyx tabular">
+                                    {esObjetivo
+                                      ? formatCurrency(falta, baseCurrency)
+                                      : subEntries.length > 0
+                                        ? subEntries.map((e) => formatCurrency(e.amount, e.currency)).join(' / ')
+                                        : formatCurrency(0)}
+                                  </span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); haptic('medium'); onManageSubAccount(ctx.id, acc.id, sub.id); }}
+                                    className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-stone active:scale-90 transition-all"
+                                    aria-label={`Gestionar ${sub.name}`}
+                                  >
+                                    <Icons.MoreH className="w-3.5 h-3.5 text-graphite" />
+                                  </button>
+                                </div>
                               </div>
                               {progress !== null && (
                                 <>
                                   <div className="h-1.5 bg-stone rounded-full overflow-hidden mt-2">
-                                    <div className="h-full bg-alloy transition-all" style={{ width: `${progress}%` }} />
+                                    <div
+                                      className={`h-full transition-all ${esObjetivo ? 'bg-gold' : 'bg-alloy'}`}
+                                      style={{ width: `${progress}%` }}
+                                    />
                                   </div>
-                                  <div className="text-[10px] text-graphite mt-1 flex justify-between">
-                                    <span>Meta: {formatCurrency(sub.target!, subEntries[0]?.currency)}</span>
-                                    <span>{progress.toFixed(0)}%</span>
+                                  <div className="text-[10px] text-graphite mt-1 flex justify-between tabular">
+                                    <span>
+                                      {esObjetivo
+                                        ? `${formatCurrency(pagado, baseCurrency)} de ${formatCurrency(sub.target!, baseCurrency)}`
+                                        : `Meta: ${formatCurrency(sub.target!, subEntries[0]?.currency || baseCurrency)}`}
+                                    </span>
+                                    <span className="font-bold">{progress.toFixed(1)}%</span>
                                   </div>
                                 </>
                               )}
