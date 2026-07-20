@@ -20,10 +20,10 @@ export const haptic = (style: 'light' | 'medium' | 'heavy' | 'selection' = 'ligh
 // ─── SAFE-AREA SHELL (mobile + desktop with sidebar) ────────────────────
 export const MobileShell: React.FC<{ children: ReactNode; sidebar?: ReactNode; className?: string }> = ({ children, sidebar, className = '' }) => {
   return (
-    <div className={`min-h-[100dvh] bg-stone text-onyx ${className}`}>
-      <div className="lg:flex lg:items-stretch lg:min-h-[100dvh]">
+    <div className={`min-h-[100svh] bg-stone text-onyx ${className}`}>
+      <div className="lg:flex lg:items-stretch lg:min-h-[100svh]">
         {sidebar}
-        <div className="mx-auto max-w-[480px] lg:max-w-none lg:flex-1 w-full min-h-[100dvh] bg-stone relative">
+        <div className="mx-auto max-w-[480px] lg:max-w-none lg:flex-1 w-full min-h-[100svh] bg-stone relative">
           {children}
         </div>
       </div>
@@ -139,7 +139,7 @@ interface DesktopSidebarProps {
 }
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ tabs, activeId, onChange, onFabPress, user, onUserClick, brand }) => {
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-[240px] lg:flex-shrink-0 lg:bg-white lg:border-r lg:border-black/5 lg:sticky lg:top-0 lg:h-[100dvh] lg:overflow-y-auto">
+    <aside className="hidden lg:flex lg:flex-col lg:w-[240px] lg:flex-shrink-0 lg:bg-white lg:border-r lg:border-black/5 lg:sticky lg:top-0 lg:h-[100svh] lg:overflow-y-auto">
       {/* Brand */}
       <div className="px-6 pt-7 pb-6 border-b border-black/5">
         <div className="flex items-center gap-3">
@@ -416,18 +416,18 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
   if (!isMounted) return null;
 
   const sizeClass = size === 'full'
-    ? 'h-[calc(100dvh-env(safe-area-inset-top)-12px)]'
+    ? 'h-[calc(100svh-env(safe-area-inset-top)-12px)]'
     : size === 'half'
-    ? 'max-h-[60dvh]'
-    : 'max-h-[88dvh]';
+    ? 'max-h-[60svh]'
+    : 'max-h-[88svh]';
 
   // Tope propio de cada tamaño, en CSS. Se combina con el hueco del teclado vía
   // min() para que abrir el teclado NUNCA agrande una hoja: sólo la achique.
   const sizeMax = size === 'full'
-    ? 'calc(100dvh - env(safe-area-inset-top) - 12px)'
+    ? 'calc(100svh - env(safe-area-inset-top) - 12px)'
     : size === 'half'
-    ? '60dvh'
-    : '88dvh';
+    ? '60svh'
+    : '88svh';
 
   return (
     // Mientras la hoja se va (280 ms de animación) este contenedor sigue en el
@@ -459,7 +459,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
             // El alto disponible se reduce por el hueco del teclado, pero SIN
             // pisar el tope propio de cada tamaño (auto / half / full).
             maxHeight: keyboardInset > 0
-              ? `min(${sizeMax}, calc(100dvh - ${keyboardInset}px - 12px))`
+              ? `min(${sizeMax}, calc(100svh - ${keyboardInset}px - 12px))`
               : undefined,
           }}
         >

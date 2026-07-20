@@ -219,6 +219,12 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
 
 // --- Generic Form Field Helpers ---
 
+// Dispositivo táctil sin ratón de precisión => selector de fecha nativo del
+// sistema. Se calcula una sola vez, no cambia durante la sesión.
+const usarSelectorNativo = typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+
 export const Input = (props: any) => {
     const isDate = props.type === 'date' || props.type === 'datetime-local';
     const [pickerOpen, setPickerOpen] = useState(false);
@@ -257,6 +263,30 @@ export const Input = (props: any) => {
     };
 
     if (isDate) {
+        // En móvil se usa el selector NATIVO del sistema.
+        //
+        // El calendario propio es HTML dentro de la página, así que cualquier
+        // recolocación del layout a mitad de gesto (la barra de Safari
+        // apareciendo o desapareciendo) hace que el dedo aterrice una fila más
+        // arriba: tocabas el 22 y salía el 15. El selector nativo lo dibuja iOS
+        // fuera de la página, así que nada de lo que pase en el HTML puede
+        // desplazarlo. En escritorio se mantiene el nuestro, que ahí va fino.
+        //
+        // El formato coincide: value y onChange usan "YYYY-MM-DD" o
+        // "YYYY-MM-DDTHH:MM", que es exactamente lo que espera y devuelve el
+        // input nativo.
+        if (usarSelectorNativo) {
+            return (
+                <div className="mb-5">
+                    {props.label && <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{props.label}</label>}
+                    <input
+                        {...props}
+                        className={`wv-field font-sans ${props.className || ''}`}
+                    />
+                </div>
+            );
+        }
+
         return (
             <div className="mb-5 group">
                 {props.label && <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">{props.label}</label>}

@@ -48,6 +48,7 @@ import { GoalsOverview } from './components/GoalsOverview';
 import { registerServiceWorker, purgarCachesViejas, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
 import { UpdatePopup, APP_VERSION } from './components/UpdatePopup';
+import { TouchDiag } from './components/TouchDiag';
 import { BrandLoader } from './components/BrandLoader';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
@@ -66,6 +67,13 @@ const WHITEVAULT_ISOTYPE = "https://storage.googleapis.com/msgsndr/QDrKqO1suwk5V
 
 
 function App() {
+  // Diagnóstico de toques: app.whitevault.cc/?diag=1
+  // Sirve para medir en el dispositivo real si el toque aterriza donde se ve el
+  // botón. No requiere sesión y no toca ningún dato.
+  if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('diag') === '1') {
+    return <TouchDiag />;
+  }
+
   const [session, setSession] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasFetchedData, setHasFetchedData] = useState(false);
@@ -1531,7 +1539,7 @@ function App() {
 
   if (isAccountPaused) {
     return (
-      <div className="min-h-[100dvh] marble-dark flex items-end sm:items-center justify-center px-4 pb-safe pt-safe">
+      <div className="min-h-[100svh] marble-dark flex items-end sm:items-center justify-center px-4 pb-safe pt-safe">
         <div className="w-full max-w-[440px] mx-auto bg-stone rounded-3xl p-8 text-center wv-pop-in shadow-[0_24px_48px_rgba(0,0,0,0.4)]">
           <img src={WHITEVAULT_ISOTYPE} alt="WhiteVault" className="w-16 h-16 mx-auto mb-5 opacity-90" />
           <div className="metallic-line w-20 mx-auto mb-5" />

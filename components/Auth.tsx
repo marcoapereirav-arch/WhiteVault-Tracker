@@ -71,7 +71,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
   };
 
   return (
-    <div className="min-h-[100dvh] marble-dark flex items-end sm:items-center justify-center pt-safe pb-safe px-0 sm:px-4">
+    <div className="min-h-[100svh] marble-dark flex items-end sm:items-center justify-center pt-safe pb-safe px-0 sm:px-4">
       <div className="w-full sm:max-w-[440px] mx-auto bg-stone sm:rounded-3xl rounded-t-[32px] p-7 sm:shadow-[0_24px_48px_rgba(0,0,0,0.4)] wv-pop-in">
         {/* Drag handle (mobile only) */}
         <div className="flex justify-center mb-3 sm:hidden">
