@@ -12,7 +12,7 @@ import { BrandLoader } from './BrandLoader';
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.07.19';
+export const APP_VERSION = '2026.07.20';
 
 interface ChangeEntry {
   version: string;
@@ -23,6 +23,18 @@ interface ChangeEntry {
 // Most recent first. Only the latest entry is shown in the popup, but the
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.07.20',
+    date: '20 jul 2026',
+    items: [
+      'El calendario ya selecciona el día que tocas (antes fallaba una fila)',
+      'La hora del calendario ya responde al dedo',
+      'Al escribir, la pantalla sube y el teclado ya no tapa el campo',
+      'Los botones de abajo responden siempre, sin tener que insistir',
+      'El botón + abre a la primera',
+      'Lo que acabas de mover se queda a la vista hasta el siguiente movimiento',
+    ],
+  },
   {
     version: '2026.07.19',
     date: '19 jul 2026',

@@ -160,20 +160,34 @@ function App() {
   const [tempName, setTempName] = useState('');
   const nameInputRef = React.useRef<HTMLInputElement>(null);
 
-  // Recent transaction indicators — shown next to accounts/sub-accounts for 30s
+  // Indicadores del último movimiento, junto a la cuenta o sub-cuenta afectada.
+  // Duran hasta el siguiente movimiento o hasta cerrar la app (no caducan solos).
   // Key: `${accountId}:${subAccountId ?? ''}`
   type RecentTxIndicator = { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' };
   const [recentTxByAccount, setRecentTxByAccount] = useState<Record<string, RecentTxIndicator>>({});
-  const recentTxTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashRecent = React.useCallback((entries: { accountId: string; subAccountId?: string; amount: number; currency: string; kind: RecentTxIndicator['kind'] }[]) => {
       const map: Record<string, RecentTxIndicator> = {};
       entries.forEach((e) => {
           const key = `${e.accountId}:${e.subAccountId ?? ''}`;
           map[key] = { amount: e.amount, currency: e.currency, kind: e.kind };
       });
+      // Sin temporizador a propósito: el indicador de lo que acabas de mover se
+      // queda a la vista hasta que registras el siguiente movimiento (esta misma
+      // llamada reemplaza el mapa entero) o hasta que cierras la app, porque es
+      // estado en memoria. Antes se borraba solo a los 30 s y daba tiempo a nada.
       setRecentTxByAccount(map);
-      if (recentTxTimerRef.current) clearTimeout(recentTxTimerRef.current);
-      recentTxTimerRef.current = setTimeout(() => setRecentTxByAccount({}), 30_000);
+      // Los badges verdes de una distribución son el otro sistema de indicadores.
+      // Sin caducidad propia se quedarían pegados junto a movimientos posteriores
+      // que no tienen nada que ver, así que al llegar uno nuevo se limpian.
+      setRecentDistributions({});
+  }, []);
+
+  // Un indicador sólo tiene sentido mientras exista el movimiento que representa.
+  // Al borrar, restaurar o editar una transacción se retira, porque si no queda
+  // un "+50 €" señalando un saldo que ya no lo incluye.
+  const clearRecentIndicators = React.useCallback(() => {
+      setRecentTxByAccount({});
+      setRecentDistributions({});
   }, []);
 
   useEffect(() => {
@@ -749,8 +763,8 @@ function App() {
       setLastDistribution({ txIds, contextId, currency, amounts: distributionAmounts });
       
       // Visual feedback
+      // Igual que flashRecent: se queda hasta el siguiente movimiento.
       setRecentDistributions(distributionAmounts);
-      setTimeout(() => setRecentDistributions({}), 5000); // Clear green text after 5s
   };
 
   const undoLastDistribution = () => {
@@ -1220,6 +1234,7 @@ function App() {
   };
 
   const handleDeleteTransaction = (txId: string) => {
+      clearRecentIndicators();
       const deletedAt = new Date().toISOString();
       let txSnapshot: Transaction | undefined;
       setState(prev => {
@@ -1263,6 +1278,7 @@ function App() {
   };
 
   const handleRestoreTransaction = (txId: string) => {
+      clearRecentIndicators();
       let before: Transaction | undefined;
       setState(prev => {
           const tx = prev.transactions.find(t => t.id === txId);
@@ -1281,6 +1297,7 @@ function App() {
   // avoid the closure race where serial setState calls overwrote each other's
   // context updates (resulting in only the last reversal being applied).
   const handleBulkDeleteTransactions = (txIds: Set<string>) => {
+      clearRecentIndicators();
       const deletedAt = new Date().toISOString();
       setState(prev => {
           let contexts = prev.contexts;
@@ -1307,6 +1324,7 @@ function App() {
   };
 
   const handleUpdateTransaction = (data: any) => {
+      clearRecentIndicators();
       const oldTx = state.transactions.find(t => t.id === data.id);
       if (!oldTx) return;
       const cur = data.currency || currencyCode;

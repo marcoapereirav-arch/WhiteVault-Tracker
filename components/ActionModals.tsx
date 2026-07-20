@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
@@ -130,7 +131,19 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
         }
     }
 
-    return (
+    // IMPORTANTE: esto va en un portal colgado de <body>.
+    //
+    // El calendario se abre desde dentro de un BottomSheet, y ese BottomSheet
+    // lleva un transform permanente (translate-y) para su animación. Un
+    // elemento position:fixed dentro de un ancestro transformado deja de
+    // medirse contra la pantalla y pasa a medirse contra ese ancestro. En iOS
+    // el resultado es que se PINTA en un sitio y se TOCA en otro, desplazado
+    // justo lo que valga el transform: tocabas el 15 y seleccionaba el 8 (una
+    // fila exacta), y la hora directamente no recibía el dedo.
+    //
+    // Sacándolo del árbol del sheet, nada lo desplaza y dibujo y toque vuelven
+    // a coincidir. No toques esto sin entender lo de arriba.
+    return createPortal(
         <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center bg-onyx/60 backdrop-blur-[2px] animate-in fade-in duration-200 p-0 md:p-4">
             <div className="bg-white w-full md:w-[340px] rounded-t-2xl md:rounded-xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-10 md:zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                 
@@ -199,7 +212,8 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

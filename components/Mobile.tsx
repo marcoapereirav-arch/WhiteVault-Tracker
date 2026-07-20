@@ -111,7 +111,10 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
       className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none lg:hidden"
     >
       <div className="mx-auto max-w-[480px] pointer-events-auto">
-        <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),8px)] pt-1.5">
+        {/* El mínimo sube de 8px a 14px: en navegador (sin barra de gestos) los
+            botones quedaban tan pegados al borde que iOS se comía el primer
+            toque como si fuera un gesto del sistema. */}
+        <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),14px)] pt-1.5">
           <div className="flex items-end justify-around relative">
             {left.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
             <FabButton onClick={onFabPress} />
@@ -205,7 +208,9 @@ const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void
   return (
     <button
       onClick={() => { haptic('selection'); onClick(); }}
-      className="flex-1 flex flex-col items-center justify-end py-2 px-1 active:scale-95 transition-transform"
+      // min-h-[52px] + touch-manipulation: zona de toque cómoda y sin el
+      // retardo de doble-tap de iOS.
+      className="flex-1 flex flex-col items-center justify-end py-2 px-1 min-h-[52px] touch-manipulation active:scale-95 transition-transform"
       aria-current={active ? 'page' : undefined}
     >
       <div className={`relative w-7 h-7 flex items-center justify-center transition-all ${active ? 'text-onyx' : 'text-graphite/60'}`}>
@@ -221,10 +226,14 @@ const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void
 
 const FabButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   return (
-    <div className="flex-1 flex items-center justify-center -mt-7 relative">
+    // El botón sobresale 28px por encima de la barra, o sea la mitad de sus
+    // 56px. Esa mitad cae fuera de la caja del padre, así que hay que declarar
+    // explícitamente que sigue recibiendo toques y que va por encima de todo lo
+    // demás de la barra — si no, el usuario toca arriba y no pasa nada.
+    <div className="flex-1 flex items-center justify-center -mt-7 relative z-10 pointer-events-auto">
       <button
         onClick={() => { haptic('medium'); onClick(); }}
-        className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:scale-90 transition-transform border-[3px] border-stone"
+        className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:scale-90 transition-transform border-[3px] border-stone pointer-events-auto touch-manipulation"
         aria-label="Acciones rápidas"
       >
         <Icons.Plus className="w-6 h-6" />
@@ -246,6 +255,7 @@ interface BottomSheetProps {
 export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, subtitle, children, size = 'auto', trailing }) => {
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startY = useRef<number | null>(null);
@@ -288,6 +298,63 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
+  // Teclado del móvil.
+  //
+  // El scroll-lock de arriba pone el body en position:fixed, así que iOS ya no
+  // puede desplazar la página para dejar a la vista el campo enfocado: el
+  // teclado se le queda encima. Lo resolvemos nosotros: medimos cuánto ocupa
+  // el teclado con visualViewport, reservamos ese hueco al final del contenido
+  // y llevamos el campo enfocado a la zona visible.
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const medir = () => {
+      const alto = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      // Por debajo de 80px es ruido (barras del navegador), no el teclado.
+      setKeyboardInset(alto > 80 ? alto : 0);
+    };
+
+    vv.addEventListener('resize', medir);
+    vv.addEventListener('scroll', medir);
+    medir();
+    return () => {
+      vv.removeEventListener('resize', medir);
+      vv.removeEventListener('scroll', medir);
+      setKeyboardInset(0);
+    };
+  }, [open]);
+
+  // Al enfocar un campo, lo llevamos a la zona visible del área que scrollea.
+  //
+  // Depende de isMounted además de open: en el render en que `open` pasa a true
+  // el componente todavía devuelve null, así que scrollRef.current aún es null y
+  // el listener no llegaba a engancharse nunca.
+  useEffect(() => {
+    if (!open || !isMounted) return;
+    const cont = scrollRef.current;
+    if (!cont) return;
+
+    let pendiente: number | undefined;
+    const alEnfocar = (e: FocusEvent) => {
+      const campo = e.target as HTMLElement | null;
+      if (!campo || !cont.contains(campo)) return;
+      if (!campo.matches('input, textarea, select, [contenteditable]')) return;
+      // Se espera a que el teclado termine de subir para no medir a medias.
+      window.clearTimeout(pendiente);
+      pendiente = window.setTimeout(() => {
+        campo.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }, 320);
+    };
+
+    cont.addEventListener('focusin', alEnfocar);
+    return () => {
+      window.clearTimeout(pendiente);
+      cont.removeEventListener('focusin', alEnfocar);
+    };
+  }, [open, isMounted]);
+
   // Drag-to-close: only engages when the scrollable content is already at the
   // top (so it doesn't fight with scrolling the list inside the sheet).
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -328,18 +395,47 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
     ? 'max-h-[60dvh]'
     : 'max-h-[88dvh]';
 
+  // Tope propio de cada tamaño, en CSS. Se combina con el hueco del teclado vía
+  // min() para que abrir el teclado NUNCA agrande una hoja: sólo la achique.
+  const sizeMax = size === 'full'
+    ? 'calc(100dvh - env(safe-area-inset-top) - 12px)'
+    : size === 'half'
+    ? '60dvh'
+    : '88dvh';
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
+    // Mientras la hoja se va (280 ms de animación) este contenedor sigue en el
+    // DOM. Si mantiene los eventos, se traga todos los toques que el usuario
+    // haga justo después de cerrar — de ahí el "le doy y no me lo lee".
+    <div
+      className={`fixed inset-0 z-50 flex items-end justify-center ${isVisible ? '' : 'pointer-events-none'}`}
+      role="dialog"
+      aria-modal="true"
+      // Con el teclado abierto SUBIMOS el suelo del contenedor. Encoger la hoja
+      // no bastaba: al ser inset-0 + items-end, su borde inferior seguía anclado
+      // al fondo del viewport de layout, que en iOS queda DETRÁS del teclado.
+      style={keyboardInset > 0 ? { bottom: keyboardInset } : undefined}
+    >
       <div
-        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
         onTouchStart={(e) => { e.stopPropagation(); }}
       />
       <div className="relative w-full max-w-[480px] mx-auto pointer-events-none">
         <div
           ref={sheetRef}
-          className={`pointer-events-auto bg-stone ${sizeClass} flex flex-col rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}
-          style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
+          // pointer-events del panel condicionado igual que el del contenedor:
+          // si se queda en auto, el panel sigue tragando toques mientras baja.
+          className={`${isVisible ? 'pointer-events-auto' : 'pointer-events-none'} bg-stone ${sizeClass} flex flex-col rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}
+          style={{
+            // Con el teclado fuera, el safe-area lo pone el contenedor (bottom).
+            paddingBottom: keyboardInset > 0 ? 0 : 'max(env(safe-area-inset-bottom), 8px)',
+            // El alto disponible se reduce por el hueco del teclado, pero SIN
+            // pisar el tope propio de cada tamaño (auto / half / full).
+            maxHeight: keyboardInset > 0
+              ? `min(${sizeMax}, calc(100dvh - ${keyboardInset}px - 12px))`
+              : undefined,
+          }}
         >
           {/* Drag zone covers the handle + header so it's easy to grab.
               A big tap target (close button) sits inside. */}
@@ -370,7 +466,15 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
             </div>
           </div>
 
-          <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6">{children}</div>
+          <div
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6"
+            // Colchón extra para que el último campo pueda subir por encima del
+            // teclado en lugar de quedarse pegado al borde.
+            style={keyboardInset > 0 ? { paddingBottom: 24 + keyboardInset * 0.35 } : undefined}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>

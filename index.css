@@ -5,7 +5,9 @@
   --safe-bottom: env(safe-area-inset-bottom);
   --safe-left: env(safe-area-inset-left);
   --safe-right: env(safe-area-inset-right);
-  --tabbar-height: calc(56px + max(env(safe-area-inset-bottom), 8px));
+  /* El 14px debe coincidir con el padding inferior de BottomTabBar en Mobile.tsx.
+     Si se cambia allí y no aquí, el contenido queda por debajo de la barra. */
+  --tabbar-height: calc(56px + max(env(safe-area-inset-bottom), 14px));
 }
 
 html, body {
