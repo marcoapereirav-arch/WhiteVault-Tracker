@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { pressProps } from './Mobile';
 import { Icons } from './Icons';
 import { AppState, FinancialContext } from '../types';
 import Confetti from 'react-confetti';
@@ -183,7 +184,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                     </span>
                     {onExit && (
                         <button
-                            onClick={onExit}
+                            {...pressProps(onExit)}
                             className="w-9 h-9 rounded-full bg-white border border-black/5 flex items-center justify-center active:scale-95 transition-transform"
                             aria-label="Salir"
                         >
@@ -239,7 +240,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                             </div>
 
                             <button 
-                                onClick={() => setStep(2)}
+                                {...pressProps(() => setStep(2))}
                                 disabled={!name.trim()}
                                 className="w-full py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -273,7 +274,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 ).map(c => (
                                     <button
                                         key={c.code}
-                                        onClick={() => setCurrency(c.code)}
+                                        {...pressProps(() => setCurrency(c.code))}
                                         className={`w-full flex items-center justify-between p-4 border-b border-black/5 last:border-0 hover:bg-stone transition-colors ${currency === c.code ? 'bg-stone border-l-4 border-l-alloy' : ''}`}
                                     >
                                         <div className="flex items-center gap-3">
@@ -288,13 +289,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(1)}
+                                {...pressProps(() => setStep(1))}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
                             >
                                 Atrás
                             </button>
                             <button 
-                                onClick={() => setStep(3)}
+                                {...pressProps(() => setStep(3))}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Continuar
@@ -335,7 +336,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 </div>
                                 {Number(personalInitialBalance) > 0 && !personalDistributed && (
                                     <button 
-                                        onClick={() => setPersonalDistributed(true)}
+                                        {...pressProps(() => setPersonalDistributed(true))}
                                         className="px-6 py-4 bg-alloy text-white font-display font-bold tracking-wide hover:bg-onyx transition-colors"
                                     >
                                         Distribuir
@@ -343,7 +344,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 )}
                                 {Number(personalInitialBalance) > 0 && personalDistributed && (
                                     <button 
-                                        onClick={() => setPersonalDistributed(false)}
+                                        {...pressProps(() => setPersonalDistributed(false))}
                                         className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
                                     >
                                         Deshacer
@@ -420,13 +421,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(2)}
+                                {...pressProps(() => setStep(2))}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Atrás
                             </button>
                             <button 
-                                onClick={() => setStep(4)}
+                                {...pressProps(() => setStep(4))}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Continuar
@@ -442,19 +443,19 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                         
                         <div className="space-y-4">
                             <button 
-                                onClick={() => {
+                                {...pressProps(() => {
                                     setAddBusiness(true);
                                     setStep(5);
-                                }}
+                                })}
                                 className="w-full py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Añadir Tracker Profesional Ahora
                             </button>
                             <button 
-                                onClick={() => {
+                                {...pressProps(() => {
                                     setAddBusiness(false);
                                     setStep(6);
-                                }}
+                                })}
                                 className="w-full py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Saltar por ahora
@@ -463,7 +464,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                         
                         <div className="mt-6">
                             <button 
-                                onClick={() => setStep(3)}
+                                {...pressProps(() => setStep(3))}
                                 className="w-full py-4 bg-transparent text-graphite font-display font-bold tracking-wide hover:text-onyx transition-colors"
                             >
                                 Atrás
@@ -506,7 +507,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 </div>
                                 {Number(businessInitialBalance) > 0 && !businessDistributed && (
                                     <button 
-                                        onClick={() => setBusinessDistributed(true)}
+                                        {...pressProps(() => setBusinessDistributed(true))}
                                         className="px-6 py-4 bg-alloy text-white font-display font-bold tracking-wide hover:bg-onyx transition-colors"
                                     >
                                         Distribuir
@@ -514,7 +515,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
                                 )}
                                 {Number(businessInitialBalance) > 0 && businessDistributed && (
                                     <button 
-                                        onClick={() => setBusinessDistributed(false)}
+                                        {...pressProps(() => setBusinessDistributed(false))}
                                         className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
                                     >
                                         Deshacer
@@ -563,13 +564,13 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete, onExit }) =>
 
                         <div className="flex gap-4">
                             <button 
-                                onClick={() => setStep(4)}
+                                {...pressProps(() => setStep(4))}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors"
                             >
                                 Atrás
                             </button>
                             <button 
-                                onClick={() => setStep(6)}
+                                {...pressProps(() => setStep(6))}
                                 className="flex-1 py-4 bg-onyx text-white font-display font-bold tracking-wide hover:bg-alloy transition-colors"
                             >
                                 Continuar

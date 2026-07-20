@@ -6,7 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { FinancialContext, Transaction, SubAccount } from '../types';
 import { Icons } from './Icons';
-import { haptic, EmptyState } from './Mobile';
+import { haptic, EmptyState, pressProps} from './Mobile';
 import {
   collectGoals,
   goalPaid,
@@ -67,7 +67,7 @@ export const GoalsOverview: React.FC<Props> = ({
           {(['PAYMENT', 'SAVING'] as Tipo[]).map((t) => (
             <button
               key={t}
-              onClick={() => { haptic('selection'); setTipo(t); }}
+              {...pressProps(() => { haptic('selection'); setTipo(t); })}
               className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
                 tipo === t ? 'bg-onyx text-white' : 'bg-white border border-onyx/[0.12] text-graphite'
               }`}
@@ -94,7 +94,7 @@ export const GoalsOverview: React.FC<Props> = ({
               </div>
               {totals.completed > 0 && (
                 <button
-                  onClick={() => { haptic('selection'); onOpenArchive(); }}
+                  {...pressProps(() => { haptic('selection'); onOpenArchive(); })}
                   className="flex-shrink-0 h-8 px-3 bg-white/10 text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-white/20 transition-all"
                 >
                   {totals.completed} saldados
@@ -110,7 +110,7 @@ export const GoalsOverview: React.FC<Props> = ({
               {['ALL', '1', '2', '3', '4', 'NONE'].map((p) => (
                 <button
                   key={p}
-                  onClick={() => { haptic('selection'); setPrioridad(p); }}
+                  {...pressProps(() => { haptic('selection'); setPrioridad(p); })}
                   className={`flex-shrink-0 h-7 px-3 rounded-full text-[10px] font-display font-bold uppercase tracking-widest transition-all active:scale-95 ${
                     prioridad === p ? 'bg-gold text-onyx' : 'bg-white/10 text-white/70'
                   }`}
@@ -196,7 +196,7 @@ const GoalRow: React.FC<{
           </div>
         </div>
         <button
-          onClick={(e) => { e.stopPropagation(); haptic('medium'); onManage(); }}
+          {...pressProps((e) => { e.stopPropagation(); haptic('medium'); onManage(); })}
           className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone active:scale-90 transition-all flex-shrink-0 -mr-1"
           aria-label={`Gestionar ${sub.name}`}
         >

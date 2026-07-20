@@ -25,8 +25,7 @@ import {
   EmptyState,
   PressButton,
   Skeleton,
-  haptic,
-} from './Mobile';
+  haptic, pressProps } from './Mobile';
 import { balanceEntries } from '../utils/balances';
 import { isSubscriptionOverdue, daysOverdue, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
 import { CURRENCIES } from '../constants';
@@ -123,7 +122,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
               <div className="text-[10px] text-graphite mt-0.5">{p.getPresetLabel(p.dashboardDateRange.preset)}</div>
             </div>
             <button
-              onClick={() => { haptic('light'); setShowFilter(true); }}
+              {...pressProps(() => { haptic('light'); setShowFilter(true); })}
               className="flex items-center gap-1.5 px-3 h-8 lg:h-9 bg-white/10 backdrop-blur-md border border-white/10 text-[10px] lg:text-[11px] font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-white/15 transition-all"
             >
               <Icons.Calendar className="w-3 h-3" />
@@ -185,7 +184,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => { haptic('selection'); p.onSubscriptionClick(s); }}
+                  {...pressProps(() => { haptic('selection'); p.onSubscriptionClick(s); })}
                   className="w-full flex items-center gap-3 px-4 py-3 active:bg-rose-50 cursor-pointer text-left"
                 >
                   <IconCircle tone="expense" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
@@ -213,7 +212,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
           <div className="lg:col-span-1">
             <ListSection
               title="Próximas Renovaciones · 7 días"
-              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" onClick={() => p.onSummaryClick('SUBS')}>Ver todas</button>}
+              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" {...pressProps(() => p.onSummaryClick('SUBS'))}>Ver todas</button>}
             >
               {upcoming.map((s) => {
                 const days = Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000);
@@ -243,7 +242,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
           <div className={upcoming.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
             <ListSection
               title="Actividad Reciente"
-              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" onClick={() => p.onSummaryClick('ALL')}>Ver libro</button>}
+              trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" {...pressProps(() => p.onSummaryClick('ALL'))}>Ver libro</button>}
             >
               {recent.map((tx) => {
                 const cat = tx.categoryId ? p.state.categories.find((c) => c.id === tx.categoryId) : null;
@@ -306,7 +305,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
             return (
               <button
                 key={id}
-                onClick={() => { haptic('selection'); p.applyDatePreset(id); setShowFilter(false); }}
+                {...pressProps(() => { haptic('selection'); p.applyDatePreset(id); setShowFilter(false); })}
                 className={`h-12 px-4 text-xs font-display font-bold uppercase tracking-widest rounded-xl transition-all ${active ? 'bg-onyx text-white' : 'bg-white text-onyx border border-black/10'}`}
               >
                 {p.getPresetLabel(id)}
@@ -365,7 +364,7 @@ const PeriodMovementCard: React.FC<{ p: DashboardProps }> = ({ p }) => {
         {/* Ingresos */}
         <button
           type="button"
-          onClick={() => { haptic('selection'); p.onSummaryClick('INCOME'); }}
+          {...pressProps(() => { haptic('selection'); p.onSummaryClick('INCOME'); })}
           className="relative p-4 text-left active:bg-stone transition-colors"
         >
           <div className="absolute top-0 left-0 w-1 h-full bg-emerald-700" />
@@ -390,7 +389,7 @@ const PeriodMovementCard: React.FC<{ p: DashboardProps }> = ({ p }) => {
         {/* Gastos */}
         <button
           type="button"
-          onClick={() => { haptic('selection'); p.onSummaryClick('EXPENSE'); }}
+          {...pressProps(() => { haptic('selection'); p.onSummaryClick('EXPENSE'); })}
           className="relative p-4 text-left active:bg-stone transition-colors"
         >
           <div className="absolute top-0 left-0 w-1 h-full bg-rose-700" />
@@ -416,7 +415,7 @@ const PeriodMovementCard: React.FC<{ p: DashboardProps }> = ({ p }) => {
       {/* Footer: subscriptions */}
       <button
         type="button"
-        onClick={() => { haptic('selection'); p.onSummaryClick('SUBS'); }}
+        {...pressProps(() => { haptic('selection'); p.onSummaryClick('SUBS'); })}
         className="w-full flex items-center justify-between px-4 py-3 border-t border-black/5 active:bg-stone transition-colors"
       >
         <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-graphite">
@@ -436,7 +435,7 @@ export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: st
   return (
     <>
       <button
-        onClick={() => { haptic('selection'); setOpen(true); }}
+        {...pressProps(() => { haptic('selection'); setOpen(true); })}
         className={`flex items-center gap-1.5 ${dark ? 'text-white' : 'text-onyx'}`}
       >
         <span className={`text-[9px] font-bold uppercase tracking-[0.2em] ${dark ? 'text-graphite' : 'text-graphite'}`}>Espacio</span>
@@ -446,7 +445,7 @@ export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: st
       <BottomSheet open={open} onClose={() => setOpen(false)} title="Seleccionar Espacio" subtitle="Vista Global o Específica" size="auto">
         <div className="space-y-2">
           <button
-            onClick={() => { onChange('ALL'); setOpen(false); }}
+            {...pressProps(() => { onChange('ALL'); setOpen(false); })}
             className={`w-full flex items-center gap-3 p-4 rounded-xl text-left ${value === 'ALL' ? 'bg-onyx text-white' : 'bg-white border border-black/5'}`}
           >
             <IconCircle tone={value === 'ALL' ? 'dark' : 'default'}><Icons.Grid className="w-4 h-4" /></IconCircle>
@@ -459,7 +458,7 @@ export const ContextSwitcher: React.FC<{ contexts: FinancialContext[]; value: st
           {contexts.map((c) => (
             <button
               key={c.id}
-              onClick={() => { onChange(c.id); setOpen(false); }}
+              {...pressProps(() => { onChange(c.id); setOpen(false); })}
               className={`w-full flex items-center gap-3 p-4 rounded-xl text-left ${value === c.id ? 'bg-onyx text-white' : 'bg-white border border-black/5'}`}
             >
               <IconCircle tone={value === c.id ? 'dark' : c.type === 'PERSONAL' ? 'default' : 'gold'}>
@@ -554,7 +553,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
               <div className="flex items-center gap-2 flex-shrink-0">
                 {incomeAcc && balanceEntries(incomeAcc.balances).some((e) => e.amount > 0) && (
                   <button
-                    onClick={() => { haptic('medium'); onDistributeIncome(ctx.id, balanceEntries(incomeAcc.balances)[0]?.currency || 'USD'); }}
+                    {...pressProps(() => { haptic('medium'); onDistributeIncome(ctx.id, balanceEntries(incomeAcc.balances)[0]?.currency || 'USD'); })}
                     className="flex items-center gap-1.5 h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-all"
                   >
                     <Icons.Zap className="w-3.5 h-3.5 text-gold" />
@@ -565,7 +564,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                     enterrado en Ajustes. El Personal no se puede borrar. */}
                 {ctx.type === 'BUSINESS' && (
                   <button
-                    onClick={() => { haptic('medium'); onDeleteContext(ctx.id); }}
+                    {...pressProps(() => { haptic('medium'); onDeleteContext(ctx.id); })}
                     className="w-9 h-9 rounded-full flex items-center justify-center bg-white border border-onyx/[0.12] text-graphite hover:text-rose-700 hover:border-rose-200 active:scale-95 transition-all"
                     aria-label={`Eliminar espacio ${ctx.name}`}
                   >
@@ -657,7 +656,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                         </div>
                         {hasSubs && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggle(acc.id); }}
+                            {...pressProps((e) => { e.stopPropagation(); toggle(acc.id); })}
                             className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-stone active:scale-95 transition-all flex-shrink-0 -mr-1"
                             aria-label={isOpen ? 'Colapsar' : 'Expandir'}
                           >
@@ -738,7 +737,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                                         : formatCurrency(0)}
                                   </span>
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); haptic('medium'); onManageSubAccount(ctx.id, acc.id, sub.id); }}
+                                    {...pressProps((e) => { e.stopPropagation(); haptic('medium'); onManageSubAccount(ctx.id, acc.id, sub.id); })}
                                     className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-stone active:scale-90 transition-all"
                                     aria-label={`Gestionar ${sub.name}`}
                                   >
@@ -768,7 +767,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                           );
                         })}
                         <button
-                          onClick={() => { haptic('medium'); onAddSubAccount(ctx.id, acc.id); }}
+                          {...pressProps(() => { haptic('medium'); onAddSubAccount(ctx.id, acc.id); })}
                           className="w-full h-10 border border-dashed border-black/15 text-graphite text-[10px] font-display font-bold uppercase tracking-widest rounded-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-1.5"
                         >
                           <Icons.Plus className="w-3.5 h-3.5" />
@@ -866,7 +865,7 @@ const MobileTransactionsBase: React.FC<TxProps> = ({ state, filteredTransactions
         <div className="flex items-center justify-between mt-3">
           <span className="text-[10px] font-bold uppercase tracking-widest text-graphite">{filtered.length} resultado{filtered.length !== 1 ? 's' : ''}</span>
           <button
-            onClick={() => { haptic('selection'); setIsBulkMode(!isBulkMode); setBulkSelectedTxIds(new Set()); }}
+            {...pressProps(() => { haptic('selection'); setIsBulkMode(!isBulkMode); setBulkSelectedTxIds(new Set()); })}
             className={`text-[10px] font-display font-bold uppercase tracking-widest h-7 px-3 rounded-full ${isBulkMode ? 'bg-rose-700 text-white' : 'bg-white border border-black/10 text-onyx'}`}
           >
             {isBulkMode ? 'Cancelar' : 'Seleccionar'}
@@ -876,7 +875,7 @@ const MobileTransactionsBase: React.FC<TxProps> = ({ state, filteredTransactions
           <div className="flex items-center justify-between mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl">
             <span className="text-[11px] font-bold text-rose-800">{bulkSelectedTxIds.size} seleccionada{bulkSelectedTxIds.size > 1 ? 's' : ''}</span>
             <button
-              onClick={onBulkDelete}
+              {...pressProps(onBulkDelete)}
               className="h-8 px-3 bg-rose-700 text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full"
             >
               Eliminar
@@ -959,7 +958,7 @@ const SpaceFilterChips: React.FC<{ contexts: FinancialContext[]; value: string; 
   <div className="flex items-center gap-1.5 flex-wrap">
     <button
       type="button"
-      onClick={() => { haptic('selection'); onChange('ALL'); }}
+      {...pressProps(() => { haptic('selection'); onChange('ALL'); })}
       className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === 'ALL' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
     >
       Todos
@@ -968,7 +967,7 @@ const SpaceFilterChips: React.FC<{ contexts: FinancialContext[]; value: string; 
       <button
         key={c.id}
         type="button"
-        onClick={() => { haptic('selection'); onChange(c.id); }}
+        {...pressProps(() => { haptic('selection'); onChange(c.id); })}
         className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === c.id ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
       >
         {c.name}
@@ -989,7 +988,7 @@ export const CurrencyFilterChips: React.FC<{ currencies: string[]; value: string
       <div className="flex items-center gap-1.5 flex-wrap">
         <button
           type="button"
-          onClick={() => { haptic('selection'); onChange('ALL'); }}
+          {...pressProps(() => { haptic('selection'); onChange('ALL'); })}
           className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 ${value === 'ALL' ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
         >
           Todas
@@ -998,7 +997,7 @@ export const CurrencyFilterChips: React.FC<{ currencies: string[]; value: string
           <button
             key={cur}
             type="button"
-            onClick={() => { haptic('selection'); onChange(cur); }}
+            {...pressProps(() => { haptic('selection'); onChange(cur); })}
             className={`px-3 h-8 rounded-full text-[10px] font-display font-bold uppercase tracking-widest border transition-all active:scale-95 tabular ${value === cur ? 'bg-onyx text-white border-onyx' : 'bg-white text-onyx border-black/10 hover:border-gold'}`}
           >
             {cur}
@@ -1087,7 +1086,7 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
                 <button
                   key={`overdue-${s.id}`}
                   type="button"
-                  onClick={() => { haptic('selection'); onSubClick(s); }}
+                  {...pressProps(() => { haptic('selection'); onSubClick(s); })}
                   className="w-full flex items-center gap-3 px-4 py-3 active:bg-rose-50 cursor-pointer text-left"
                 >
                   <IconCircle tone="expense" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
@@ -1141,7 +1140,7 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
               <div className="text-sm text-graphite">Sin suscripciones</div>
             )}
           </div>
-          <button onClick={onAddSub} className="mt-4 h-10 px-4 bg-onyx text-white rounded-xl text-[10px] font-display font-bold uppercase tracking-widest hover:bg-graphite transition-colors active:scale-[0.98]">
+          <button {...pressProps(onAddSub)} className="mt-4 h-10 px-4 bg-onyx text-white rounded-xl text-[10px] font-display font-bold uppercase tracking-widest hover:bg-graphite transition-colors active:scale-[0.98]">
             + Nueva
           </button>
         </div>
@@ -1213,7 +1212,7 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
             );
           })}
           <button
-            onClick={() => { haptic('medium'); onAddSub(); }}
+            {...pressProps(() => { haptic('medium'); onAddSub(); })}
             className="w-full h-14 border-2 border-dashed border-black/15 text-graphite text-xs font-display font-bold uppercase tracking-widest rounded-2xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             <Icons.Plus className="w-4 h-4" />
@@ -1340,7 +1339,7 @@ const MobileCategoriesBase: React.FC<CatProps> = ({ state, contextFilter, setCon
         );
       })}
       <button
-        onClick={() => { haptic('medium'); onAddCategory(); }}
+        {...pressProps(() => { haptic('medium'); onAddCategory(); })}
         className="w-full h-14 border-2 border-dashed border-black/15 text-graphite text-xs font-display font-bold uppercase tracking-widest rounded-2xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
       >
         <Icons.Plus className="w-4 h-4" />
@@ -1418,7 +1417,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
               {p.state.user.avatarUrl ? <img src={p.state.user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" /> : p.state.user.name.charAt(0)}
             </div>
             <button
-              onClick={() => { haptic('medium'); document.getElementById('avatar-upload-mobile')?.click(); }}
+              {...pressProps(() => { haptic('medium'); document.getElementById('avatar-upload-mobile')?.click(); })}
               className="absolute -bottom-1 -right-1 w-7 h-7 bg-gold text-onyx rounded-full flex items-center justify-center shadow-md active:scale-95"
               aria-label="Cambiar avatar"
             >
@@ -1536,7 +1535,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
           {CURRENCIES.filter((c) => c.code.toLowerCase().includes(p.currencySearch.toLowerCase()) || c.name.toLowerCase().includes(p.currencySearch.toLowerCase())).map((c) => (
             <button
               key={c.code}
-              onClick={() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, currency: c.code } })); }}
+              {...pressProps(() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, currency: c.code } })); })}
               className={`w-full flex items-center justify-between p-3 rounded-xl ${p.state.user.currency === c.code ? 'bg-onyx text-white' : 'bg-white border border-black/5'}`}
             >
               <div className="flex items-center gap-3">
@@ -1563,7 +1562,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
         </div>
         <div className="space-y-1.5">
           <button
-            onClick={() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } })); }}
+            {...pressProps(() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } })); })}
             className="w-full flex items-center justify-between p-3 rounded-xl bg-white border border-black/5"
           >
             <span className="text-sm text-onyx">Automático (Sistema)</span>
@@ -1572,7 +1571,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
           {p.filteredTimezones.slice(0, 80).map((tz: any) => (
             <button
               key={tz.value}
-              onClick={() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, timezone: tz.value } })); }}
+              {...pressProps(() => { haptic('selection'); p.setState((s) => ({ ...s, user: { ...s.user, timezone: tz.value } })); })}
               className={`w-full text-left p-3 rounded-xl text-sm ${p.state.user.timezone === tz.value ? 'bg-onyx text-white' : 'bg-white border border-black/5 text-onyx'}`}
             >
               {tz.label}
@@ -1596,7 +1595,7 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
                   />
                   {ctx.type === 'BUSINESS' && (
                     <button
-                      onClick={() => { haptic('heavy'); if (confirm('¿Eliminar negocio?')) p.onDeleteContext(ctx.id); }}
+                      {...pressProps(() => { haptic('heavy'); if (confirm('¿Eliminar negocio?')) p.onDeleteContext(ctx.id); })}
                       className="p-2 text-rose-700 active:scale-95"
                       aria-label="Eliminar"
                     >
@@ -1759,9 +1758,9 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
         {pushState === 'denied' ? (
           <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700">Bloqueadas</span>
         ) : pushSubscribed ? (
-          <button onClick={onDisable} disabled={pushBusy} className="h-9 px-4 text-[10px] font-display font-bold uppercase tracking-widest text-onyx border border-black/10 rounded-full active:scale-95">Desactivar</button>
+          <button {...pressProps(onDisable)} disabled={pushBusy} className="h-9 px-4 text-[10px] font-display font-bold uppercase tracking-widest text-onyx border border-black/10 rounded-full active:scale-95">Desactivar</button>
         ) : (
-          <button onClick={onEnable} disabled={pushBusy} className="h-9 px-4 text-[10px] font-display font-bold uppercase tracking-widest bg-onyx text-white rounded-full active:scale-95">Activar</button>
+          <button {...pressProps(onEnable)} disabled={pushBusy} className="h-9 px-4 text-[10px] font-display font-bold uppercase tracking-widest bg-onyx text-white rounded-full active:scale-95">Activar</button>
         )}
       </div>
 
@@ -1807,7 +1806,7 @@ const NotificationSettings: React.FC<{ pushState: string; pushSubscribed: boolea
           </div>
 
           <button
-            onClick={() => { haptic('medium'); showLocalTest('Notificación de Prueba', 'Las notificaciones funcionan correctamente'); }}
+            {...pressProps(() => { haptic('medium'); showLocalTest('Notificación de Prueba', 'Las notificaciones funcionan correctamente'); })}
             className="w-full h-12 bg-stone border border-black/5 rounded-2xl text-sm font-display font-bold uppercase tracking-widest text-onyx active:scale-[0.98] mt-4"
           >
             Enviar Notificación de Prueba
@@ -1825,7 +1824,7 @@ const ToggleRow: React.FC<{ label: string; desc?: string; value: boolean; onChan
       {desc && <div className="text-[11px] text-graphite mt-0.5">{desc}</div>}
     </div>
     <button
-      onClick={() => onChange(!value)}
+      {...pressProps(() => onChange(!value))}
       className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${value ? 'bg-onyx' : 'bg-concrete'}`}
       aria-pressed={value}
     >

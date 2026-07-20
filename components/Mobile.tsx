@@ -7,53 +7,64 @@ import { Icons } from './Icons';
 
 // ─── PULSACIÓN FIABLE ───────────────────────────────────────────────────
 //
-// PROBLEMA: en iOS hay pulsaciones que se pierden. El botón hace su animación
-// de pulsado (eso es CSS puro, no necesita JavaScript) pero la acción no llega a
-// ejecutarse, y hay que volver a tocar. Pasa en muchos botones distintos: la
-// barra inferior, el +, el botón de actualizar... Se descartaron por medición la
-// geometría, el transform del :active, el rendimiento, la caché y las unidades
-// de viewport: ninguna lo explicaba.
+// PROBLEMA: en iOS se perdían pulsaciones. El botón hacía su animación de
+// pulsado (CSS puro, no necesita JavaScript) pero la acción no se ejecutaba y
+// había que volver a tocar. Se descartaron por medición la geometría, el
+// transform del :active, el rendimiento, la caché y las unidades de viewport.
 //
-// SOLUCIÓN: dejar de depender del evento `click`. Cuando levantas el dedo el
-// navegador dispara `pointerup` SIEMPRE, y sólo después SINTETIZA un `click`.
-// Ese click sintetizado es el que se pierde. Así que la acción se dispara en
-// `pointerup`, que es real, y el `click` queda como camino alternativo para
-// ratón y teclado.
+// SOLUCIÓN: no depender del evento `click`. Al levantar el dedo el navegador
+// dispara `pointerup` SIEMPRE y sólo después SINTETIZA un `click`; ese click
+// sintetizado es el que se pierde. La acción se dispara en pointerup, y el click
+// queda como camino para ratón y teclado.
 //
-// Se protege el doble disparo con una ventana de 400 ms: si ya se ejecutó por
-// pointerup, el click posterior se ignora. En una app de dinero, disparar dos
-// veces sería peor que no disparar.
-export const usePress = (onPress?: () => void, disabled?: boolean) => {
-  const est = useRef({ x: 0, y: 0, t: 0, activo: false, ultimo: 0 });
+// pressProps NO es un hook: guarda su estado en un WeakMap por elemento, así que
+// se puede usar dentro de .map(), condicionales o donde haga falta. Ese detalle
+// importa: los botones del desplegable de Acción Rápida se generan en un map y
+// con un hook no habrían podido arreglarse.
+//
+// Uso:  <button {...pressProps(() => hacerAlgo())}>
+const estadoPulsacion = new WeakMap<EventTarget, { x: number; y: number; t: number; activo: boolean; ultimo: number }>();
 
-  const disparar = useCallback(() => {
-    if (disabled || !onPress) return;
-    const ahora = Date.now();
-    if (ahora - est.current.ultimo < 400) return; // ya se ejecutó por el otro camino
-    est.current.ultimo = ahora;
-    onPress();
-  }, [onPress, disabled]);
+const leerEstado = (el: EventTarget) => {
+  let e = estadoPulsacion.get(el);
+  if (!e) { e = { x: 0, y: 0, t: 0, activo: false, ultimo: 0 }; estadoPulsacion.set(el, e); }
+  return e;
+};
 
+export const pressProps = (onPress?: (e?: any) => void, disabled?: boolean) => {
+  if (!onPress || disabled) return {};
   return {
     onPointerDown: (e: React.PointerEvent) => {
-      est.current.x = e.clientX;
-      est.current.y = e.clientY;
-      est.current.t = Date.now();
-      est.current.activo = true;
+      const s = leerEstado(e.currentTarget);
+      s.x = e.clientX; s.y = e.clientY; s.t = Date.now(); s.activo = true;
     },
     onPointerUp: (e: React.PointerEvent) => {
-      if (!est.current.activo) return;
-      est.current.activo = false;
-      // Si el dedo se desplazó mucho fue un arrastre, no una pulsación.
-      if (Math.hypot(e.clientX - est.current.x, e.clientY - est.current.y) > 14) return;
-      if (Date.now() - est.current.t > 900) return; // pulsación larga: se ignora
-      disparar();
+      const s = leerEstado(e.currentTarget);
+      if (!s.activo) return;
+      s.activo = false;
+      // Arrastre, no pulsación.
+      if (Math.hypot(e.clientX - s.x, e.clientY - s.y) > 14) return;
+      if (Date.now() - s.t > 900) return; // pulsación larga
+      s.ultimo = Date.now();
+      // Un botón es un elemento hoja: su pulsación no debe activar también la
+      // fila que lo contiene.
+      e.stopPropagation();
+      onPress(e);
     },
-    onPointerCancel: () => { est.current.activo = false; },
-    // Ratón y teclado (Enter/Espacio) llegan por aquí. El guard evita el doble.
-    onClick: () => { disparar(); },
+    onPointerCancel: (e: React.PointerEvent) => { leerEstado(e.currentTarget).activo = false; },
+    onClick: (e: React.MouseEvent) => {
+      const s = leerEstado(e.currentTarget);
+      // Ya se ejecutó en pointerup: se frena aquí para que el click sintetizado
+      // no vuelva a dispararlo NI burbujee al contenedor.
+      if (Date.now() - s.ultimo < 400) { e.stopPropagation(); return; }
+      s.ultimo = Date.now();
+      onPress(e);
+    },
   };
 };
+
+/** Versión hook, por comodidad donde ya se usaba. */
+export const usePress = (onPress?: () => void, disabled?: boolean) => pressProps(onPress, disabled);
 
 // ─── HAPTICS ────────────────────────────────────────────────────────────
 export const haptic = (style: 'light' | 'medium' | 'heavy' | 'selection' = 'light') => {
@@ -204,7 +215,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ tabs, activeId, 
       {/* Quick action */}
       <div className="px-4 pt-4">
         <button
-          onClick={() => { haptic('medium'); onFabPress(); }}
+          {...pressProps(() => { haptic('medium'); onFabPress(); })}
           className="w-full h-11 bg-onyx text-white text-xs font-display font-bold uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 active:scale-[0.98] hover:bg-graphite transition-all"
         >
           <Plus />
@@ -220,7 +231,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ tabs, activeId, 
           return (
             <button
               key={t.id}
-              onClick={() => { haptic('selection'); onChange(t.id); }}
+              {...pressProps(() => { haptic('selection'); onChange(t.id); })}
               className={`w-full flex items-center gap-3 px-3 h-11 rounded-xl transition-all ${active ? 'bg-stone text-onyx' : 'text-graphite hover:bg-stone/60 hover:text-onyx'}`}
             >
               <Icon className={`w-[18px] h-[18px] ${active ? 'text-gold' : ''}`} />
@@ -234,7 +245,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({ tabs, activeId, 
       {/* User */}
       <div className="px-3 pb-5 pt-3 border-t border-black/5">
         <button
-          onClick={() => { haptic('selection'); onUserClick?.(); }}
+          {...pressProps(() => { haptic('selection'); onUserClick?.(); })}
           className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-stone transition-colors"
         >
           <div className="w-9 h-9 bg-onyx rounded-xl flex items-center justify-center text-white font-display font-bold text-sm overflow-hidden flex-shrink-0">
@@ -399,17 +410,32 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
     if (!vv) return;
 
     const medir = () => {
+      // GUARDA: sólo se considera que hay teclado si de verdad hay un campo
+      // enfocado DENTRO de la hoja. Sin esto, la diferencia entre innerHeight y
+      // el área visible (que incluye la barra de Safari al aparecer o
+      // desaparecer) se tomaba por teclado: la hoja se encogía y se subía sola,
+      // y el usuario veía la parte de abajo cortada sin haber teclado ninguno.
+      const activo = document.activeElement as HTMLElement | null;
+      const escribiendo = !!activo
+        && activo.matches('input, textarea, select, [contenteditable]')
+        && !!scrollRef.current?.contains(activo);
+      if (!escribiendo) { setKeyboardInset(0); return; }
+
       const alto = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      // Por debajo de 80px es ruido (barras del navegador), no el teclado.
-      setKeyboardInset(alto > 80 ? alto : 0);
+      // Por debajo de 120px no es un teclado: es la barra del navegador.
+      setKeyboardInset(alto > 120 ? alto : 0);
     };
 
     vv.addEventListener('resize', medir);
     vv.addEventListener('scroll', medir);
+    document.addEventListener('focusin', medir);
+    document.addEventListener('focusout', medir);
     medir();
     return () => {
       vv.removeEventListener('resize', medir);
       vv.removeEventListener('scroll', medir);
+      document.removeEventListener('focusin', medir);
+      document.removeEventListener('focusout', medir);
       setKeyboardInset(0);
     };
   }, [open]);
@@ -583,7 +609,7 @@ export const FabSheet: React.FC<{ open: boolean; onClose: () => void; actions: {
           return (
             <button
               key={a.id}
-              onClick={() => { haptic('medium'); a.onClick(); onClose(); }}
+              {...pressProps(() => { haptic('medium'); a.onClick(); onClose(); })}
               className={`group flex items-center gap-4 p-4 bg-white border border-black/5 ${toneStyle} hover:border-alloy active:scale-[0.98] transition-all text-left`}
             >
               <div className="w-11 h-11 rounded-xl bg-stone border border-black/5 flex items-center justify-center group-hover:bg-onyx group-hover:text-white transition-colors flex-shrink-0">
@@ -633,7 +659,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             <span className="text-sm flex-1">{t.message}</span>
             {t.action && (
               <button
-                onClick={() => { t.action!.onClick(); setToasts((p) => p.filter((x) => x.id !== t.id)); }}
+                {...pressProps(() => { t.action!.onClick(); setToasts((p) => p.filter((x) => x.id !== t.id)); })}
                 className="text-xs font-bold uppercase tracking-widest text-gold"
               >
                 {t.action.label}
@@ -656,7 +682,7 @@ export const Segmented: React.FC<{ options: { id: string; label: string }[]; act
         return (
           <button
             key={o.id}
-            onClick={() => { haptic('selection'); onChange(o.id); }}
+            {...pressProps(() => { haptic('selection'); onChange(o.id); })}
             className={`flex-1 ${padding} px-3 rounded-full font-medium transition-all uppercase tracking-widest text-center ${active ? 'bg-white text-onyx shadow-sm' : 'text-graphite'}`}
           >
             {o.label}
@@ -769,7 +795,7 @@ export const EmptyState: React.FC<{ icon: React.ComponentType<{ className?: stri
     {description && <p className="text-sm text-graphite max-w-[280px]">{description}</p>}
     {action && (
       <button
-        onClick={() => { haptic('medium'); action.onClick(); }}
+        {...pressProps(() => { haptic('medium'); action.onClick(); })}
         className="mt-5 px-5 h-10 bg-onyx text-white text-xs font-display font-bold uppercase tracking-widest rounded-xl active:scale-95 transition-transform"
       >
         {action.label}
@@ -832,7 +858,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({ label, placeholder = '
       {label && <label className="block text-[10px] font-bold uppercase tracking-widest text-graphite mb-2">{label}</label>}
       <button
         type="button"
-        onClick={() => { haptic('selection'); setOpen(true); }}
+        {...pressProps(() => { haptic('selection'); setOpen(true); })}
         className="w-full h-12 px-4 bg-white border border-onyx/[0.22] rounded-xl flex items-center justify-between gap-3 text-left active:scale-[0.99] hover:border-onyx/[0.34] focus:border-alloy focus:ring-[3px] focus:ring-alloy/20 outline-none transition-all"
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -880,7 +906,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({ label, placeholder = '
                         key={o.value}
                         type="button"
                         disabled={o.disabled}
-                        onClick={() => { haptic('selection'); onChange(o.value); setOpen(false); setSearch(''); }}
+                        {...pressProps(() => { haptic('selection'); onChange(o.value); setOpen(false); setSearch(''); })}
                         className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left active:scale-[0.99] ${
                           isActive ? 'bg-onyx text-white' : o.disabled ? 'bg-stone/40 text-graphite/40 cursor-not-allowed' : 'bg-white border border-black/5 hover:border-onyx'
                         }`}

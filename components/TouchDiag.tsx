@@ -7,6 +7,7 @@
 // no se reproduce en emuladores.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { pressProps } from './Mobile';
 import { Icons } from './Icons';
 
 interface Toque {
@@ -88,7 +89,7 @@ export const TouchDiag: React.FC = () => {
 
   const Tab = ({ id }: { id: string }) => (
     <button
-      onTouchStart={onStart(id)} onTouchEnd={onEnd()} onClick={onClick}
+      onTouchStart={onStart(id)} onTouchEnd={onEnd()} {...pressProps(onClick)}
       className="flex-1 flex flex-col items-center justify-end py-2 px-1 min-h-[52px] rounded-xl touch-manipulation active:bg-stone active:scale-95 transition-[transform,background-color] duration-75"
     >
       <Icons.Dashboard className="w-[22px] h-[22px] text-graphite" />
@@ -144,7 +145,7 @@ export const TouchDiag: React.FC = () => {
             <div className="flex items-end justify-around relative">
               <Tab id="T1" /><Tab id="T2" />
               <button
-                onTouchStart={onStart('FAB +')} onTouchEnd={onEnd()} onClick={onClick}
+                onTouchStart={onStart('FAB +')} onTouchEnd={onEnd()} {...pressProps(onClick)}
                 aria-label="Acciones rápidas"
                 className="group flex-1 flex items-center justify-center -mt-9 relative z-20 w-[72px] h-[72px] touch-manipulation bg-transparent"
               >

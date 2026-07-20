@@ -12,7 +12,7 @@ import { BrandLoader } from './BrandLoader';
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.07.20.7';
+export const APP_VERSION = '2026.07.20.8';
 
 interface ChangeEntry {
   version: string;
@@ -24,9 +24,11 @@ interface ChangeEntry {
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
   {
-    version: '2026.07.20.7',
+    version: '2026.07.20.8',
     date: '20 jul 2026',
     items: [
+      'Los 106 botones de la app usan ya el sistema de pulsación fiable, no solo unos pocos',
+      'Arreglado el corte de abajo en los formularios de Acción Rápida',
       'ARREGLADO: los botones ya no se comen pulsaciones. Ahora la acción se dispara al levantar el dedo, no con el clic que el móvil se inventaba después',
       'Botón + de vuelta en su sitio (lo había descuadrado)',
       'Los botones responden al instante: se acabó tener que tocar dos veces',

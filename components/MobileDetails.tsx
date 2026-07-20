@@ -5,7 +5,7 @@
 import React from 'react';
 import { AppState, Transaction, Subscription, Category } from '../types';
 import { Icons } from './Icons';
-import { BottomSheet, IconCircle, PressButton, haptic } from './Mobile';
+import { BottomSheet, IconCircle, PressButton, haptic, pressProps} from './Mobile';
 import { formatIntervalLabel } from '../utils/subscriptions';
 import { isPaymentGoal, goalPaid, goalRemaining, goalProgress } from '../utils/goals';
 
@@ -719,7 +719,7 @@ export const TrashSheet: React.FC<CommonProps & {
                   </div>
                 </div>
                 <button
-                  onClick={() => { haptic('medium'); onRestore(tx.id); }}
+                  {...pressProps(() => { haptic('medium'); onRestore(tx.id); })}
                   className="h-9 px-3 bg-onyx text-white text-[10px] font-display font-bold uppercase tracking-widest rounded-full active:scale-95 hover:bg-graphite transition-colors flex-shrink-0 flex items-center gap-1.5"
                 >
                   <Icons.Refresh className="w-3 h-3" />

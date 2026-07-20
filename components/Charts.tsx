@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { pressProps } from './Mobile';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar, LabelList,
@@ -345,12 +346,12 @@ export const ExpenseBreakdown: React.FC<{ transactions: Transaction[], categorie
                   <button
                     key={d.categoryId}
                     type="button"
-                    onClick={() => onDrill?.({
+                    {...pressProps(() => onDrill?.({
                       title: d.name,
                       subtitle: `${cur} · ${d.percent}% del total`,
                       transactions: list.filter((t) => t.categoryId === d.categoryId),
                       currency: cur,
-                    })}
+                    }))}
                     className="w-full flex items-center justify-between py-1.5 px-1 hover:bg-stone/50 rounded-md transition-colors"
                   >
                     <div className="flex items-center gap-2 min-w-0">
@@ -414,7 +415,7 @@ export const FinancialCalendar: React.FC<{ transactions: Transaction[], subscrip
       <button
         key={d}
         type="button"
-        onClick={() => {
+        {...pressProps(() => {
           if (!hasActivity) return;
           onDrill?.({
             title: `Día ${dateStr}`,
@@ -423,7 +424,7 @@ export const FinancialCalendar: React.FC<{ transactions: Transaction[], subscrip
             subscriptions: daySubs,
             currency,
           });
-        }}
+        })}
         className={`min-h-[48px] md:min-h-[80px] bg-white border border-black/5 rounded p-1.5 text-left active:scale-[0.98] transition-all ${isToday ? 'ring-2 ring-gold' : ''} ${hasActivity ? 'hover:border-onyx cursor-pointer' : 'cursor-default'}`}
       >
         <div className={`text-[10px] font-bold ${isToday ? 'text-gold' : 'text-graphite'}`}>{d}</div>
@@ -444,10 +445,10 @@ export const FinancialCalendar: React.FC<{ transactions: Transaction[], subscrip
           <p className="text-[10px] text-graphite uppercase tracking-widest mt-1">{monthName}</p>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={handlePrev} className="w-9 h-9 rounded-full bg-stone hover:bg-concrete flex items-center justify-center active:scale-95">
+          <button {...pressProps(handlePrev)} className="w-9 h-9 rounded-full bg-stone hover:bg-concrete flex items-center justify-center active:scale-95">
             <Icons.ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={handleNext} className="w-9 h-9 rounded-full bg-stone hover:bg-concrete flex items-center justify-center active:scale-95">
+          <button {...pressProps(handleNext)} className="w-9 h-9 rounded-full bg-stone hover:bg-concrete flex items-center justify-center active:scale-95">
             <Icons.ChevronRight className="w-4 h-4" />
           </button>
         </div>

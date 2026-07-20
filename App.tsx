@@ -22,6 +22,7 @@ import {
   useToast,
   haptic,
   PullToRefresh,
+  pressProps,
 } from './components/Mobile';
 import {
   MobileDashboard,
@@ -1576,7 +1577,7 @@ function App() {
             Tus datos están seguros. Al renovar, recuperarás acceso completo.
           </p>
           <button
-            onClick={() => { supabase.auth.signOut(); }}
+            {...pressProps(() => { supabase.auth.signOut(); })}
             className="mt-5 text-[10px] text-graphite hover:text-onyx uppercase tracking-widest font-bold transition-colors"
           >
             Cerrar Sesión
@@ -1690,7 +1691,7 @@ function App() {
         <MobileHeader
           {...hc}
           leading={
-            <button onClick={() => haptic('light')} className="p-1 active:scale-95 transition-transform lg:hidden">
+            <button {...pressProps(() => haptic('light'))} className="p-1 active:scale-95 transition-transform lg:hidden">
               <img src={WHITEVAULT_ISOTYPE} alt="WhiteVault" className="w-7 h-7 object-contain" />
             </button>
           }
@@ -1756,7 +1757,7 @@ function App() {
                   {([['CUENTAS', 'Cuentas'], ['GOALS', 'Metas y Objetivos']] as const).map(([id, label]) => (
                     <button
                       key={id}
-                      onClick={() => { haptic('selection'); setAccountsTab(id); }}
+                      {...pressProps(() => { haptic('selection'); setAccountsTab(id); })}
                       className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
                         accountsTab === id ? 'bg-onyx text-white' : 'bg-white border border-onyx/[0.12] text-graphite'
                       }`}
@@ -1913,14 +1914,14 @@ function App() {
             so it dismisses reliably (drag/backdrop/back-arrow). */}
         <BottomSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="Otras Secciones" subtitle="Más">
           <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => { setMoreOpen(false); setCurrentView('CATEGORIES'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
+            <button {...pressProps(() => { setMoreOpen(false); setCurrentView('CATEGORIES'); haptic('selection'); })} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
               <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
                 <Icons.Category className="w-5 h-5 text-onyx" />
               </div>
               <div className="text-sm font-display font-bold text-onyx">Categorías</div>
               <div className="text-[10px] text-graphite mt-0.5">{state.categories.length} categorías</div>
             </button>
-            <button onClick={() => { setMoreOpen(false); setCurrentView('SETTINGS'); haptic('selection'); }} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
+            <button {...pressProps(() => { setMoreOpen(false); setCurrentView('SETTINGS'); haptic('selection'); })} className="bg-white border border-black/5 rounded-2xl p-5 active:scale-[0.97] transition-transform text-left">
               <div className="w-10 h-10 rounded-xl bg-stone border border-black/5 flex items-center justify-center mb-3">
                 <Icons.Settings className="w-5 h-5 text-onyx" />
               </div>

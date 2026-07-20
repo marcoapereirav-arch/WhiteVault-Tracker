@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { pressProps } from './Mobile';
 import { FinancialContext, Account, SubAccount } from '../types';
 import { Icons } from './Icons';
 import { balanceEntries, getActiveCurrencies, getTotalsByCurrency } from '../utils/balances';
@@ -108,7 +109,7 @@ export const AccountsView: React.FC<Props> = ({
                             <div className="space-y-2 mb-4">
                                 {hasBalance && activeCurrencies.length === 1 && (
                                     <button
-                                        onClick={() => onDistributeIncome(context.id, activeCurrencies[0])}
+                                        {...pressProps(() => onDistributeIncome(context.id, activeCurrencies[0]))}
                                         className="w-full py-2 bg-onyx text-white text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors flex items-center justify-center gap-2"
                                     >
                                         <Icons.Transfer className="w-3 h-3" /> Distribuir Fondos
@@ -126,7 +127,7 @@ export const AccountsView: React.FC<Props> = ({
                                 {/* Undo Button */}
                                 {canUndo && (
                                     <button
-                                        onClick={onUndoDistribution}
+                                        {...pressProps(onUndoDistribution)}
                                         className="w-full py-2 bg-white border border-red-200 text-red-600 text-[10px] font-bold uppercase tracking-widest hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
                                     >
                                         <Icons.Transfer className="w-3 h-3 rotate-180" /> Deshacer Distribucion (Control Z)
@@ -166,7 +167,7 @@ export const AccountsView: React.FC<Props> = ({
 
                         <div className="mt-6 flex justify-end opacity-0 group-hover/card:opacity-100 transition-opacity">
                             <button
-                                onClick={() => onAddSubAccount?.(context.id, account.id)}
+                                {...pressProps(() => onAddSubAccount?.(context.id, account.id))}
                                 className="text-[10px] text-alloy font-bold uppercase tracking-widest hover:text-gold flex items-center gap-1"
                             >
                                 <Icons.Plus className="w-3 h-3"/> Añadir Sub-cuenta
@@ -197,7 +198,7 @@ const CurrencyDistributeButtons: React.FC<{
             {currencies.map(cur => (
                 <button
                     key={cur}
-                    onClick={() => onDistribute(contextId, cur)}
+                    {...pressProps(() => onDistribute(contextId, cur))}
                     className="w-full py-2 bg-onyx text-white text-[10px] font-bold uppercase tracking-widest hover:bg-gold transition-colors flex items-center justify-center gap-2"
                 >
                     <Icons.Transfer className="w-3 h-3" /> {cur} ({formatCurrency(balances[cur], cur)})

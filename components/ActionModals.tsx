@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Icons } from './Icons';
 import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
-import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic } from './Mobile';
+import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic, pressProps} from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
 import { formatIntervalLabel } from '../utils/subscriptions';
 
@@ -116,7 +116,7 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
                 <button 
                     key={i} 
                     type="button"
-                    onClick={(e) => { e.preventDefault(); handleDayClick(dayNumber); }}
+                    {...pressProps((e) => { e.preventDefault(); handleDayClick(dayNumber); })}
                     className={`
                         h-9 w-9 text-xs font-bold rounded-full flex items-center justify-center transition-all
                         ${isSelected ? 'bg-alloy text-white shadow-md scale-110' : 'text-onyx hover:bg-stone'}
@@ -153,10 +153,10 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
                         {MONTHS[currentMonth]} <span className="text-alloy">{currentYear}</span>
                     </span>
                     <div className="flex gap-1">
-                        <button type="button" onClick={handlePrevMonth} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <button type="button" {...pressProps(handlePrevMonth)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
                         </button>
-                        <button type="button" onClick={handleNextMonth} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                        <button type="button" {...pressProps(handleNextMonth)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         </button>
                     </div>
@@ -198,14 +198,14 @@ const DateTimePicker: React.FC<DateTimePickerProps> = ({ value, onChange, onCanc
                 <div className="p-4 bg-stone border-t border-black/5 flex gap-3">
                     <button 
                         type="button" 
-                        onClick={onCancel}
+                        {...pressProps(onCancel)}
                         className="flex-1 py-3 bg-white border border-black/10 text-graphite font-bold uppercase tracking-widest text-xs rounded hover:bg-gray-50 transition-colors"
                     >
                         Cancelar
                     </button>
                     <button 
                         type="button" 
-                        onClick={handleConfirm}
+                        {...pressProps(handleConfirm)}
                         className="flex-1 py-3 bg-onyx text-white font-bold uppercase tracking-widest text-xs rounded hover:bg-graphite transition-colors shadow-lg shadow-onyx/20"
                     >
                         Listo
@@ -302,7 +302,7 @@ export const Input = (props: any) => {
 
                     <button
                         type="button"
-                        onClick={() => setPickerOpen(true)}
+                        {...pressProps(() => setPickerOpen(true))}
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-graphite hover:text-alloy transition-colors z-10 cursor-pointer p-1"
                     >
                         <Icons.Calendar className="w-5 h-5" />
@@ -482,7 +482,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                         <div className={`w-full rounded-2xl flex items-stretch gap-2 transition-all ${linkedSub ? 'bg-onyx text-white border border-onyx' : 'bg-gold/10 border border-gold/30'}`}>
                             <button
                                 type="button"
-                                onClick={() => setSubPickerOpen(true)}
+                                {...pressProps(() => setSubPickerOpen(true))}
                                 className="flex-1 min-w-0 h-14 px-4 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
                             >
                                 <IconCircle tone="gold" size="sm"><Icons.Subscription className="w-3.5 h-3.5" /></IconCircle>
@@ -504,7 +504,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                             {linkedSub && (
                                 <button
                                     type="button"
-                                    onClick={() => setLinkedSubscriptionId('')}
+                                    {...pressProps(() => setLinkedSubscriptionId(''))}
                                     className="h-14 px-4 text-[10px] font-bold uppercase tracking-widest text-rose-300 hover:text-rose-200 active:scale-95 transition-transform"
                                     aria-label="Quitar suscripción"
                                 >
@@ -631,7 +631,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                             <button
                                 key={s.id}
                                 type="button"
-                                onClick={() => { applySubscription(s); setSubPickerOpen(false); }}
+                                {...pressProps(() => { applySubscription(s); setSubPickerOpen(false); })}
                                 className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all active:scale-[0.99] text-left ${isSelected ? 'bg-onyx text-white' : 'bg-white border border-black/5 hover:border-onyx'}`}
                             >
                                 <IconCircle tone="gold" size="md"><Icons.Subscription className="w-4 h-4" /></IconCircle>
@@ -965,7 +965,7 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
                             <button
                                 key={k}
                                 type="button"
-                                onClick={() => setKind(k)}
+                                {...pressProps(() => setKind(k))}
                                 className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
                                     kind === k ? 'bg-onyx text-white' : 'bg-stone text-graphite'
                                 }`}
@@ -1069,7 +1069,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                     <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Etiqueta de Color</label>
                     <div className="flex gap-3 flex-wrap">
                         {colors.map(c => (
-                            <button key={c} type="button" onClick={() => setColor(c)} 
+                            <button key={c} type="button" {...pressProps(() => setColor(c))} 
                                 className={`w-8 h-8 rounded-full border border-black/10 transition-transform ${color === c ? 'scale-110 ring-2 ring-alloy ring-offset-2' : ''}`} 
                                 style={{ backgroundColor: c }} />
                         ))}
@@ -1269,8 +1269,8 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                 <div className="mb-5">
                      <label className="block text-xs font-bold text-graphite uppercase tracking-wider mb-2">Estado</label>
                      <div className="flex gap-4">
-                         <button type="button" onClick={() => setActive(true)} className={`px-4 py-2 text-xs font-bold uppercase ${active ? 'bg-green-100 text-green-800' : 'bg-stone text-gray-500'}`}>Activo</button>
-                         <button type="button" onClick={() => setActive(false)} className={`px-4 py-2 text-xs font-bold uppercase ${!active ? 'bg-red-100 text-red-800' : 'bg-stone text-gray-500'}`}>Pausado</button>
+                         <button type="button" {...pressProps(() => setActive(true))} className={`px-4 py-2 text-xs font-bold uppercase ${active ? 'bg-green-100 text-green-800' : 'bg-stone text-gray-500'}`}>Activo</button>
+                         <button type="button" {...pressProps(() => setActive(false))} className={`px-4 py-2 text-xs font-bold uppercase ${!active ? 'bg-red-100 text-red-800' : 'bg-stone text-gray-500'}`}>Pausado</button>
                      </div>
                 </div>
 
@@ -1380,7 +1380,7 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                         {Number(initialBalance) > 0 && !distributed && (
                             <button 
                                 type="button"
-                                onClick={() => setDistributed(true)}
+                                {...pressProps(() => setDistributed(true))}
                                 className="px-6 py-4 bg-alloy text-white font-display font-bold tracking-wide hover:bg-onyx transition-colors"
                             >
                                 Distribuir
@@ -1389,7 +1389,7 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                         {Number(initialBalance) > 0 && distributed && (
                             <button 
                                 type="button"
-                                onClick={() => setDistributed(false)}
+                                {...pressProps(() => setDistributed(false))}
                                 className="px-6 py-4 bg-stone text-onyx font-display font-bold tracking-wide hover:bg-black/5 transition-colors border border-black/5"
                             >
                                 Deshacer

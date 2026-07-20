@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Icons } from './Icons';
-import { haptic } from './Mobile';
+import { haptic, pressProps} from './Mobile';
 
 interface AuthProps {
   onLogin: () => void;
@@ -133,7 +133,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
             <div className="text-center pt-2">
               <button
                 type="button"
-                onClick={() => { setIsForgotPassword(false); setError(null); setSuccessMessage(null); }}
+                {...pressProps(() => { setIsForgotPassword(false); setError(null); setSuccessMessage(null); })}
                 className="text-xs text-graphite hover:text-onyx transition-colors"
               >
                 ← Volver a iniciar sesión
@@ -174,7 +174,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
+                    {...pressProps(() => setShowPassword(!showPassword))}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-graphite hover:text-onyx"
                     aria-label="Mostrar/ocultar contraseña"
                   >
@@ -196,7 +196,7 @@ export const Auth = ({ onLogin }: AuthProps) => {
             </form>
             <div className="mt-5 text-center">
               <button
-                onClick={() => { setIsForgotPassword(true); setError(null); setSuccessMessage(null); }}
+                {...pressProps(() => { setIsForgotPassword(true); setError(null); setSuccessMessage(null); })}
                 className="text-xs text-graphite hover:text-onyx transition-colors"
               >
                 ¿Olvidaste tu contraseña?

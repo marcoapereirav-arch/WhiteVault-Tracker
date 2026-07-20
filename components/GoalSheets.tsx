@@ -6,7 +6,7 @@
 import React, { useState } from 'react';
 import { AppState, SubAccount, GoalKind } from '../types';
 import { Icons } from './Icons';
-import { BottomSheet, PressButton, haptic } from './Mobile';
+import { BottomSheet, PressButton, haptic, pressProps} from './Mobile';
 import {
   goalKindOf,
   goalPaid,
@@ -104,7 +104,7 @@ export const ManageSubAccountSheet: React.FC<{
         {([null, 'SAVING', 'PAYMENT'] as const).map((k) => (
           <button
             key={String(k)}
-            onClick={() => cambiarTipo(k)}
+            {...pressProps(() => cambiarTipo(k))}
             className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
               kind === k ? 'bg-onyx text-white' : 'bg-stone text-graphite'
             }`}
@@ -144,7 +144,7 @@ export const ManageSubAccountSheet: React.FC<{
             {[null, 1, 2, 3, 4].map((p) => (
               <button
                 key={String(p)}
-                onClick={() => { haptic('selection'); onUpdate({ priority: p }); }}
+                {...pressProps(() => { haptic('selection'); onUpdate({ priority: p }); })}
                 className={`h-10 rounded-xl text-xs font-display font-bold transition-all active:scale-95 ${
                   (sub.priority ?? null) === p ? 'bg-gold text-onyx' : 'bg-stone text-graphite'
                 }`}
@@ -162,7 +162,7 @@ export const ManageSubAccountSheet: React.FC<{
           <label className="block text-[10px] font-display font-bold uppercase tracking-widest text-graphite mb-1.5">Estado</label>
           <div className="grid grid-cols-2 gap-2 mb-5">
             <button
-              onClick={() => { haptic('medium'); onUpdate({ completedAt: null }); }}
+              {...pressProps(() => { haptic('medium'); onUpdate({ completedAt: null }); })}
               className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
                 !sub.completedAt ? 'bg-onyx text-white' : 'bg-stone text-graphite'
               }`}
@@ -170,7 +170,7 @@ export const ManageSubAccountSheet: React.FC<{
               Pendiente
             </button>
             <button
-              onClick={() => { haptic('medium'); onUpdate({ completedAt: new Date().toISOString() }); }}
+              {...pressProps(() => { haptic('medium'); onUpdate({ completedAt: new Date().toISOString() }); })}
               className={`h-11 rounded-xl text-xs font-display font-bold uppercase tracking-wider transition-all active:scale-95 ${
                 sub.completedAt ? 'bg-emerald-700 text-white' : 'bg-stone text-graphite'
               }`}
@@ -207,7 +207,7 @@ export const ManageSubAccountSheet: React.FC<{
       {/* Borrar */}
       {!confirmarBorrado ? (
         <button
-          onClick={() => { haptic('medium'); setConfirmarBorrado(true); }}
+          {...pressProps(() => { haptic('medium'); setConfirmarBorrado(true); })}
           className="w-full h-12 text-rose-700 text-xs font-display font-bold uppercase tracking-widest rounded-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
         >
           <Icons.Trash className="w-4 h-4" />
@@ -222,13 +222,13 @@ export const ManageSubAccountSheet: React.FC<{
           </p>
           <div className="flex gap-2">
             <button
-              onClick={() => setConfirmarBorrado(false)}
+              {...pressProps(() => setConfirmarBorrado(false))}
               className="flex-1 h-11 bg-white text-graphite text-xs font-display font-bold uppercase tracking-widest rounded-xl active:scale-95"
             >
               Cancelar
             </button>
             <button
-              onClick={() => { haptic('heavy'); onDelete(); onClose(); }}
+              {...pressProps(() => { haptic('heavy'); onDelete(); onClose(); })}
               className="flex-1 h-11 bg-rose-700 text-white text-xs font-display font-bold uppercase tracking-widest rounded-xl active:scale-95"
             >
               Eliminar
@@ -314,7 +314,7 @@ export const GoalArchiveSheet: React.FC<{
             return (
               <div key={sub.id} className="bg-stone rounded-2xl overflow-hidden">
                 <button
-                  onClick={() => { haptic('selection'); setAbierto(isOpen ? null : sub.id); }}
+                  {...pressProps(() => { haptic('selection'); setAbierto(isOpen ? null : sub.id); })}
                   className="w-full px-4 py-3.5 flex items-center gap-3 text-left active:bg-black/5 transition-colors"
                 >
                   <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
