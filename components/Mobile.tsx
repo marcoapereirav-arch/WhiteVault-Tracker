@@ -543,7 +543,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
           className={`${isVisible ? 'pointer-events-auto' : 'pointer-events-none'} bg-stone ${sizeClass} flex flex-col rounded-t-[28px] shadow-[0_-12px_40px_rgba(0,0,0,0.18)] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${isVisible ? 'translate-y-0' : 'translate-y-full'}`}
           style={{
             // Con el teclado fuera, el safe-area lo pone el contenedor (bottom).
-            paddingBottom: keyboardInset > 0 ? 0 : 'max(env(safe-area-inset-bottom), 8px)',
+            paddingBottom: 0,
             // El alto disponible se reduce por el hueco del teclado, pero SIN
             // pisar el tope propio de cada tamaño (auto / half / full).
             maxHeight: keyboardInset > 0
@@ -582,7 +582,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
 
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-6"
+            className="flex-1 overflow-y-auto overscroll-contain px-6 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]"
             // Colchón extra para que el último campo pueda subir por encima del
             // teclado en lugar de quedarse pegado al borde.
             style={keyboardInset > 0 ? { paddingBottom: 24 + keyboardInset * 0.35 } : undefined}
