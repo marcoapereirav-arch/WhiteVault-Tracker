@@ -91,25 +91,22 @@
 
     <script>
       // Register service worker (PWA + push) with auto-update
+      // El service worker lo registra la app (lib/push.ts -> registerServiceWorker),
+      // atándolo a APP_VERSION para que las cachés de versiones viejas se purguen.
+      // AQUÍ NO se registra: dos registros para el mismo scope compiten entre sí y
+      // ganaba el de aquí, que iba sin versión, dejando las cachés eternas.
+      //
+      // Lo único que se hace aquí es pedirle al navegador que compruebe si hay una
+      // versión nueva cada vez que se vuelve a la app.
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(function (reg) {
-            // Check for updates whenever the user returns to the app
-            const checkForUpdate = function () { reg.update().catch(function () {}); };
-            window.addEventListener('focus', checkForUpdate);
-            document.addEventListener('visibilitychange', function () {
-              if (document.visibilityState === 'visible') checkForUpdate();
-            });
-            // When a new SW takes over, reload once so the new bundle is in use
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-              if (refreshing) return;
-              refreshing = true;
-              window.location.reload();
-            });
-          }).catch(function (err) {
-            console.warn('[wv] SW registration failed', err);
-          });
+        var comprobarActualizacion = function () {
+          navigator.serviceWorker.getRegistration().then(function (reg) {
+            if (reg) reg.update().catch(function () {});
+          }).catch(function () {});
+        };
+        window.addEventListener('focus', comprobarActualizacion);
+        document.addEventListener('visibilitychange', function () {
+          if (document.visibilityState === 'visible') comprobarActualizacion();
         });
       }
     </script>

@@ -21,15 +21,70 @@ export const getPermissionState = (): PushPermissionState => {
   return Notification.permission as PushPermissionState;
 };
 
-export const registerServiceWorker = async (): Promise<ServiceWorkerRegistration | null> => {
+/**
+ * Registra el service worker atándolo a la versión de la app.
+ *
+ * La versión viaja en la URL (/sw.js?v=2026.07.20). Al cambiar la URL, el
+ * navegador lo trata como un worker distinto y lo instala; dentro, el SW lee esa
+ * versión para nombrar sus cachés, así que las de la versión anterior se borran
+ * en el activate. Sin esto las cachés eran eternas y la app se quedaba clavada
+ * en una versión antigua para siempre.
+ */
+export const registerServiceWorker = async (version?: string): Promise<ServiceWorkerRegistration | null> => {
   if (!('serviceWorker' in navigator)) return null;
   try {
-    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    const url = version ? `/sw.js?v=${encodeURIComponent(version)}` : '/sw.js';
+    const reg = await navigator.serviceWorker.register(url, { scope: '/' });
+
+    // Limpieza de una vez: cualquier OTRO registro (el antiguo sin versión, o de
+    // una versión previa) se da de baja. Si no, el viejo sigue controlando la
+    // página y sirviendo su caché eterna aunque el nuevo esté instalado.
+    // Nunca se toca el registro que acabamos de crear.
+    if (version) {
+      const todos = await navigator.serviceWorker.getRegistrations();
+      for (const r of todos) {
+        if (r === reg) continue;
+        await r.unregister().catch(() => {});
+      }
+    }
+
+    // Si hay una versión nueva esperando, se activa sin esperar a que el usuario
+    // cierre todas las pestañas.
+    if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+    reg.addEventListener('updatefound', () => {
+      const nuevo = reg.installing;
+      if (!nuevo) return;
+      nuevo.addEventListener('statechange', () => {
+        if (nuevo.state === 'installed' && navigator.serviceWorker.controller) {
+          nuevo.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    });
+
     await navigator.serviceWorker.ready;
+    reg.update().catch(() => {});
     return reg;
   } catch (err) {
     console.warn('[push] SW registration failed', err);
     return null;
+  }
+};
+
+/**
+ * Borra TODAS las cachés que no sean de la versión actual, incluidas las que
+ * dejó el service worker antiguo (wv-shell-wv-v1.0.0 y compañía), que nunca se
+ * purgaban solas.
+ */
+export const purgarCachesViejas = async (version: string): Promise<number> => {
+  if (!('caches' in window)) return 0;
+  try {
+    const keys = await caches.keys();
+    const validas = [`wv-shell-${version}`, `wv-runtime-${version}`];
+    const aBorrar = keys.filter((k) => !validas.includes(k));
+    await Promise.all(aBorrar.map((k) => caches.delete(k)));
+    return aBorrar.length;
+  } catch {
+    return 0;
   }
 };
 

@@ -45,9 +45,9 @@ import {
 } from './components/MobileDetails';
 import { ManageSubAccountSheet, GoalCreditSheet, GoalArchiveSheet } from './components/GoalSheets';
 import { GoalsOverview } from './components/GoalsOverview';
-import { registerServiceWorker, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
+import { registerServiceWorker, purgarCachesViejas, isPushSupported, getPermissionState, getCurrentSubscription, subscribeToPush } from './lib/push';
 import { advanceSubscriptionRenewal } from './utils/subscriptions';
-import { UpdatePopup } from './components/UpdatePopup';
+import { UpdatePopup, APP_VERSION } from './components/UpdatePopup';
 import { BrandLoader } from './components/BrandLoader';
 
 type View = 'DASHBOARD' | 'ACCOUNTS' | 'TRANSACTIONS' | 'SUBSCRIPTIONS' | 'CATEGORIES' | 'SETTINGS';
@@ -1462,7 +1462,24 @@ function App() {
 
   // ─── PWA / Push bootstrap ──────────────────────────────────────────
   useEffect(() => {
-    registerServiceWorker();
+    // El SW se registra atado a APP_VERSION y se purgan las cachés de versiones
+    // anteriores. Sin esto la app se quedaba servida desde una caché eterna y
+    // los despliegues nuevos no llegaban nunca al móvil.
+    registerServiceWorker(APP_VERSION);
+    purgarCachesViejas(APP_VERSION);
+
+    // Si el service worker que controla la página cambia (ha entrado una versión
+    // nueva), se recarga una sola vez para empezar a usarla de verdad.
+    if ('serviceWorker' in navigator) {
+      let recargando = false;
+      const alCambiar = () => {
+        if (recargando) return;
+        recargando = true;
+        window.location.reload();
+      };
+      navigator.serviceWorker.addEventListener('controllerchange', alCambiar);
+      return () => navigator.serviceWorker.removeEventListener('controllerchange', alCambiar);
+    }
   }, []);
 
   useEffect(() => {
