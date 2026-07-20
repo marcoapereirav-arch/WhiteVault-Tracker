@@ -210,7 +210,10 @@ const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void
       onClick={() => { haptic('selection'); onClick(); }}
       // min-h-[52px] + touch-manipulation: zona de toque cómoda y sin el
       // retardo de doble-tap de iOS.
-      className="flex-1 flex flex-col items-center justify-end py-2 px-1 min-h-[52px] touch-manipulation active:scale-95 transition-transform"
+      // active:bg-stone además del scale: iOS NO soporta navigator.vibrate, así
+      // que el haptic no hace nada ahí. Sin un cambio de color visible el
+      // usuario no sabe si el toque entró y acaba pulsando varias veces.
+      className="flex-1 flex flex-col items-center justify-end py-2 px-1 min-h-[52px] rounded-xl touch-manipulation active:bg-stone active:scale-95 transition-[transform,background-color] duration-75"
       aria-current={active ? 'page' : undefined}
     >
       <div className={`relative w-7 h-7 flex items-center justify-center transition-all ${active ? 'text-onyx' : 'text-graphite/60'}`}>
@@ -233,13 +236,43 @@ const FabButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
     <div className="flex-1 flex items-center justify-center -mt-7 relative z-10 pointer-events-auto">
       <button
         onClick={() => { haptic('medium'); onClick(); }}
-        className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:scale-90 transition-transform border-[3px] border-stone pointer-events-auto touch-manipulation"
+        className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:scale-90 active:bg-graphite transition-[transform,background-color] duration-75 border-[3px] border-stone pointer-events-auto touch-manipulation"
         aria-label="Acciones rápidas"
       >
         <Icons.Plus className="w-6 h-6" />
       </button>
     </div>
   );
+};
+
+// ─── BLOQUEO DE SCROLL COMPARTIDO ───────────────────────────────────────
+// Estado a nivel de módulo: lo comparten TODAS las hojas. Ver el comentario en
+// el efecto de BottomSheet para el porqué.
+let hojasAbiertas = 0;
+let scrollGuardado = 0;
+
+const bloquearScroll = () => {
+  hojasAbiertas += 1;
+  if (hojasAbiertas > 1) return; // ya estaba bloqueado por una hoja de fuera
+  scrollGuardado = window.scrollY;
+  const body = document.body;
+  body.style.position = 'fixed';
+  body.style.top = `-${scrollGuardado}px`;
+  body.style.left = '0';
+  body.style.right = '0';
+  body.style.width = '100%';
+};
+
+const desbloquearScroll = () => {
+  hojasAbiertas = Math.max(0, hojasAbiertas - 1);
+  if (hojasAbiertas > 0) return; // quedan hojas abiertas: sigue bloqueado
+  const body = document.body;
+  body.style.position = '';
+  body.style.top = '';
+  body.style.left = '';
+  body.style.right = '';
+  body.style.width = '';
+  window.scrollTo(0, scrollGuardado);
 };
 
 // ─── BOTTOM SHEET ───────────────────────────────────────────────────────
@@ -262,28 +295,21 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
   const currentY = useRef<number | null>(null);
   const dragging = useRef(false);
 
-  // Robust body scroll-lock for iOS: position:fixed on body + restore scroll.
-  // (overflow:hidden alone does NOT stop background scroll on iOS Safari.)
+  // Bloqueo del scroll de fondo para iOS (overflow:hidden solo no basta ahí).
+  //
+  // Contado a nivel de módulo porque la app tiene una docena de hojas montadas y
+  // se abren anidadas. Cada una bloqueando por su cuenta provocaba: la segunda
+  // leía scrollY = 0 (el body ya estaba fijo) y machacaba la posición guardada,
+  // y al cerrar la de dentro se desbloqueaba el fondo con la de fuera todavía
+  // abierta. Resultado: el fondo scrolleaba detrás de la hoja y al cerrar todo
+  // el usuario aparecía arriba del todo. Sólo bloquea la primera y sólo
+  // desbloquea la última, conservando la posición original.
   useEffect(() => {
     if (open) {
       setIsMounted(true);
       requestAnimationFrame(() => requestAnimationFrame(() => setIsVisible(true)));
-      const scrollY = window.scrollY;
-      const body = document.body;
-      body.style.position = 'fixed';
-      body.style.top = `-${scrollY}px`;
-      body.style.left = '0';
-      body.style.right = '0';
-      body.style.width = '100%';
-      return () => {
-        const top = body.style.top;
-        body.style.position = '';
-        body.style.top = '';
-        body.style.left = '';
-        body.style.right = '';
-        body.style.width = '';
-        window.scrollTo(0, top ? -parseInt(top, 10) : 0);
-      };
+      bloquearScroll();
+      return () => { desbloquearScroll(); };
     } else if (isMounted) {
       setIsVisible(false);
       const t = setTimeout(() => setIsMounted(false), 280);
