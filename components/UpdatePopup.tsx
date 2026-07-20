@@ -12,7 +12,7 @@ import { BrandLoader } from './BrandLoader';
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.07.20.4';
+export const APP_VERSION = '2026.07.20.5';
 
 interface ChangeEntry {
   version: string;
@@ -24,9 +24,11 @@ interface ChangeEntry {
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
   {
-    version: '2026.07.20.4',
+    version: '2026.07.20.5',
     date: '20 jul 2026',
     items: [
+      'Los botones responden al instante: se acabó tener que tocar dos veces',
+      'La app abre en 1,4 segundos en vez de 18',
       'La app responde al doble de rápido al tocar (era lo que se comía los toques)',
       'Botón + con zona de toque más grande',
       'La fecha y la hora ahora usan el selector propio de tu iPhone',

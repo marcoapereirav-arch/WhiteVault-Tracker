@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AppState, FinancialContext, Transaction, Subscription, Category, Account, SubAccount, GoalEntry } from './types';
 import { INITIAL_STATE, CURRENCIES } from './constants';
 import { Icons } from './components/Icons';
@@ -456,7 +456,7 @@ function App() {
 
   // --- Helpers ---
   
-  const formatCurrency = (amount: number, currency?: string) => {
+  const formatCurrency = useCallback((amount: number, currency?: string) => {
       const cur = currency || currencyCode;
       try {
           return new Intl.NumberFormat('es-ES', {
@@ -473,11 +473,11 @@ function App() {
           }).format(amount);
           return `${symbol} ${formatted}`;
       }
-  };
+  }, [currencyCode]);
 
   const tz = state.user.timezone;
 
-  const formatDateTime = (isoString: string) => {
+  const formatDateTime = useCallback((isoString: string) => {
       try {
           return new Intl.DateTimeFormat('es-ES', {
               year: 'numeric', month: '2-digit', day: '2-digit',
@@ -487,10 +487,10 @@ function App() {
       } catch (e) {
           return isoString;
       }
-  };
+  }, [state.user.timezone]);
 
   // Time only (HH:MM) in user's timezone
-  const formatTime = (isoString: string) => {
+  const formatTime = useCallback((isoString: string) => {
       try {
           return new Intl.DateTimeFormat('es-ES', {
               hour: '2-digit', minute: '2-digit',
@@ -499,10 +499,10 @@ function App() {
       } catch (e) {
           return '';
       }
-  };
+  }, [state.user.timezone]);
 
   // Day key (YYYY-MM-DD) in user's timezone — used for grouping transactions by day
-  const getDayKey = (isoString: string) => {
+  const getDayKey = useCallback((isoString: string) => {
       try {
           const parts = new Intl.DateTimeFormat('en-CA', {
               year: 'numeric', month: '2-digit', day: '2-digit',
@@ -515,10 +515,10 @@ function App() {
       } catch (e) {
           return isoString.split('T')[0];
       }
-  };
+  }, [state.user.timezone]);
 
   // Friendly day label in user's timezone
-  const formatDayLabel = (isoString: string) => {
+  const formatDayLabel = useCallback((isoString: string) => {
       try {
           const now = new Date();
           const today = getDayKey(now.toISOString());
@@ -534,20 +534,20 @@ function App() {
       } catch (e) {
           return isoString;
       }
-  };
+  }, [state.user.timezone]);
 
-  const getAccountName = (ctxId: string, accId: string) => {
+  const getAccountName = useCallback((ctxId: string, accId: string) => {
       const ctx = state.contexts.find(c => c.id === ctxId);
       const acc = ctx?.accounts.find(a => a.id === accId);
       return acc ? acc.name : '';
-  };
+  }, [state.contexts]);
 
-  const getSubAccountName = (ctxId: string, accId: string, subId: string) => {
+  const getSubAccountName = useCallback((ctxId: string, accId: string, subId: string) => {
       const ctx = state.contexts.find(c => c.id === ctxId);
       const acc = ctx?.accounts.find(a => a.id === accId);
       const sub = acc?.subAccounts.find(s => s.id === subId);
       return sub ? sub.name : '';
-  };
+  }, [state.contexts]);
 
   // --- Date Filter Logic ---
   const applyDatePreset = (preset: string) => {
@@ -618,8 +618,11 @@ function App() {
   );
 
   // --- Calculations for Dashboard ---
-  const filteredTransactions = activeTransactions.filter(t =>
-      contextFilter === 'ALL' || t.contextId === contextFilter
+  // Memoizado: sin esto se recorrían las transacciones en cada render Y se
+  // invalidaba en cascada todo useMemo que dependiera de esta referencia.
+  const filteredTransactions = useMemo(
+      () => activeTransactions.filter(t => contextFilter === 'ALL' || t.contextId === contextFilter),
+      [activeTransactions, contextFilter]
   );
 
   // Filter transactions by Date Range for Charts
@@ -635,13 +638,19 @@ function App() {
       });
   }, [filteredTransactions, dashboardDateRange]);
   
-  const filteredContexts = state.contexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter);
+  const filteredContexts = useMemo(
+      () => state.contexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter),
+      [state.contexts, contextFilter]
+  );
 
-  const totalsByCurrencyRaw = getTotalsByCurrency(filteredContexts);
+  const totalsByCurrencyRaw = useMemo(() => getTotalsByCurrency(filteredContexts), [filteredContexts]);
   // When a currency is selected in the dashboard, narrow totals to that one.
-  const totalsByCurrency = dashboardCurrencyFilter === 'ALL'
-      ? totalsByCurrencyRaw
-      : { [dashboardCurrencyFilter]: totalsByCurrencyRaw[dashboardCurrencyFilter] || 0 };
+  const totalsByCurrency = useMemo(
+      () => dashboardCurrencyFilter === 'ALL'
+          ? totalsByCurrencyRaw
+          : { [dashboardCurrencyFilter]: totalsByCurrencyRaw[dashboardCurrencyFilter] || 0 },
+      [totalsByCurrencyRaw, dashboardCurrencyFilter]
+  );
 
   // Apply the dashboard's currency filter (if set) on top of date/context.
   const dashboardCurrencyFilteredTransactions = useMemo(() => {
@@ -650,17 +659,27 @@ function App() {
   }, [dashboardFilteredTransactions, dashboardCurrencyFilter]);
 
   // Dashboard Chart Totals (using currency-filtered set)
-  const dashboardIncome = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'INCOME').reduce((s,t) => s + t.amount, 0);
-  const dashboardExpense = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce((s,t) => s + t.amount, 0);
-
-  const monthlyIncomeByCurrency = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'INCOME').reduce<Record<string, number>>((acc, t) => {
-    acc[t.currency] = (acc[t.currency] || 0) + t.amount;
-    return acc;
-  }, {});
-  const monthlyExpenseByCurrency = dashboardCurrencyFilteredTransactions.filter(t => t.type === 'EXPENSE').reduce<Record<string, number>>((acc, t) => {
-    acc[t.currency] = (acc[t.currency] || 0) + t.amount;
-    return acc;
-  }, {});
+  // Los cuatro totales salen de UNA sola pasada. Antes eran 6 recorridos
+  // completos de las transacciones en cada render.
+  const dashboardTotals = useMemo(() => {
+    let income = 0, expense = 0;
+    const byCurIn: Record<string, number> = {};
+    const byCurOut: Record<string, number> = {};
+    for (const t of dashboardCurrencyFilteredTransactions) {
+      if (t.type === 'INCOME') {
+        income += t.amount;
+        byCurIn[t.currency] = (byCurIn[t.currency] || 0) + t.amount;
+      } else if (t.type === 'EXPENSE') {
+        expense += t.amount;
+        byCurOut[t.currency] = (byCurOut[t.currency] || 0) + t.amount;
+      }
+    }
+    return { income, expense, byCurIn, byCurOut };
+  }, [dashboardCurrencyFilteredTransactions]);
+  const dashboardIncome = dashboardTotals.income;
+  const dashboardExpense = dashboardTotals.expense;
+  const monthlyIncomeByCurrency = dashboardTotals.byCurIn;
+  const monthlyExpenseByCurrency = dashboardTotals.byCurOut;
   const dashboardFilteredSubs = useMemo(() => {
     // Calculate the real end of the period (not capped to today)
     const start = new Date(dashboardDateRange.start);

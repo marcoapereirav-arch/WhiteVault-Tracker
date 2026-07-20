@@ -73,7 +73,7 @@ interface DashboardProps {
   availableCurrencies: string[];
 }
 
-export const MobileDashboard: React.FC<DashboardProps> = (p) => {
+const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
   const [showFilter, setShowFilter] = useState(false);
   const recent = useMemo(
     () => [...p.dashboardFilteredTransactions]
@@ -513,7 +513,7 @@ const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; ki
   );
 };
 
-export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions, formatCurrency, baseCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory, onManageSubAccount, onRenameAccount, onOpenGoalArchive, onDeleteContext }) => {
+const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, formatCurrency, baseCurrency, onDistributeIncome, onAddSubAccount, recentDistributions, recentTxByAccount, onAccountHistory, onManageSubAccount, onRenameAccount, onOpenGoalArchive, onDeleteContext }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [editingAccount, setEditingAccount] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState('');
@@ -812,7 +812,7 @@ interface TxProps {
   onTxClick: (tx: Transaction) => void;
   onBulkDelete: () => void;
 }
-export const MobileTransactions: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, currencyFilter, setCurrencyFilter, availableCurrencies, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatTime, formatDayLabel, getDayKey, onTxClick, onBulkDelete }) => {
+const MobileTransactionsBase: React.FC<TxProps> = ({ state, filteredTransactions, transactionTypeFilter, setTransactionTypeFilter, currencyFilter, setCurrencyFilter, availableCurrencies, isBulkMode, setIsBulkMode, bulkSelectedTxIds, setBulkSelectedTxIds, formatCurrency, formatTime, formatDayLabel, getDayKey, onTxClick, onBulkDelete }) => {
   const [search, setSearch] = useState('');
   const filtered = useMemo(() => {
     return filteredTransactions
@@ -1027,7 +1027,7 @@ interface SubsProps {
   getAccountName: (cId: string, aId: string) => string;
   getSubAccountName: (cId: string, aId: string, sId: string) => string;
 }
-export const MobileSubscriptions: React.FC<SubsProps> = ({ state, contextFilter, setContextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
+const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, setContextFilter, subscriptionStatusFilter, setSubscriptionStatusFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, formatDateTime, onSubClick, onSubEdit, onAddSub, getAccountName }) => {
   const list = useMemo(() => {
     return state.subscriptions
       .filter((s) => contextFilter === 'ALL' || s.contextId === contextFilter)
@@ -1239,7 +1239,7 @@ interface CatProps {
   onAddCategory: () => void;
   getAccountName: (cId: string, aId: string) => string;
 }
-export const MobileCategories: React.FC<CatProps> = ({ state, contextFilter, setContextFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
+const MobileCategoriesBase: React.FC<CatProps> = ({ state, contextFilter, setContextFilter, currencyFilter, setCurrencyFilter, availableCurrencies, formatCurrency, onCategoryClick, onAddCategory, getAccountName }) => {
   // Categories that have at least one active tx in the selected currency
   // (when filtering). When 'ALL', no extra filter is applied.
   const list = useMemo(() => {
@@ -1834,3 +1834,13 @@ const ToggleRow: React.FC<{ label: string; desc?: string; value: boolean; onChan
     </button>
   </div>
 );
+
+export const MobileAccounts = React.memo(MobileAccountsBase);
+
+export const MobileTransactions = React.memo(MobileTransactionsBase);
+
+export const MobileSubscriptions = React.memo(MobileSubscriptionsBase);
+
+export const MobileCategories = React.memo(MobileCategoriesBase);
+
+export const MobileDashboard = React.memo(MobileDashboardBase);
