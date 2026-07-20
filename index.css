@@ -203,3 +203,24 @@ svg, svg * {
   outline: none !important;
   -webkit-tap-highlight-color: transparent !important;
 }
+
+/* ─── PIE DE FORMULARIO FIJO ──────────────────────────────────────────────
+   El botón principal de cada formulario (Confirmar Gasto, Confirmar Ingreso…)
+   se queda PEGADO al fondo del área que scrollea, siempre visible.
+   Antes vivía al final del contenido: en pantallas altas había que bajar ~100px
+   para encontrarlo y, contra el borde de la hoja más la franja de la barra de
+   gestos del iPhone, parecía cortado por la mitad.
+   El margen negativo compensa el padding lateral del contenedor para que la
+   barra ocupe todo el ancho y tape lo que pasa por debajo al hacer scroll. */
+.wv-form-footer {
+  position: sticky;
+  bottom: -1.5rem;            /* compensa el pb-6 del contenedor */
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 1.5rem calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  background: #F7F7F7;
+  box-shadow: 0 -8px 16px -8px rgba(0, 0, 0, .12);
+  z-index: 5;
+}
+.wv-form-footer > button { margin-top: 0 !important; }

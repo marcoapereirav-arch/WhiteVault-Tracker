@@ -599,9 +599,11 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                     />
                 </div>
 
+                <div className="wv-form-footer">
                 <button type="submit" className={`w-full h-14 mt-4 font-display font-bold uppercase tracking-widest text-sm text-white transition-all hover:opacity-90 active:scale-[0.98] rounded-xl ${type === 'EXPENSE' ? 'bg-rose-800' : 'bg-emerald-800'}`}>
                     {initialData ? 'Guardar Cambios' : `Confirmar ${type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}`}
                 </button>
+                </div>
             </form>
 
             {/* Inline "new category" form — opens on top of TransactionForm */}
@@ -752,6 +754,7 @@ export const AdjustBalanceForm: React.FC<AdjustBalanceFormProps> = ({ state, onS
 
                 <Input type="text" label="Nota (opcional)" maxLength={200} value={notes} placeholder="Ej: dinero que entró sin registrar" onChange={(e: any) => setNotes(e.target.value)} />
 
+                <div className="wv-form-footer">
                 <button
                     type="submit"
                     disabled={!accountId || realBalance === '' || delta === 0}
@@ -759,6 +762,7 @@ export const AdjustBalanceForm: React.FC<AdjustBalanceFormProps> = ({ state, onS
                 >
                     {delta === 0 ? 'Ya está cuadrado' : 'Aplicar Ajuste'}
                 </button>
+                </div>
             </form>
         </Modal>
     );
@@ -900,10 +904,12 @@ export const TransferForm: React.FC<TransferFormProps> = ({ state, onSubmit, onC
                 </div>
 
                 <Input type="text" label="Nota de Referencia" maxLength={200} value={notes} onChange={(e: any) => setNotes(e.target.value)} />
+                <div className="wv-form-footer">
                 <button type="submit" className="w-full h-14 bg-sky-700 hover:bg-sky-800 text-white font-display font-bold uppercase tracking-widest text-sm transition-all active:scale-[0.98] rounded-xl mt-3 flex items-center justify-center gap-2">
                     <Icons.Transfer className="w-4 h-4" />
                     Ejecutar Transferencia
                 </button>
+                </div>
             </form>
         </Modal>
     );
@@ -999,7 +1005,9 @@ export const SubAccountForm: React.FC<any> = ({ state, onSubmit, onClose, initia
                     />
                 )}
                 <Input type="date" label="Fecha Inicio" value={startDate} onChange={(e: any) => setStartDate(e.target.value)} />
+                <div className="wv-form-footer">
                 <button type="submit" className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] mt-3">Crear Sub-Cuenta</button>
+                </div>
             </form>
         </Modal>
     );
@@ -1076,9 +1084,11 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ state, onSubmit, onC
                     </div>
                 </div>
                 <Input type="number" label="Presupuesto Mensual (Opcional)" min="0.01" max="999999999" step="0.01" value={budget} onChange={(e: any) => setBudget(e.target.value)} />
+                <div className="wv-form-footer">
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm">
                     {initialData ? 'Actualizar Categoría' : 'Crear Categoría'}
                 </button>
+                </div>
             </form>
         </Modal>
     )
@@ -1317,9 +1327,11 @@ export const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ state, onSub
                     </label>
                 </div>
 
+                <div className="wv-form-footer">
                 <button type="submit" className="w-full py-4 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl">
                     {initialData ? 'Actualizar Suscripción' : 'Añadir Suscripción'}
                 </button>
+                </div>
             </form>
         </Modal>
     )
@@ -1412,7 +1424,9 @@ export const NewContextForm: React.FC<any> = ({ onSubmit, onClose }) => {
                     </div>
                 )}
 
+                <div className="wv-form-footer">
                 <button type="submit" className="w-full py-4 bg-gold hover:bg-alloy text-white font-display font-bold uppercase tracking-widest text-sm transition-colors">Lanzar Espacio de Negocio</button>
+                </div>
             </form>
         </Modal>
     )
