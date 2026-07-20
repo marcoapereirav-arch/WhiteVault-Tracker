@@ -14,7 +14,9 @@ import {
   goalProgress,
   isGoalComplete,
   paymentGoalTotals,
-  byPriority,
+  sortGoals,
+  buildPaymentIndex,
+  PaymentIndex,
   GoalRef,
 } from '../utils/goals';
 
@@ -41,15 +43,19 @@ export const GoalsOverview: React.FC<Props> = ({
     [contexts, transactions, baseCurrency]
   );
 
+  // Índice construido una sola vez; sin él cada objetivo recorría todas las
+  // transacciones varias veces por render.
+  const paymentIndex = useMemo(() => buildPaymentIndex(transactions), [transactions]);
+
   const lista = useMemo(() => {
     const todas = collectGoals(contexts, tipo)
-      .filter(({ sub }) => !isGoalComplete(sub, transactions, baseCurrency));
+      .filter(({ sub }) => !isGoalComplete(sub, transactions, baseCurrency, paymentIndex));
     const filtrada = tipo === 'SAVING' || prioridad === 'ALL'
       ? todas
       : todas.filter(({ sub }) =>
           prioridad === 'NONE' ? sub.priority == null : String(sub.priority ?? '') === prioridad);
-    return filtrada.sort((a, b) => byPriority(a.sub, b.sub, transactions, baseCurrency));
-  }, [contexts, transactions, baseCurrency, tipo, prioridad]);
+    return sortGoals(filtrada, transactions, baseCurrency, paymentIndex);
+  }, [contexts, transactions, baseCurrency, tipo, prioridad, paymentIndex]);
 
   const metas = collectGoals(contexts, 'SAVING');
 
@@ -135,6 +141,7 @@ export const GoalsOverview: React.FC<Props> = ({
               goal={g}
               tipo={tipo}
               transactions={transactions}
+              paymentIndex={paymentIndex}
               baseCurrency={baseCurrency}
               formatCurrency={formatCurrency}
               onOpen={() => onOpenGoal(g.contextId, g.accountId, g.sub.id)}
@@ -151,15 +158,16 @@ const GoalRow: React.FC<{
   goal: GoalRef;
   tipo: Tipo;
   transactions: Transaction[];
+  paymentIndex: PaymentIndex;
   baseCurrency: string;
   formatCurrency: (n: number, c?: string) => string;
   onOpen: () => void;
   onManage: () => void;
-}> = ({ goal, tipo, transactions, baseCurrency, formatCurrency, onOpen, onManage }) => {
+}> = ({ goal, tipo, transactions, paymentIndex, baseCurrency, formatCurrency, onOpen, onManage }) => {
   const { sub, contextName, accountName } = goal;
-  const pagado = goalPaid(sub, transactions, baseCurrency);
-  const falta = goalRemaining(sub, transactions, baseCurrency);
-  const pct = goalProgress(sub, transactions, baseCurrency);
+  const pagado = goalPaid(sub, transactions, baseCurrency, paymentIndex);
+  const falta = goalRemaining(sub, transactions, baseCurrency, paymentIndex);
+  const pct = goalProgress(sub, transactions, baseCurrency, paymentIndex);
 
   return (
     <div

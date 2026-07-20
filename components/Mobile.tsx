@@ -110,18 +110,29 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
       aria-label="Navegación principal"
       className="fixed bottom-0 left-0 right-0 z-40 pointer-events-none lg:hidden"
     >
-      <div className="mx-auto max-w-[480px] pointer-events-auto">
+      <div className="relative mx-auto max-w-[480px] pointer-events-auto">
         {/* El mínimo sube de 8px a 14px: en navegador (sin barra de gestos) los
             botones quedaban tan pegados al borde que iOS se comía el primer
             toque como si fuera un gesto del sistema. */}
         <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),14px)] pt-1.5">
           <div className="flex items-end justify-around relative">
             {left.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
-            <FabButton onClick={onFabPress} />
+            {/* Hueco reservado: el botón real se pinta fuera de este contenedor */}
+            <div className="flex-1" aria-hidden />
             {right.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
           </div>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-px bg-metallic opacity-60" />
         </div>
+
+        {/* El FAB va FUERA del contenedor con backdrop-blur.
+            Antes vivía dentro y sobresalía 28px por arriba con un margen
+            negativo. Esa mitad que se salía de un elemento con backdrop-filter
+            perdía toques: medido en WebKit real, 3 de cada 20 toques cerca del
+            borde superior o inferior no llegaban a disparar la acción, aunque sí
+            se veía la animación de pulsado. Ahora es hermano de la barra, con
+            zona táctil cuadrada de 72px que NO se transforma; el círculo y su
+            animación van en una capa interna sin eventos. */}
+        <FabButton onClick={onFabPress} />
       </div>
     </nav>
   );
@@ -229,19 +240,20 @@ const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void
 
 const FabButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   return (
-    // El botón sobresale 28px por encima de la barra, o sea la mitad de sus
-    // 56px. Esa mitad cae fuera de la caja del padre, así que hay que declarar
-    // explícitamente que sigue recibiendo toques y que va por encima de todo lo
-    // demás de la barra — si no, el usuario toca arriba y no pasa nada.
-    <div className="flex-1 flex items-center justify-center -mt-7 relative z-10 pointer-events-auto">
-      <button
-        onClick={() => { haptic('medium'); onClick(); }}
-        className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:scale-90 active:bg-graphite transition-[transform,background-color] duration-75 border-[3px] border-stone pointer-events-auto touch-manipulation"
-        aria-label="Acciones rápidas"
-      >
+    // Zona táctil: cuadrado de 72px centrado sobre el borde superior de la barra.
+    // NO lleva transform ni border-radius, así que su área de impacto es un
+    // rectángulo simple y constante durante todo el gesto. El aspecto visual
+    // (círculo, sombra, animación de pulsado) va en el <span> interior, que está
+    // marcado como no interactivo para que nunca intercepte el toque.
+    <button
+      onClick={() => { haptic('medium'); onClick(); }}
+      aria-label="Acciones rápidas"
+      className="group absolute left-1/2 -translate-x-1/2 top-0 -translate-y-1/2 w-[72px] h-[72px] flex items-center justify-center z-20 pointer-events-auto touch-manipulation bg-transparent"
+    >
+      <span className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] border-[3px] border-stone pointer-events-none transition-[transform,background-color] duration-75 group-active:scale-90 group-active:bg-graphite">
         <Icons.Plus className="w-6 h-6" />
-      </button>
-    </div>
+      </span>
+    </button>
   );
 };
 

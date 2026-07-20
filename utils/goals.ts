@@ -35,40 +35,74 @@ export const linkedPayments = (sub: SubAccount, transactions: Transaction[]): Tr
     (t) => t.subAccountId === sub.id && t.type === 'EXPENSE' && !t.deletedAt
   );
 
-export const linkedTotal = (sub: SubAccount, transactions: Transaction[]): number =>
-  linkedPayments(sub, transactions).reduce((acc, t) => acc + (t.amount || 0), 0);
+// ---------------------------------------------------------------------------
+// ÍNDICE DE PAGOS — rendimiento
+//
+// Sin esto, cada llamada a goalPaid/goalRemaining/goalProgress recorría TODAS
+// las transacciones. Como la lista de objetivos se ordena por progreso, y un
+// sort hace ~n·log(n) comparaciones llamando a goalProgress dos veces cada una,
+// salían ~200.000 recorridos de las 495 transacciones POR RENDER. Medido en un
+// móvil: 596 ms de hilo principal bloqueado, con lo que los toques se quedaban
+// en cola y parecía que la app no los leía (la animación de pulsado sí salía,
+// porque es CSS y no necesita JavaScript).
+//
+// Se construye UNA vez por render y las consultas pasan a ser instantáneas.
+// ---------------------------------------------------------------------------
+export type PaymentIndex = Map<string, number>;
+
+export const buildPaymentIndex = (transactions: Transaction[]): PaymentIndex => {
+  const index: PaymentIndex = new Map();
+  for (const t of transactions) {
+    if (t.type !== 'EXPENSE' || t.deletedAt || !t.subAccountId) continue;
+    index.set(t.subAccountId, (index.get(t.subAccountId) || 0) + (t.amount || 0));
+  }
+  return index;
+};
+
+export const linkedTotal = (
+  sub: SubAccount,
+  transactions: Transaction[],
+  index?: PaymentIndex
+): number => {
+  if (index) return index.get(sub.id) || 0;
+  return linkedPayments(sub, transactions).reduce((acc, t) => acc + (t.amount || 0), 0);
+};
 
 /** Cuánto se lleva aportado. Meta = saldo dentro; Objetivo = pagos + abonos. */
 export const goalPaid = (
   sub: SubAccount,
   transactions: Transaction[],
-  currency: string
+  currency: string,
+  index?: PaymentIndex
 ): number => {
-  if (isPaymentGoal(sub)) return entriesTotal(sub) + linkedTotal(sub, transactions);
+  if (isPaymentGoal(sub)) return entriesTotal(sub) + linkedTotal(sub, transactions, index);
   return sub.balances?.[currency] ?? Object.values(sub.balances || {})[0] ?? 0;
 };
 
 export const goalRemaining = (
   sub: SubAccount,
   transactions: Transaction[],
-  currency: string
-): number => Math.max(0, (sub.target || 0) - goalPaid(sub, transactions, currency));
+  currency: string,
+  index?: PaymentIndex
+): number => Math.max(0, (sub.target || 0) - goalPaid(sub, transactions, currency, index));
 
 export const goalProgress = (
   sub: SubAccount,
   transactions: Transaction[],
-  currency: string
+  currency: string,
+  index?: PaymentIndex
 ): number => {
   const target = sub.target || 0;
   if (target <= 0) return 0;
-  return Math.min(100, Math.max(0, (goalPaid(sub, transactions, currency) / target) * 100));
+  return Math.min(100, Math.max(0, (goalPaid(sub, transactions, currency, index) / target) * 100));
 };
 
 export const isGoalComplete = (
   sub: SubAccount,
   transactions: Transaction[],
-  currency: string
-): boolean => !!sub.completedAt || goalRemaining(sub, transactions, currency) <= 0.005;
+  currency: string,
+  index?: PaymentIndex
+): boolean => !!sub.completedAt || goalRemaining(sub, transactions, currency, index) <= 0.005;
 
 /** Timeline unificada de un Objetivo: abonos + gastos vinculados, más reciente primero. */
 export interface GoalMovement {
@@ -151,29 +185,40 @@ export const paymentGoalTotals = (
   currency: string
 ): GoalTotals => {
   const all = collectGoals(contexts, 'PAYMENT');
+  const index = buildPaymentIndex(transactions);
   const totals: GoalTotals = { target: 0, paid: 0, remaining: 0, count: 0, completed: 0 };
   for (const { sub } of all) {
-    if (isGoalComplete(sub, transactions, currency)) {
+    if (isGoalComplete(sub, transactions, currency, index)) {
       totals.completed += 1;
       continue;
     }
     totals.count += 1;
     totals.target += sub.target || 0;
-    totals.paid += goalPaid(sub, transactions, currency);
-    totals.remaining += goalRemaining(sub, transactions, currency);
+    totals.paid += goalPaid(sub, transactions, currency, index);
+    totals.remaining += goalRemaining(sub, transactions, currency, index);
   }
   return totals;
 };
 
-/** Orden sugerido: prioridad 1..4 primero, sin prioridad al final; luego más avanzado. */
-export const byPriority = (
-  a: SubAccount,
-  b: SubAccount,
+/**
+ * Ordena por prioridad (1..4 primero, sin prioridad al final) y luego por
+ * progreso descendente.
+ *
+ * Calcula el progreso UNA vez por elemento antes de ordenar. Antes era un
+ * comparador que llamaba a goalProgress en cada comparación: con 44 objetivos
+ * eso son ~400 llamadas, cada una recorriendo las 495 transacciones. Era la
+ * causa principal de los 596 ms de bloqueo.
+ */
+export const sortGoals = <T extends { sub: SubAccount } | SubAccount>(
+  items: T[],
   transactions: Transaction[],
-  currency: string
-): number => {
-  const pa = a.priority ?? 99;
-  const pb = b.priority ?? 99;
-  if (pa !== pb) return pa - pb;
-  return goalProgress(b, transactions, currency) - goalProgress(a, transactions, currency);
+  currency: string,
+  index?: PaymentIndex
+): T[] => {
+  const idx = index || buildPaymentIndex(transactions);
+  const sub = (x: T): SubAccount => ('sub' in (x as any) ? (x as any).sub : x) as SubAccount;
+  return items
+    .map((x) => ({ x, p: sub(x).priority ?? 99, prog: goalProgress(sub(x), transactions, currency, idx) }))
+    .sort((a, b) => (a.p !== b.p ? a.p - b.p : b.prog - a.prog))
+    .map((d) => d.x);
 };

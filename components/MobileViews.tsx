@@ -12,7 +12,8 @@ import {
   goalRemaining,
   isGoalComplete,
   paymentGoalTotals,
-  byPriority,
+  sortGoals,
+  buildPaymentIndex,
 } from '../utils/goals';
 import {
   BottomSheet,
@@ -527,6 +528,10 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions
     });
   };
 
+  // Índice de pagos por sub-cuenta, construido UNA vez. Sin esto cada objetivo
+  // recorría las transacciones enteras varias veces por render.
+  const paymentIndex = useMemo(() => buildPaymentIndex(transactions), [transactions]);
+
   if (contexts.length === 0) {
     return <EmptyState icon={Icons.Accounts} title="Sin bóvedas" description="Configura tus contextos financieros para empezar." />;
   }
@@ -688,15 +693,20 @@ export const MobileAccounts: React.FC<AccountsProps> = ({ contexts, transactions
                           // Se ven TODAS las sub-cuentas de la cuenta: normales, Metas
                           // y Objetivos. Sólo se ocultan los Objetivos ya saldados, que
                           // viven en el historial.
-                          .filter((sub) => !(isPaymentGoal(sub) && isGoalComplete(sub, transactions, baseCurrency)))
-                          .sort((a, b) => byPriority(a, b, transactions, baseCurrency))
+                          .filter((sub) => !(isPaymentGoal(sub) && isGoalComplete(sub, transactions, baseCurrency, paymentIndex)))
+                          .sort((a, b) => {
+                            const pa = a.priority ?? 99, pb = b.priority ?? 99;
+                            if (pa !== pb) return pa - pb;
+                            return goalProgress(b, transactions, baseCurrency, paymentIndex)
+                                 - goalProgress(a, transactions, baseCurrency, paymentIndex);
+                          })
                           .map((sub) => {
                           const subEntries = balanceEntries(sub.balances);
                           const kind = goalKindOf(sub);
                           const esObjetivo = kind === 'PAYMENT';
-                          const progress = kind ? goalProgress(sub, transactions, baseCurrency) : null;
-                          const pagado = kind ? goalPaid(sub, transactions, baseCurrency) : 0;
-                          const falta = kind ? goalRemaining(sub, transactions, baseCurrency) : 0;
+                          const progress = kind ? goalProgress(sub, transactions, baseCurrency, paymentIndex) : null;
+                          const pagado = kind ? goalPaid(sub, transactions, baseCurrency, paymentIndex) : 0;
+                          const falta = kind ? goalRemaining(sub, transactions, baseCurrency, paymentIndex) : 0;
                           const subRecent = recentTxByAccount[`${acc.id}:${sub.id}`];
                           return (
                             <div
