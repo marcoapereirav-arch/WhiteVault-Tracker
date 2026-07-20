@@ -6,13 +6,13 @@
 
 import React, { useEffect, useState } from 'react';
 import { Icons } from './Icons';
-import { haptic } from './Mobile';
+import { haptic, usePress } from './Mobile';
 import { BrandLoader } from './BrandLoader';
 
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.07.20.6';
+export const APP_VERSION = '2026.07.20.7';
 
 interface ChangeEntry {
   version: string;
@@ -24,9 +24,10 @@ interface ChangeEntry {
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
   {
-    version: '2026.07.20.6',
+    version: '2026.07.20.7',
     date: '20 jul 2026',
     items: [
+      'ARREGLADO: los botones ya no se comen pulsaciones. Ahora la acción se dispara al levantar el dedo, no con el clic que el móvil se inventaba después',
       'Botón + de vuelta en su sitio (lo había descuadrado)',
       'Los botones responden al instante: se acabó tener que tocar dos veces',
       'La app abre en 1,4 segundos en vez de 18',
@@ -132,6 +133,8 @@ export const UpdatePopup: React.FC = () => {
     setTimeout(() => window.location.reload(), 400);
   };
 
+  const pressActualizar = usePress(handleUpdate);
+
   if (reloading) return <BrandLoader label="Actualizando" fullscreen />;
   if (!open || !latest) return null;
 
@@ -165,7 +168,7 @@ export const UpdatePopup: React.FC = () => {
         {/* Action */}
         <div className="px-6 pt-5">
           <button
-            onClick={handleUpdate}
+            {...pressActualizar}
             className="w-full h-14 bg-onyx text-white font-display font-bold uppercase tracking-widest text-sm rounded-xl active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           >
             <Icons.Refresh className="w-4 h-4" />

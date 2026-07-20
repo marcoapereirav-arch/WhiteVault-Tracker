@@ -5,6 +5,56 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, ReactNode } from 'react';
 import { Icons } from './Icons';
 
+// ─── PULSACIÓN FIABLE ───────────────────────────────────────────────────
+//
+// PROBLEMA: en iOS hay pulsaciones que se pierden. El botón hace su animación
+// de pulsado (eso es CSS puro, no necesita JavaScript) pero la acción no llega a
+// ejecutarse, y hay que volver a tocar. Pasa en muchos botones distintos: la
+// barra inferior, el +, el botón de actualizar... Se descartaron por medición la
+// geometría, el transform del :active, el rendimiento, la caché y las unidades
+// de viewport: ninguna lo explicaba.
+//
+// SOLUCIÓN: dejar de depender del evento `click`. Cuando levantas el dedo el
+// navegador dispara `pointerup` SIEMPRE, y sólo después SINTETIZA un `click`.
+// Ese click sintetizado es el que se pierde. Así que la acción se dispara en
+// `pointerup`, que es real, y el `click` queda como camino alternativo para
+// ratón y teclado.
+//
+// Se protege el doble disparo con una ventana de 400 ms: si ya se ejecutó por
+// pointerup, el click posterior se ignora. En una app de dinero, disparar dos
+// veces sería peor que no disparar.
+export const usePress = (onPress?: () => void, disabled?: boolean) => {
+  const est = useRef({ x: 0, y: 0, t: 0, activo: false, ultimo: 0 });
+
+  const disparar = useCallback(() => {
+    if (disabled || !onPress) return;
+    const ahora = Date.now();
+    if (ahora - est.current.ultimo < 400) return; // ya se ejecutó por el otro camino
+    est.current.ultimo = ahora;
+    onPress();
+  }, [onPress, disabled]);
+
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      est.current.x = e.clientX;
+      est.current.y = e.clientY;
+      est.current.t = Date.now();
+      est.current.activo = true;
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      if (!est.current.activo) return;
+      est.current.activo = false;
+      // Si el dedo se desplazó mucho fue un arrastre, no una pulsación.
+      if (Math.hypot(e.clientX - est.current.x, e.clientY - est.current.y) > 14) return;
+      if (Date.now() - est.current.t > 900) return; // pulsación larga: se ignora
+      disparar();
+    },
+    onPointerCancel: () => { est.current.activo = false; },
+    // Ratón y teclado (Enter/Espacio) llegan por aquí. El guard evita el doble.
+    onClick: () => { disparar(); },
+  };
+};
+
 // ─── HAPTICS ────────────────────────────────────────────────────────────
 export const haptic = (style: 'light' | 'medium' | 'heavy' | 'selection' = 'light') => {
   if (typeof navigator === 'undefined' || !navigator.vibrate) return;
@@ -74,7 +124,7 @@ export const MobileHeader: React.FC<HeaderProps> = ({ title, subtitle, leading, 
 export const HeaderButton: React.FC<{ onClick?: () => void; children: ReactNode; ariaLabel?: string; badge?: number }> = ({ onClick, children, ariaLabel, badge }) => {
   return (
     <button
-      onClick={() => { haptic('light'); onClick?.(); }}
+      {...usePress(() => { haptic('light'); onClick?.(); })}
       aria-label={ariaLabel}
       className="relative w-10 h-10 rounded-full flex items-center justify-center bg-white border border-black/5 shadow-sm active:scale-95 transition-transform"
     >
@@ -205,9 +255,10 @@ const Plus: React.FC = () => <Icons.Plus className="w-4 h-4" />;
 
 const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void }> = ({ item, active, onClick }) => {
   const Icon = item.icon;
+  const press = usePress(() => { haptic('selection'); onClick(); });
   return (
     <button
-      onClick={() => { haptic('selection'); onClick(); }}
+      {...press}
       // min-h-[52px] + touch-manipulation: zona de toque cómoda y sin el
       // retardo de doble-tap de iOS.
       // active:bg-stone además del scale: iOS NO soporta navigator.vibrate, así
@@ -240,7 +291,7 @@ const FabButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
     //     sin ocupar espacio en el layout ni mover un solo píxel del diseño.
     <div className="flex-1 flex items-center justify-center -mt-7 relative z-20 pointer-events-auto">
       <button
-        onClick={() => { haptic('medium'); onClick(); }}
+        {...usePress(() => { haptic('medium'); onClick(); })}
         aria-label="Acciones rápidas"
         className="group relative w-14 h-14 flex items-center justify-center bg-transparent pointer-events-auto touch-manipulation"
       >
@@ -297,6 +348,9 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
   const [isMounted, setIsMounted] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [keyboardInset, setKeyboardInset] = useState(0);
+  // El hook va aquí arriba: más abajo hay un `return null` condicional y llamar
+  // hooks después de él rompe las reglas de React.
+  const pressCerrar = usePress(() => { haptic('light'); onClose(); });
   const sheetRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const startY = useRef<number | null>(null);
@@ -484,7 +538,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({ open, onClose, title, 
             <div className="flex items-center gap-3 px-3 pb-2.5 border-b border-black/5">
               <button
                 type="button"
-                onClick={() => { haptic('light'); onClose(); }}
+                {...pressCerrar}
                 className="w-11 h-11 rounded-full flex items-center justify-center bg-stone hover:bg-concrete active:scale-95 transition-all flex-shrink-0"
                 aria-label="Cerrar"
               >
@@ -647,6 +701,7 @@ export const ListRow: React.FC<{ leading?: ReactNode; title: string; subtitle?: 
 // ─── PRESS-TO-CONFIRM ────────────────────────────────────────────────────
 export const PressButton: React.FC<{ onClick?: () => void; children: ReactNode; variant?: 'primary' | 'secondary' | 'ghost' | 'danger'; size?: 'sm' | 'md' | 'lg'; full?: boolean; disabled?: boolean; type?: 'button' | 'submit' }> = ({ onClick, children, variant = 'primary', size = 'md', full, disabled, type = 'button' }) => {
   const sizes = { sm: 'h-9 px-4 text-xs', md: 'h-11 px-5 text-sm', lg: 'h-14 px-6 text-base' };
+  const press = usePress(() => { haptic('medium'); onClick?.(); }, disabled);
   const variants = {
     primary: 'bg-onyx text-white hover:bg-gold hover:text-onyx',
     secondary: 'bg-white border border-black/10 text-onyx hover:border-onyx',
@@ -657,7 +712,7 @@ export const PressButton: React.FC<{ onClick?: () => void; children: ReactNode; 
     <button
       type={type}
       disabled={disabled}
-      onClick={() => { haptic('medium'); onClick?.(); }}
+      {...press}
       className={`${sizes[size]} ${variants[variant]} ${full ? 'w-full' : ''} font-display font-bold tracking-tight uppercase rounded-xl transition-all active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2`}
     >
       {children}
