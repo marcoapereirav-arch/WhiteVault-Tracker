@@ -117,22 +117,11 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
         <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),14px)] pt-1.5">
           <div className="flex items-end justify-around relative">
             {left.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
-            {/* Hueco reservado: el botón real se pinta fuera de este contenedor */}
-            <div className="flex-1" aria-hidden />
+            <FabButton onClick={onFabPress} />
             {right.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
           </div>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-px bg-metallic opacity-60" />
         </div>
-
-        {/* El FAB va FUERA del contenedor con backdrop-blur.
-            Antes vivía dentro y sobresalía 28px por arriba con un margen
-            negativo. Esa mitad que se salía de un elemento con backdrop-filter
-            perdía toques: medido en WebKit real, 3 de cada 20 toques cerca del
-            borde superior o inferior no llegaban a disparar la acción, aunque sí
-            se veía la animación de pulsado. Ahora es hermano de la barra, con
-            zona táctil cuadrada de 72px que NO se transforma; el círculo y su
-            animación van en una capa interna sin eventos. */}
-        <FabButton onClick={onFabPress} />
       </div>
     </nav>
   );
@@ -240,20 +229,27 @@ const TabItemBtn: React.FC<{ item: TabItem; active: boolean; onClick: () => void
 
 const FabButton: React.FC<{ onClick: () => void }> = ({ onClick }) => {
   return (
-    // Zona táctil: cuadrado de 72px centrado sobre el borde superior de la barra.
-    // NO lleva transform ni border-radius, así que su área de impacto es un
-    // rectángulo simple y constante durante todo el gesto. El aspecto visual
-    // (círculo, sombra, animación de pulsado) va en el <span> interior, que está
-    // marcado como no interactivo para que nunca intercepte el toque.
-    <button
-      onClick={() => { haptic('medium'); onClick(); }}
-      aria-label="Acciones rápidas"
-      className="group absolute left-1/2 -translate-x-1/2 top-0 -translate-y-1/2 w-[72px] h-[72px] flex items-center justify-center z-20 pointer-events-auto touch-manipulation bg-transparent"
-    >
-      <span className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] border-[3px] border-stone pointer-events-none transition-[transform,background-color] duration-75 group-active:scale-90 group-active:bg-graphite">
-        <Icons.Plus className="w-6 h-6" />
-      </span>
-    </button>
+    // Estructura y posición EXACTAMENTE las originales (flex-1 + -mt-7 + círculo
+    // de 56px): así el botón queda centrado en su hueco de la fila y sobresale lo
+    // mismo de siempre. Lo único que cambia respecto al original:
+    //
+    //  1. El <button> no lleva el fondo ni el transform. El círculo y su
+    //     animación de pulsado van en un <span> sin eventos, de modo que el área
+    //     que recibe el toque NUNCA se encoge a mitad de gesto.
+    //  2. Un <span> invisible con -inset-2 amplía la zona táctil de 56 a 72px
+    //     sin ocupar espacio en el layout ni mover un solo píxel del diseño.
+    <div className="flex-1 flex items-center justify-center -mt-7 relative z-20 pointer-events-auto">
+      <button
+        onClick={() => { haptic('medium'); onClick(); }}
+        aria-label="Acciones rápidas"
+        className="group relative w-14 h-14 flex items-center justify-center bg-transparent pointer-events-auto touch-manipulation"
+      >
+        <span className="absolute -inset-2" aria-hidden />
+        <span className="w-14 h-14 rounded-full bg-onyx text-white flex items-center justify-center shadow-[0_8px_24px_rgba(0,0,0,0.25)] border-[3px] border-stone pointer-events-none transition-[transform,background-color] duration-75 group-active:scale-90 group-active:bg-graphite">
+          <Icons.Plus className="w-6 h-6" />
+        </span>
+      </button>
+    </div>
   );
 };
 
@@ -886,15 +882,33 @@ export const AutoFitText: React.FC<{ text: string; max?: number; min?: number; c
   const spanRef = useRef<HTMLSpanElement>(null);
   const [size, setSize] = useState(max);
 
+  // OJO: esto tenía un bucle de recolocación infinito.
+  //
+  // Al ajustar el tamaño de letra cambiaba el ALTO del contenedor, el
+  // ResizeObserver lo detectaba y volvía a ajustar, sin parar. Cada vuelta hacía
+  // 8 escrituras+lecturas de estilo, o sea 8 recálculos de layout forzados. Con
+  // una instancia por moneda en el panel de inicio, la pantalla se recolocaba
+  // continuamente: el dedo aterrizaba donde el elemento ya no estaba, así que se
+  // veía la animación de pulsado pero el toque no llegaba a su destino.
+  // (Se veía en consola como "ResizeObserver loop completed with undelivered
+  // notifications".)
+  //
+  // Ahora: sólo reacciona si cambia el ANCHO (que es lo único que afecta al
+  // ajuste), no escribe estado si el resultado es el mismo, y mide dentro de un
+  // requestAnimationFrame para no encadenar layouts síncronos.
+  const anchoPrevio = useRef(-1);
+
   useEffect(() => {
-    const fit = () => {
+    let pendiente = 0;
+
+    const medir = () => {
       const wrap = wrapRef.current;
       const span = spanRef.current;
       if (!wrap || !span) return;
-      let lo = min, hi = max, best = min;
-      // Binary search the largest size that fits
       const avail = wrap.clientWidth;
       if (avail <= 0) return;
+
+      let lo = min, hi = max, best = min;
       for (let i = 0; i < 8; i++) {
         const mid = (lo + hi) / 2;
         span.style.fontSize = `${mid}px`;
@@ -902,12 +916,30 @@ export const AutoFitText: React.FC<{ text: string; max?: number; min?: number; c
         else { hi = mid; }
       }
       span.style.fontSize = '';
-      setSize(Math.floor(best * 10) / 10);
+      const nuevo = Math.floor(best * 10) / 10;
+      // Sin cambio => sin render => sin nueva notificación => sin bucle.
+      setSize((prev) => (Math.abs(prev - nuevo) < 0.05 ? prev : nuevo));
     };
-    fit();
-    const ro = new ResizeObserver(fit);
-    if (wrapRef.current) ro.observe(wrapRef.current);
-    return () => ro.disconnect();
+
+    const programar = () => {
+      cancelAnimationFrame(pendiente);
+      pendiente = requestAnimationFrame(medir);
+    };
+
+    programar();
+
+    const ro = new ResizeObserver((entries) => {
+      const ancho = entries[0]?.contentRect.width ?? -1;
+      // El alto cambia como CONSECUENCIA de nuestro propio ajuste: ignorarlo.
+      if (Math.abs(ancho - anchoPrevio.current) < 0.5) return;
+      anchoPrevio.current = ancho;
+      programar();
+    });
+    if (wrapRef.current) {
+      anchoPrevio.current = wrapRef.current.clientWidth;
+      ro.observe(wrapRef.current);
+    }
+    return () => { cancelAnimationFrame(pendiente); ro.disconnect(); };
   }, [text, max, min]);
 
   return (
