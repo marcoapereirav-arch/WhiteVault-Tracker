@@ -1071,27 +1071,15 @@ function App() {
   const handleTransaction = (data: any) => {
     const cur = data.currency || currencyCode;
     const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
-    const newContexts = [...state.contexts];
-    const ctxIdx = newContexts.findIndex(c => c.id === data.contextId);
 
-    if (ctxIdx > -1) {
-        const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === data.accountId);
-        if (accIdx > -1) {
-            const acc = newContexts[ctxIdx].accounts[accIdx];
-            const delta = data.type === 'INCOME' ? data.amount : -data.amount;
-            if (data.subAccountId) {
-                const subIdx = acc.subAccounts.findIndex(s => s.id === data.subAccountId);
-                if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, cur, delta);
-            } else {
-                acc.balances = addToBalance(acc.balances, cur, delta);
-            }
-        }
-    }
-
+    // El saldo se aplica DENTRO del updater sobre `prev`, no sobre el `state` del
+    // closure (que puede estar viejo). Si no, dos gastos seguidos a la misma
+    // cuenta se pisaban y uno perdía su resta de saldo aunque sí se guardaba en
+    // el Libro — así se descuadró la cuenta de Marco por el gasto de OpenAI.
     setState(prev => ({
         ...prev,
         transactions: [newTx, ...prev.transactions],
-        contexts: newContexts
+        contexts: applyTxEffect(prev.contexts, newTx, 1),
     }));
     logAudit(newTx.id, 'CREATE', null, newTx);
 
@@ -1120,23 +1108,15 @@ function App() {
 
   const handleTransfer = (data: any) => {
       const cur = data.currency || currencyCode;
-      const newContexts = [...state.contexts];
-      const updateBal = (ctxId: string, accId: string, subId: string | undefined, amount: number) => {
-          const c = newContexts.find(c => c.id === ctxId);
-          const a = c?.accounts.find(a => a.id === accId);
-          if (a) {
-              if (subId) {
-                  const s = a.subAccounts.find(s => s.id === subId);
-                  if (s) s.balances = addToBalance(s.balances, cur, amount);
-              } else {
-                  a.balances = addToBalance(a.balances, cur, amount);
-              }
-          }
-      };
-      updateBal(data.contextId, data.accountId, data.subAccountId, -data.amount);
-      updateBal(data.toContextId, data.toAccountId, data.toSubAccountId, data.amount);
       const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
-      setState(prev => ({ ...prev, contexts: newContexts, transactions: [newTx, ...prev.transactions] }));
+      // Saldo aplicado dentro del updater sobre `prev` (mismo motivo que en
+      // handleTransaction): así una transferencia no puede pisar el saldo de una
+      // transacción inmediatamente anterior.
+      setState(prev => ({
+          ...prev,
+          contexts: applyTxEffect(prev.contexts, newTx, 1),
+          transactions: [newTx, ...prev.transactions],
+      }));
       logAudit(newTx.id, 'CREATE', null, newTx);
       flashRecent([
           { accountId: data.accountId, subAccountId: data.subAccountId || undefined, amount: data.amount, currency: cur, kind: 'TRANSFER_OUT' },
@@ -1212,40 +1192,49 @@ function App() {
   };
 
   // Apply (or reverse, with sign = -1) a transaction's effect on context balances.
+  // Aplica el efecto de una transacción sobre los saldos, de forma TOTALMENTE
+  // INMUTABLE: nunca muta los objetos de `contexts`, sólo devuelve copias nuevas
+  // de lo que cambia. Antes mutaba en sitio (`acc.balances = ...`), lo que unido
+  // a que handleTransaction lo hacía fuera del updater con un `state` viejo del
+  // closure provocaba que dos gastos seguidos a la misma cuenta se pisaran: el
+  // segundo leía el saldo anterior y el primero se perdía. La transacción se
+  // guardaba pero su resta de saldo no. Eso descuadró la cuenta de Marco 10,62 €
+  // (el gasto de OpenAI). Con esto, y aplicándolo siempre dentro del updater con
+  // `prev`, dos transacciones consecutivas ya no pueden pisarse.
   const applyTxEffect = (contexts: FinancialContext[], tx: Transaction, sign: 1 | -1): FinancialContext[] => {
-      const newContexts = [...contexts];
-      const ctxIdx = newContexts.findIndex(c => c.id === tx.contextId);
-      if (ctxIdx > -1) {
-          const accIdx = newContexts[ctxIdx].accounts.findIndex(a => a.id === tx.accountId);
-          if (accIdx > -1) {
-              const acc = newContexts[ctxIdx].accounts[accIdx];
-              // ADJUSTMENT stores a signed delta → add it directly (like income).
-              const delta = sign * ((tx.type === 'INCOME' || tx.type === 'ADJUSTMENT') ? tx.amount : -tx.amount);
-              if (tx.subAccountId) {
-                  const subIdx = acc.subAccounts.findIndex(s => s.id === tx.subAccountId);
-                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, delta);
-              } else {
-                  acc.balances = addToBalance(acc.balances, tx.currency, delta);
-              }
+      const originDelta = sign * ((tx.type === 'INCOME' || tx.type === 'ADJUSTMENT') ? tx.amount : -tx.amount);
+      const destDelta = sign * tx.amount;
+
+      const patchAccount = (
+          acc: Account,
+          subId: string | undefined,
+          delta: number
+      ): Account => {
+          if (subId) {
+              return {
+                  ...acc,
+                  subAccounts: acc.subAccounts.map(s =>
+                      s.id === subId ? { ...s, balances: addToBalance(s.balances, tx.currency, delta) } : s
+                  ),
+              };
           }
-      }
-      if (tx.type === 'TRANSFER' && tx.toContextId && tx.toAccountId) {
-          const toCtxIdx = newContexts.findIndex(c => c.id === tx.toContextId);
-          if (toCtxIdx > -1) {
-              const toAccIdx = newContexts[toCtxIdx].accounts.findIndex(a => a.id === tx.toAccountId);
-              if (toAccIdx > -1) {
-                  const acc = newContexts[toCtxIdx].accounts[toAccIdx];
-                  const delta = sign * tx.amount;
-                  if (tx.toSubAccountId) {
-                      const subIdx = acc.subAccounts.findIndex(s => s.id === tx.toSubAccountId);
-                      if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, tx.currency, delta);
-                  } else {
-                      acc.balances = addToBalance(acc.balances, tx.currency, delta);
-                  }
-              }
-          }
-      }
-      return newContexts;
+          return { ...acc, balances: addToBalance(acc.balances, tx.currency, delta) };
+      };
+
+      return contexts.map(c => {
+          const isOrigin = c.id === tx.contextId;
+          const isDest = tx.type === 'TRANSFER' && c.id === tx.toContextId;
+          if (!isOrigin && !isDest) return c;
+          return {
+              ...c,
+              accounts: c.accounts.map(a => {
+                  let next = a;
+                  if (isOrigin && a.id === tx.accountId) next = patchAccount(next, tx.subAccountId, originDelta);
+                  if (isDest && a.id === tx.toAccountId) next = patchAccount(next, tx.toSubAccountId, destDelta);
+                  return next;
+              }),
+          };
+      });
   };
 
   // Audit log helper — fire-and-forget insert.
@@ -1356,46 +1345,21 @@ function App() {
       const oldTx = state.transactions.find(t => t.id === data.id);
       if (!oldTx) return;
       const cur = data.currency || currencyCode;
-      const newContexts = [...state.contexts];
-
-      // Reverse old balance
-      const oldCtxIdx = newContexts.findIndex(c => c.id === oldTx.contextId);
-      if (oldCtxIdx > -1) {
-          const oldAccIdx = newContexts[oldCtxIdx].accounts.findIndex(a => a.id === oldTx.accountId);
-          if (oldAccIdx > -1) {
-              const acc = newContexts[oldCtxIdx].accounts[oldAccIdx];
-              const reverseDelta = oldTx.type === 'INCOME' ? -oldTx.amount : oldTx.amount;
-              if (oldTx.subAccountId) {
-                  const subIdx = acc.subAccounts.findIndex(s => s.id === oldTx.subAccountId);
-                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, oldTx.currency, reverseDelta);
-              } else {
-                  acc.balances = addToBalance(acc.balances, oldTx.currency, reverseDelta);
-              }
-          }
-      }
-
-      // Apply new balance
-      const newCtxIdx = newContexts.findIndex(c => c.id === data.contextId);
-      if (newCtxIdx > -1) {
-          const newAccIdx = newContexts[newCtxIdx].accounts.findIndex(a => a.id === data.accountId);
-          if (newAccIdx > -1) {
-              const acc = newContexts[newCtxIdx].accounts[newAccIdx];
-              const newDelta = data.type === 'INCOME' ? data.amount : -data.amount;
-              if (data.subAccountId) {
-                  const subIdx = acc.subAccounts.findIndex(s => s.id === data.subAccountId);
-                  if (subIdx > -1) acc.subAccounts[subIdx].balances = addToBalance(acc.subAccounts[subIdx].balances, cur, newDelta);
-              } else {
-                  acc.balances = addToBalance(acc.balances, cur, newDelta);
-              }
-          }
-      }
-
       const updatedTx = { ...oldTx, ...data, currency: cur };
-      setState(prev => ({
-          ...prev,
-          transactions: prev.transactions.map(t => t.id === data.id ? updatedTx : t),
-          contexts: newContexts
-      }));
+
+      // Todo dentro del updater sobre `prev`: primero se revierte el efecto de la
+      // transacción vieja y luego se aplica el de la nueva, encadenando
+      // applyTxEffect (inmutable). Antes se calculaba sobre el `state` del
+      // closure y mutando en sitio, lo que podía perder o duplicar saldo.
+      setState(prev => {
+          const reverted = applyTxEffect(prev.contexts, oldTx, -1);
+          const applied = applyTxEffect(reverted, updatedTx, 1);
+          return {
+              ...prev,
+              transactions: prev.transactions.map(t => t.id === data.id ? updatedTx : t),
+              contexts: applied,
+          };
+      });
       logAudit(oldTx.id, 'UPDATE', oldTx, updatedTx);
   };
 

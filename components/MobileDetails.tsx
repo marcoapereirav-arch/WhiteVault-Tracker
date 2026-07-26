@@ -302,6 +302,12 @@ export const DashboardSummarySheet: React.FC<CommonProps & {
         // Group by currency — never mix
         const byCur: Record<string, Transaction[]> = {};
         filtered.forEach((t) => { (byCur[t.currency] ||= []).push(t); });
+        // Ordenar cada moneda por fecha, más reciente primero. Antes salían en el
+        // orden en que venían (no por fecha), y el slice(0,30) recortaba 30 al
+        // azar en vez de los 30 más recientes.
+        Object.values(byCur).forEach((list) =>
+          list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        );
         const currencies = Object.keys(byCur).sort();
         const totalsByCur: Record<string, number> = {};
         currencies.forEach((cur) => { totalsByCur[cur] = byCur[cur].reduce((s, t) => s + t.amount, 0); });
