@@ -580,7 +580,16 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                 const hasSubs = acc.subAccounts.length > 0;
                 const isOpen = expanded.has(acc.id);
                 const recentlyAdded = recentDistributions[acc.id];
-                const recentTx = recentTxByAccount[`${acc.id}:`];
+                // Movimiento reciente propio de la cuenta (sin sub-cuenta).
+                const recentTxOwn = recentTxByAccount[`${acc.id}:`];
+                // Movimiento reciente en CUALQUIERA de sus sub-cuentas. Se sube al
+                // nivel de la cuenta para que el indicador se vea sin tener que
+                // desplegar: si registras un gasto en una sub-cuenta plegada, el
+                // "-X €" aparece igualmente aquí arriba.
+                const recentTxInSub = acc.subAccounts
+                  .map((s) => recentTxByAccount[`${acc.id}:${s.id}`])
+                  .find(Boolean);
+                const recentTx = recentTxOwn || recentTxInSub;
                 const target = acc.percentageTarget;
 
                 // Compute totals: own (account balances only) vs combined (account + sub-accounts)

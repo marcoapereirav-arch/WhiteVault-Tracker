@@ -12,7 +12,7 @@ import { BrandLoader } from './BrandLoader';
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.07.20.10';
+export const APP_VERSION = '2026.07.20.11';
 
 interface ChangeEntry {
   version: string;
@@ -24,9 +24,10 @@ interface ChangeEntry {
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
   {
-    version: '2026.07.20.10',
+    version: '2026.07.20.11',
     date: '20 jul 2026',
     items: [
+      'El movimiento reciente ahora se ve en la cuenta aunque el gasto vaya a una sub-cuenta (antes quedaba escondido dentro)',
       'Quitado el espacio en blanco debajo del botón de confirmar',
       'El botón de confirmar ya no se corta: se queda fijo abajo, siempre visible',
       'Los 106 botones de la app usan ya el sistema de pulsación fiable, no solo unos pocos',
