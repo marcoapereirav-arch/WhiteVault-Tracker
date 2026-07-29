@@ -274,7 +274,7 @@ function App() {
           : (browserTz && browserTz !== 'UTC') ? browserTz
           : (p.timezone || 'UTC');
 
-        setState(migrateState({
+        const migrated = migrateState({
           user: {
             name: p.name || INITIAL_STATE.user.name,
             email: p.email || INITIAL_STATE.user.email,
@@ -288,7 +288,26 @@ function App() {
           subscriptions: p.subscriptions || INITIAL_STATE.subscriptions,
           categories: p.categories || INITIAL_STATE.categories,
           transactions
-        }));
+        });
+        setState(migrated);
+
+        // Si la migración limpió algún Objetivo con saldo fantasma, se persiste
+        // de inmediato. El sync normal está desactivado en la carga inicial (para
+        // no pisar datos), así que sin esto la limpieza sólo se guardaría en la
+        // siguiente acción del usuario.
+        const objetivoSucio = (contexts as any[]).some((c) =>
+          (c.accounts || []).some((a: any) =>
+            (a.subAccounts || []).some((s: any) =>
+              s.goalKind === 'PAYMENT' && s.balances && Object.values(s.balances).some((v: any) => Math.abs(Number(v)) > 1e-7)
+            )
+          )
+        );
+        if (objetivoSucio) {
+          supabase.from('profiles')
+            .update({ contexts: migrated.contexts, updated_at: new Date().toISOString() })
+            .eq('id', userId)
+            .then(({ error }) => { if (error) console.warn('[heal]', error.message); });
+        }
       } else {
         setNeedsOnboarding(true);
       }

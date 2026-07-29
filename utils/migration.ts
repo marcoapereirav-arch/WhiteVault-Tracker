@@ -31,8 +31,25 @@ export const migrateState = (state: AppState): AppState => {
         return { ...subRest, balances: subBalances };
       });
 
+      // AUTO-LIMPIEZA de Objetivos: un Objetivo (PAYMENT) es un contador de deuda,
+      // no un bucket de dinero, así que su saldo debe ser 0. Si arrastra un saldo
+      // (p.ej. -100 de un pago hecho con la versión antigua), se mueve al saldo
+      // PROPIO de la cuenta para que el total no cambie y el contador quede limpio.
+      // Es idempotente: una vez a 0, no vuelve a tocar nada.
+      const cleanBalances: Record<string, number> = { ...(balances as Record<string, number>) };
+      const cleanedSubs = subAccounts.map(sub => {
+        if ((sub as any).goalKind !== 'PAYMENT') return sub;
+        const sb = (sub.balances || {}) as Record<string, number>;
+        const hasMoney = Object.values(sb).some(v => Math.abs(v) > 0.0000001);
+        if (!hasMoney) return sub;
+        for (const [cur, v] of Object.entries(sb)) {
+          if (v) cleanBalances[cur] = Number(((cleanBalances[cur] || 0) + v).toFixed(10));
+        }
+        return { ...sub, balances: {} };
+      });
+
       const { balance: _ab, ...accRest } = accAny;
-      return { ...accRest, balances, subAccounts };
+      return { ...accRest, balances: cleanBalances, subAccounts: cleanedSubs };
     })
   }));
 
