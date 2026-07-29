@@ -456,6 +456,12 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const subAccountOptions: SelectFieldOption[] = activeAccount ? [
         { value: '', label: 'Ninguna', hint: '' },
         ...activeAccount.subAccounts.map((s) => {
+            // Un Objetivo (PAYMENT) no mueve su propio saldo: el pago sale de la
+            // cuenta y sólo hace avanzar la barra. Mostrar "0 → -50" confundía
+            // (parecía que el contador se iba a negativo). Aquí se muestra la meta.
+            if (s.goalKind === 'PAYMENT' && s.target) {
+                return { value: s.id, label: s.name, hint: `Objetivo · meta ${formatMoney(s.target, currency)}` };
+            }
             const bal = s.balances?.[currency] ?? 0;
             const delta = type === 'INCOME' ? Number(amount || 0) : -Number(amount || 0);
             const projected = bal + delta;
