@@ -1210,7 +1210,14 @@ function App() {
           subId: string | undefined,
           delta: number
       ): Account => {
-          if (subId) {
+          const sub = subId ? acc.subAccounts.find(s => s.id === subId) : undefined;
+          // Un Objetivo (PAYMENT) es un CONTADOR de deuda, no un bucket de dinero:
+          // su saldo no se mueve (si no, quedaba en negativo, p.ej. Adrián V -100).
+          // El dinero de un pago a un Objetivo sale del saldo PROPIO de la cuenta
+          // padre; el Objetivo cuenta el pago por el vínculo de la transacción
+          // (sub_account_id), no por su saldo. En una Meta (SAVING) o sub normal el
+          // saldo sí es dinero y se aplica al sub como siempre.
+          if (subId && sub && !isPaymentGoal(sub)) {
               return {
                   ...acc,
                   subAccounts: acc.subAccounts.map(s =>
