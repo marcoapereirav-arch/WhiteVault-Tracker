@@ -496,8 +496,18 @@ interface AccountsProps {
   onDeleteContext: (id: string) => void;
 }
 
-const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }; formatCurrency: (n: number, c?: string) => string }> = ({ indicator, formatCurrency }) => {
+const RecentBadge: React.FC<{ indicator?: { amount: number; currency: string; kind: 'INCOME' | 'EXPENSE' | 'TRANSFER_OUT' | 'TRANSFER_IN' }; formatCurrency: (n: number, c?: string) => string; asProgress?: boolean }> = ({ indicator, formatCurrency, asProgress }) => {
   if (!indicator) return null;
+  // asProgress: un pago a un Objetivo es AVANCE de la deuda, no una pérdida.
+  // Se muestra en verde con "+" (abonado) en vez de rojo con "-", que hacía
+  // pensar que el Objetivo se iba a negativo.
+  if (asProgress) {
+    return (
+      <span className="inline-flex items-center text-[10px] font-display font-bold tabular px-2 py-0.5 rounded-full border wv-pop-in text-emerald-700 bg-emerald-50 border-emerald-200">
+        +{formatCurrency(indicator.amount, indicator.currency)} abonado
+      </span>
+    );
+  }
   const isIn = indicator.kind === 'INCOME' || indicator.kind === 'TRANSFER_IN';
   const isOut = indicator.kind === 'EXPENSE' || indicator.kind === 'TRANSFER_OUT';
   const isTransfer = indicator.kind === 'TRANSFER_IN' || indicator.kind === 'TRANSFER_OUT';
@@ -735,7 +745,7 @@ const MobileAccountsBase: React.FC<AccountsProps> = ({ contexts, transactions, f
                                   {esObjetivo && sub.priority != null && (
                                     <span className="flex-shrink-0 px-1.5 py-0.5 text-[8px] font-bold bg-gold/20 text-onyx rounded">P{sub.priority}</span>
                                   )}
-                                  <RecentBadge indicator={subRecent} formatCurrency={formatCurrency} />
+                                  <RecentBadge indicator={subRecent} formatCurrency={formatCurrency} asProgress={esObjetivo} />
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                   <span className="text-xs font-display font-bold text-onyx tabular">
