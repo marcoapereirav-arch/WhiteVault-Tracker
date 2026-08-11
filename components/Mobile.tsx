@@ -161,8 +161,9 @@ interface BottomTabBarProps {
   activeId: string;
   onChange: (id: string) => void;
   onFabPress: () => void;
+  hideFab?: boolean;
 }
-export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onChange, onFabPress }) => {
+export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onChange, onFabPress, hideFab }) => {
   const left = tabs.slice(0, 2);
   const right = tabs.slice(2);
   return (
@@ -178,7 +179,9 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({ tabs, activeId, onCh
         <div className="relative bg-white/95 backdrop-blur-xl border-t border-black/5 pb-[max(env(safe-area-inset-bottom),14px)] pt-1.5">
           <div className="flex items-end justify-around relative">
             {left.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
-            <FabButton onClick={onFabPress} />
+            {/* En Demo (solo lectura) se oculta el + para que no se pueda
+                registrar nada; se deja el hueco para no descuadrar la barra. */}
+            {hideFab ? <div className="flex-1" aria-hidden /> : <FabButton onClick={onFabPress} />}
             {right.map((t) => <TabItemBtn key={t.id} item={t} active={activeId === t.id} onClick={() => onChange(t.id)} />)}
           </div>
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-12 h-px bg-metallic opacity-60" />

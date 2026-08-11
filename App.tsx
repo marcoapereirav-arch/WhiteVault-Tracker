@@ -9,6 +9,7 @@ import { Onboarding } from './components/Onboarding';
 import { getBalance, addToBalance, subtractFromBalance, getTotalsByCurrency, balanceEntries } from './utils/balances';
 import { migrateState } from './utils/migration';
 import { collectGoals, goalRemaining, isPaymentGoal, paymentGoalTotals } from './utils/goals';
+import { buildDemoContexts } from './utils/demo';
 import {
   MobileShell,
   MobileHeader,
@@ -137,6 +138,19 @@ function App() {
   
   // Quick Actions Menu State
   const [isActionsOpen, setIsActionsOpen] = useState(false);
+
+  // Entorno activo: 'real' (tus datos) o 'demo' (foto de solo lectura con saldo
+  // objetivo). El Demo NUNCA toca ni sincroniza tus datos reales: sólo cambia lo
+  // que se muestra. La elección se recuerda entre sesiones.
+  const [activeEnv, setActiveEnv] = useState<'real' | 'demo'>(() => {
+    try { return localStorage.getItem('wv_env') === 'demo' ? 'demo' : 'real'; } catch { return 'real'; }
+  });
+  const isDemo = activeEnv === 'demo';
+  const switchEnv = (env: 'real' | 'demo') => {
+    setActiveEnv(env);
+    try { localStorage.setItem('wv_env', env); } catch {}
+    haptic('medium');
+  };
 
   // Undo & Feedback State
   const [lastDistribution, setLastDistribution] = useState<{ txIds: string[], contextId: string, currency: string, amounts: {[id:string]:number} } | null>(null);
@@ -322,6 +336,9 @@ function App() {
   // Sync state to Supabase
   const syncToSupabase = React.useCallback(async () => {
     if (!isLoaded || !session || !hasFetchedData) return;
+    // Garantía dura: en Demo NUNCA se escribe nada al servidor. Aunque algo
+    // intentara mutar, tus datos reales quedan intactos.
+    if (isDemo) return;
     const uid = session.user.id;
 
     try {
@@ -376,7 +393,7 @@ function App() {
     } catch (err) {
       console.error('Sync error:', err);
     }
-  }, [state, isLoaded, session, hasFetchedData]);
+  }, [state, isLoaded, session, hasFetchedData, isDemo]);
 
   // Debounced sync on state changes
   useEffect(() => {
@@ -421,6 +438,7 @@ function App() {
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (!isLoaded || !session || !hasFetchedData) return;
+      if (isDemo) return; // en Demo no se persiste nada
       const uid = session.user.id;
       const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}`;
       fetch(url, {
@@ -441,7 +459,7 @@ function App() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [state, isLoaded, session, hasFetchedData]);
+  }, [state, isLoaded, session, hasFetchedData, isDemo]);
 
   const t = DICTIONARY;
   const currencyCode = state.user.currency;
@@ -658,9 +676,15 @@ function App() {
       });
   }, [filteredTransactions, dashboardDateRange]);
   
+  // En Demo, la vista usa una copia con los saldos escalados al objetivo. Se
+  // deriva de state.contexts (nunca lo reemplaza), así que los datos reales y el
+  // sync quedan intactos.
+  const demoContexts = useMemo(() => buildDemoContexts(state.contexts), [state.contexts]);
+  const viewContexts = isDemo ? demoContexts : state.contexts;
+
   const filteredContexts = useMemo(
-      () => state.contexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter),
-      [state.contexts, contextFilter]
+      () => viewContexts.filter(c => contextFilter === 'ALL' || c.id === contextFilter),
+      [viewContexts, contextFilter]
   );
 
   const totalsByCurrencyRaw = useMemo(() => getTotalsByCurrency(filteredContexts), [filteredContexts]);
@@ -738,6 +762,7 @@ function App() {
 
   // Profit First Logic with Undo Support
   const distributeIncome = (contextId: string, currency: string, specificAmount?: number) => {
+      if (isDemo) return;
       const ctx = state.contexts.find(c => c.id === contextId);
       if (!ctx) return;
 
@@ -815,6 +840,7 @@ function App() {
   };
 
   const undoLastDistribution = () => {
+      if (isDemo) return;
       if (!lastDistribution) return;
 
       const { txIds, contextId, currency, amounts } = lastDistribution;
@@ -860,6 +886,7 @@ function App() {
   };
 
   const handleUpdateAccountPercentage = (contextId: string, accountId: string, percentage: number) => {
+      if (isDemo) return;
       const newContexts = state.contexts.map(c => {
           if (c.id !== contextId) return c;
           return {
@@ -873,6 +900,7 @@ function App() {
   }
 
   const handleUpdateContextName = (contextId: string, newName: string) => {
+      if (isDemo) return;
       const newContexts = state.contexts.map(c => {
           if (c.id !== contextId) return c;
           return { ...c, name: newName };
@@ -881,6 +909,7 @@ function App() {
   }
 
   const handleDeleteContext = (contextId: string) => {
+      if (isDemo) return;
       const newContexts = state.contexts.filter(c => c.id !== contextId);
       setState({ ...state, contexts: newContexts });
       setContextToDelete(null);
@@ -894,6 +923,7 @@ function App() {
   // renombran. Las SUB-CUENTAS sí: crear, renombrar, mover y borrar libremente.
 
   const handleRenameAccount = (contextId: string, accountId: string, newName: string) => {
+      if (isDemo) return;
       setState(prev => ({
           ...prev,
           contexts: prev.contexts.map(c => c.id !== contextId ? c : {
@@ -904,6 +934,7 @@ function App() {
   };
 
   const handleRenameSubAccount = (contextId: string, accountId: string, subId: string, newName: string) => {
+      if (isDemo) return;
       setState(prev => ({
           ...prev,
           contexts: prev.contexts.map(c => c.id !== contextId ? c : {
@@ -920,6 +951,7 @@ function App() {
   // se quedan en el libro mayor, sólo pierden el vínculo con la sub-cuenta. Si
   // tenía saldo, se devuelve a la cuenta padre para no descuadrar el total.
   const handleDeleteSubAccount = (contextId: string, accountId: string, subId: string) => {
+      if (isDemo) return;
       setState(prev => {
           const contexts = prev.contexts.map(c => {
               if (c.id !== contextId) return c;
@@ -956,6 +988,7 @@ function App() {
   // búsqueda falla en silencio (subIdx = -1) y cualquier reversión de saldo
   // —borrar o editar un gasto— se descarta sin aviso: descuadre permanente.
   const handleMoveSubAccount = (contextId: string, fromAccountId: string, toAccountId: string, subId: string) => {
+      if (isDemo) return;
       if (fromAccountId === toAccountId) return;
       setState(prev => {
           const ctx = prev.contexts.find(c => c.id === contextId);
@@ -994,6 +1027,7 @@ function App() {
       subId: string,
       patch: Partial<Pick<SubAccount, 'name' | 'target' | 'goalKind' | 'priority' | 'completedAt'>>
   ) => {
+      if (isDemo) return;
       setState(prev => ({
           ...prev,
           contexts: prev.contexts.map(c => c.id !== contextId ? c : {
@@ -1015,6 +1049,7 @@ function App() {
       subId: string,
       data: { amount: number; date: string; note?: string; kind?: 'HISTORY' | 'CREDIT' }
   ) => {
+      if (isDemo) return;
       const entry: GoalEntry = {
           id: crypto.randomUUID(),
           date: data.date || new Date().toISOString(),
@@ -1038,6 +1073,7 @@ function App() {
   };
 
   const handleDeleteGoalEntry = (contextId: string, accountId: string, subId: string, entryId: string) => {
+      if (isDemo) return;
       setState(prev => ({
           ...prev,
           contexts: prev.contexts.map(c => c.id !== contextId ? c : {
@@ -1057,6 +1093,7 @@ function App() {
   // the delta vs the tracked balance and create a signed ADJUSTMENT entry.
   // Excluded from income/expense metrics — only corrects the balance.
   const handleAdjustment = (data: { contextId: string; accountId: string; subAccountId?: string; currency: string; realBalance: number; notes?: string }) => {
+      if (isDemo) return;
       const cur = data.currency || currencyCode;
       const ctx = state.contexts.find(c => c.id === data.contextId);
       const acc = ctx?.accounts.find(a => a.id === data.accountId);
@@ -1088,6 +1125,7 @@ function App() {
   };
 
   const handleTransaction = (data: any) => {
+      if (isDemo) return;
     const cur = data.currency || currencyCode;
     const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
 
@@ -1126,6 +1164,7 @@ function App() {
   };
 
   const handleTransfer = (data: any) => {
+      if (isDemo) return;
       const cur = data.currency || currencyCode;
       const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
       // Saldo aplicado dentro del updater sobre `prev` (mismo motivo que en
@@ -1144,6 +1183,7 @@ function App() {
   };
 
   const handleNewSubAccount = (data: any) => {
+      if (isDemo) return;
       const nueva: SubAccount = {
           id: `sub_${Date.now()}_${Math.floor(Math.random() * 1e6)}`,
           name: data.name,
@@ -1168,6 +1208,7 @@ function App() {
   };
 
   const handleNewCategory = (data: any) => {
+      if (isDemo) return;
       setState(prev => ({ ...prev, categories: [...prev.categories, { id: `c_${Date.now()}`, ...data, icon: 'Tags' }]}));
   };
 
@@ -1180,10 +1221,12 @@ function App() {
   };
 
   const handleUpdateCategory = (data: any) => {
+      if (isDemo) return;
       setState(prev => ({ ...prev, categories: prev.categories.map(c => c.id === data.id ? { ...c, ...data } : c) }));
   };
 
   const handleNewSubscription = (data: any) => {
+      if (isDemo) return;
       const uid = session?.user?.id;
       setState(prev => {
           const newSubs = [...prev.subscriptions, { id: `s_${Date.now()}`, ...data }];
@@ -1197,6 +1240,7 @@ function App() {
   };
 
   const handleUpdateSubscription = (data: any) => {
+      if (isDemo) return;
       const uid = session?.user?.id;
       setState(prev => {
           const newSubs = prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s);
@@ -1277,6 +1321,7 @@ function App() {
   };
 
   const handleDeleteTransaction = (txId: string) => {
+      if (isDemo) return;
       clearRecentIndicators();
       const deletedAt = new Date().toISOString();
       let txSnapshot: Transaction | undefined;
@@ -1296,6 +1341,7 @@ function App() {
   // Duplicate a transaction — keeps EVERY field identical, only changes id
   // and appends "(copia)" to the notes for easy identification.
   const handleDuplicateTransaction = (txId: string) => {
+      if (isDemo) return;
       const tx = state.transactions.find(t => t.id === txId);
       if (!tx) return;
       const dup: Transaction = {
@@ -1321,6 +1367,7 @@ function App() {
   };
 
   const handleRestoreTransaction = (txId: string) => {
+      if (isDemo) return;
       clearRecentIndicators();
       let before: Transaction | undefined;
       setState(prev => {
@@ -1340,6 +1387,7 @@ function App() {
   // avoid the closure race where serial setState calls overwrote each other's
   // context updates (resulting in only the last reversal being applied).
   const handleBulkDeleteTransactions = (txIds: Set<string>) => {
+      if (isDemo) return;
       clearRecentIndicators();
       const deletedAt = new Date().toISOString();
       setState(prev => {
@@ -1367,6 +1415,7 @@ function App() {
   };
 
   const handleUpdateTransaction = (data: any) => {
+      if (isDemo) return;
       clearRecentIndicators();
       const oldTx = state.transactions.find(t => t.id === data.id);
       if (!oldTx) return;
@@ -1390,6 +1439,7 @@ function App() {
   };
 
   const handleNewBusiness = (data: any) => {
+      if (isDemo) return;
     let remainingBalance = Number(data.initialBalance) || 0;
     const cur = data.currency || currencyCode;
 
@@ -1642,6 +1692,7 @@ function App() {
   const hc = headerConfig[currentView] || headerConfig.DASHBOARD;
 
   const handleSaveProfile = async () => {
+      if (isDemo) return;
     try {
       const userId = session?.user?.id;
       if (!userId) throw new Error('No hay sesión activa');
@@ -1686,13 +1737,24 @@ function App() {
             </button>
           }
           trailing={
-            currentView !== 'SETTINGS' ? (
-              <div className="lg:hidden">
-                <HeaderButton onClick={() => setCurrentView('SETTINGS')} ariaLabel="Configuración">
-                  <Icons.Settings className="w-4 h-4 text-onyx" />
-                </HeaderButton>
-              </div>
-            ) : null
+            <div className="flex items-center gap-2">
+              {isDemo && (
+                <button
+                  {...pressProps(() => setCurrentView('SETTINGS'))}
+                  className="h-7 px-2.5 rounded-full bg-gold text-onyx text-[10px] font-display font-bold uppercase tracking-widest active:scale-95"
+                  aria-label="Entorno Demo — toca para cambiar"
+                >
+                  Demo
+                </button>
+              )}
+              {currentView !== 'SETTINGS' ? (
+                <div className="lg:hidden">
+                  <HeaderButton onClick={() => setCurrentView('SETTINGS')} ariaLabel="Configuración">
+                    <Icons.Settings className="w-4 h-4 text-onyx" />
+                  </HeaderButton>
+                </div>
+              ) : null}
+            </div>
           }
         />
 
@@ -1874,6 +1936,8 @@ function App() {
               onSaveProfile={handleSaveProfile}
               onOpenTrash={() => setTrashOpen(true)}
               deletedCount={deletedTransactions.length}
+              activeEnv={activeEnv}
+              onSwitchEnv={switchEnv}
             />
           )}
         </main>
@@ -1883,6 +1947,7 @@ function App() {
           activeId={activeTabId}
           onChange={handleTabChange}
           onFabPress={() => setIsActionsOpen(true)}
+          hideFab={isDemo}
         />
 
         {/* FAB quick actions */}

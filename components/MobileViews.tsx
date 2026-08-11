@@ -1391,6 +1391,8 @@ interface SettingsProps {
   onSignOut: () => void;
   onSaveProfile: () => Promise<void>;
   onOpenTrash: () => void;
+  activeEnv: 'real' | 'demo';
+  onSwitchEnv: (env: 'real' | 'demo') => void;
   deletedCount: number;
 }
 export const MobileSettings: React.FC<SettingsProps> = (p) => {
@@ -1464,6 +1466,29 @@ export const MobileSettings: React.FC<SettingsProps> = (p) => {
           </div>
         </div>
       </section>
+
+      {/* ── ENTORNO ── desplegable minimalista para cambiar de "cuenta" ── */}
+      <div className="mb-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-graphite mb-2 px-1">Entorno</div>
+        <div className="bg-white border border-onyx/[0.12] rounded-2xl p-1.5 flex gap-1">
+          {([['real', 'Mi cuenta'], ['demo', 'Demo']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              {...pressProps(() => p.onSwitchEnv(id))}
+              className={`flex-1 h-11 rounded-xl text-xs font-display font-bold uppercase tracking-widest transition-all active:scale-[0.98] ${
+                p.activeEnv === id ? 'bg-onyx text-white' : 'text-graphite'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {p.activeEnv === 'demo' && (
+          <p className="text-[11px] text-graphite mt-2 px-1 leading-snug">
+            Estás viendo el entorno <strong>Demo</strong> (solo lectura). Tus datos reales no se tocan. Vuelve a “Mi cuenta” para seguir usando la app.
+          </p>
+        )}
+      </div>
 
       <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:mt-6">
         <div>
