@@ -82,6 +82,8 @@ export interface Transaction {
   // If this transaction was created via subscription quick-pay, links back
   // to the subscription so we can show payment history.
   linkedSubscriptionId?: string | null;
+  /** Payment goal link, independent of the account/subaccount that funded the expense. */
+  linkedGoalId?: string | null;
 }
 
 export interface TransactionAudit {

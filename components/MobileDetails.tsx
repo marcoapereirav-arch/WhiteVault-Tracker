@@ -29,6 +29,9 @@ export const TransactionDetailSheet: React.FC<CommonProps & {
   if (!tx) return null;
   const cat = tx.categoryId ? state.categories.find((c) => c.id === tx.categoryId) : null;
   const ctx = state.contexts.find((c) => c.id === tx.contextId);
+  const linkedGoal = tx.linkedGoalId
+    ? state.contexts.flatMap((c) => c.accounts.flatMap((a) => a.subAccounts)).find((s) => s.id === tx.linkedGoalId)
+    : undefined;
   const tone = tx.type === 'INCOME' ? 'income' : tx.type === 'EXPENSE' ? 'expense' : 'transfer';
   const Icon = tx.type === 'INCOME' ? Icons.Income : tx.type === 'EXPENSE' ? Icons.Expense : Icons.Transfer;
   const sign = tx.type === 'INCOME' ? '+' : tx.type === 'EXPENSE' ? '-' : '';
@@ -52,6 +55,8 @@ export const TransactionDetailSheet: React.FC<CommonProps & {
         <DetailRow label="Moneda" value={tx.currency} mono />
         <DetailRow label="Espacio" value={ctx?.name || '—'} />
         <DetailRow label="Cuenta" value={getAccountName(tx.contextId, tx.accountId) || '—'} />
+        {tx.comments && <DetailRow label="Notas" value={tx.comments} />}
+        {linkedGoal && <DetailRow label="Objetivo" value={linkedGoal.name} />}
         {tx.subAccountId && <DetailRow label="Sub-Cuenta" value={getSubAccountName(tx.contextId, tx.accountId, tx.subAccountId)} />}
         {cat && (
           <DetailRow
@@ -446,6 +451,9 @@ export const AccountHistorySheet: React.FC<CommonProps & {
   const ctx = state.contexts.find((c) => c.id === target.contextId);
   const accName = getAccountName(target.contextId, target.accountId);
   const subName = target.subAccountId ? getSubAccountName(target.contextId, target.accountId, target.subAccountId) : null;
+  const targetGoal = target.subAccountId
+    ? ctx?.accounts.flatMap((account) => account.subAccounts).find((sub) => sub.id === target.subAccountId)
+    : undefined;
 
   const history = transactions
     .filter((tx) => {
@@ -455,13 +463,21 @@ export const AccountHistorySheet: React.FC<CommonProps & {
       // Inbound (transfers): tx arriving to this account/subaccount
       const inbound = tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId &&
         (target.subAccountId ? tx.toSubAccountId === target.subAccountId : !tx.toSubAccountId);
-      return out || inbound;
+      const linkedGoalPayment = !!targetGoal && tx.type === 'EXPENSE' &&
+        ((tx.linkedGoalId === targetGoal.id && tx.contextId === target.contextId) ||
+          // Legacy references stored the goal ID as subAccountId under the actual
+          // paying account, which may differ from the goal's parent account.
+          (tx.subAccountId === targetGoal.id && tx.contextId === target.contextId));
+      return out || inbound || linkedGoalPayment;
     })
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   // Compute totals (per currency)
   const totals: Record<string, { income: number; expense: number; net: number }> = {};
   history.forEach((tx) => {
+    const accountMovement = (tx.contextId === target.contextId && tx.accountId === target.accountId) ||
+      (tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId);
+    if (!accountMovement) return;
     if (!totals[tx.currency]) totals[tx.currency] = { income: 0, expense: 0, net: 0 };
     const isInbound = tx.type === 'TRANSFER' && tx.toContextId === target.contextId && tx.toAccountId === target.accountId;
     const isOutbound = tx.contextId === target.contextId && tx.accountId === target.accountId && !isInbound;

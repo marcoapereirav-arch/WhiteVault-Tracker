@@ -32,7 +32,7 @@ export const entriesTotal = (sub: SubAccount): number =>
 /** Gastos del libro mayor vinculados a esta sub-cuenta. Sólo EXPENSE. */
 export const linkedPayments = (sub: SubAccount, transactions: Transaction[]): Transaction[] =>
   transactions.filter(
-    (t) => t.subAccountId === sub.id && t.type === 'EXPENSE' && !t.deletedAt
+    (t) => (t.linkedGoalId === sub.id || t.subAccountId === sub.id) && t.type === 'EXPENSE' && !t.deletedAt
   );
 
 // ---------------------------------------------------------------------------
@@ -53,8 +53,10 @@ export type PaymentIndex = Map<string, number>;
 export const buildPaymentIndex = (transactions: Transaction[]): PaymentIndex => {
   const index: PaymentIndex = new Map();
   for (const t of transactions) {
-    if (t.type !== 'EXPENSE' || t.deletedAt || !t.subAccountId) continue;
-    index.set(t.subAccountId, (index.get(t.subAccountId) || 0) + (t.amount || 0));
+    if (t.type !== 'EXPENSE' || t.deletedAt) continue;
+    const goalId = t.linkedGoalId || t.subAccountId;
+    if (!goalId) continue;
+    index.set(goalId, (index.get(goalId) || 0) + (t.amount || 0));
   }
   return index;
 };

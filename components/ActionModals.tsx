@@ -6,6 +6,7 @@ import { CURRENCIES } from '../constants';
 import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic, pressProps} from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
 import { formatIntervalLabel } from '../utils/subscriptions';
+import { collectGoals, goalRemaining } from '../utils/goals';
 
 // Compact money formatter for select options (no decimals if integer to save space).
 const formatMoney = (n: number, currency: string): string => {
@@ -381,7 +382,8 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     const [notes, setNotes] = useState(initialData?.notes || '');
     const [comments, setComments] = useState(initialData?.comments || '');
     const [distribute, setDistribute] = useState(false);
-    const [linkedSubscriptionId, setLinkedSubscriptionId] = useState<string>('');
+    const [linkedSubscriptionId, setLinkedSubscriptionId] = useState<string>(initialData?.linkedSubscriptionId || '');
+    const [linkedGoalId, setLinkedGoalId] = useState<string>(initialData?.linkedGoalId || '');
     const [subPickerOpen, setSubPickerOpen] = useState(false);
     const [newCategoryOpen, setNewCategoryOpen] = useState(false);
 
@@ -401,6 +403,11 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     }, [type, activeContext]);
 
     const availableCategories = state.categories.filter(c => c.contextId === contextId);
+    const availablePaymentGoals = type === 'EXPENSE'
+        ? collectGoals(state.contexts, 'PAYMENT').filter(({ contextId: goalContextId, sub }) =>
+            goalContextId === contextId && !sub.completedAt && goalRemaining(sub, state.transactions, currency) > 0.005
+        )
+        : [];
 
     // When user picks an active subscription, autofill all fields from it.
     // Ordered by nextRenewal ascending (the soonest to be paid first).
@@ -421,6 +428,10 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
         setAccountId(sub.accountId);
         setSubAccountId(sub.subAccountId || '');
         setCategoryId(sub.categoryId || '');
+        const matchingGoal = availablePaymentGoals.find(({ sub: goal }) =>
+            goal.name.trim().toLocaleLowerCase() === sub.name.trim().toLocaleLowerCase()
+        );
+        setLinkedGoalId(matchingGoal?.sub.id || '');
         if (!notes) setNotes(sub.name);
     };
 
@@ -435,6 +446,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
             comments: comments || undefined,
             distribute,
             linkedSubscriptionId: linkedSubscriptionId || undefined,
+            linkedGoalId: linkedGoalId || undefined,
         });
         onClose();
     };
@@ -455,7 +467,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
     });
     const subAccountOptions: SelectFieldOption[] = activeAccount ? [
         { value: '', label: 'Ninguna', hint: '' },
-        ...activeAccount.subAccounts.map((s) => {
+        ...activeAccount.subAccounts.filter((s) => s.goalKind !== 'PAYMENT').map((s) => {
             // Un Objetivo (PAYMENT) no mueve su propio saldo: el pago sale de la
             // cuenta y sólo hace avanzar la barra. Mostrar "0 → -50" confundía
             // (parecía que el contador se iba a negativo). Aquí se muestra la meta.
@@ -526,9 +538,27 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                         label="Espacio"
                         value={contextId}
                         options={state.contexts.map((c) => ({ value: c.id, label: c.name }))}
-                        onChange={(v) => { setContextId(v); setCategoryId(''); setLinkedSubscriptionId(''); }}
+                        onChange={(v) => { setContextId(v); setCategoryId(''); setLinkedSubscriptionId(''); setLinkedGoalId(''); }}
                     />
                 </div>
+
+                {type === 'EXPENSE' && (
+                    <SelectField
+                        label="Vincular a objetivo (opcional)"
+                        value={linkedGoalId}
+                        options={[
+                            { value: '', label: 'Sin objetivo', hint: '' },
+                            ...availablePaymentGoals.map(({ sub, accountName }) => ({
+                                value: sub.id,
+                                label: sub.name,
+                                hint: `${accountName} · quedan ${formatMoney(goalRemaining(sub, state.transactions, currency), currency)}`,
+                            })),
+                        ]}
+                        onChange={setLinkedGoalId}
+                        subtitle="El gasto se queda en la cuenta que lo pagó y también avanza el objetivo"
+                        searchable
+                    />
+                )}
 
                 <Input type="datetime-local" label="Fecha y Hora" value={dateTime} onChange={(e: any) => setDateTime(e.target.value)} />
 

@@ -255,6 +255,7 @@ function App() {
           amount: t.amount,
           date: t.date,
           notes: t.notes,
+          comments: t.comments || undefined,
           currency: t.currency || userCurrency,
           contextId: t.context_id,
           accountId: t.account_id,
@@ -265,6 +266,7 @@ function App() {
           toSubAccountId: t.to_sub_account_id,
           deletedAt: t.deleted_at,
           linkedSubscriptionId: t.linked_subscription_id,
+          linkedGoalId: t.linked_goal_id,
         }));
 
         // Check if account is paused
@@ -374,6 +376,7 @@ function App() {
         amount: t.amount,
         date: t.date,
         notes: t.notes,
+        comments: t.comments ?? null,
         currency: t.currency,
         context_id: t.contextId,
         account_id: t.accountId,
@@ -384,6 +387,7 @@ function App() {
         to_sub_account_id: t.toSubAccountId,
         deleted_at: t.deletedAt ?? null,
         linked_subscription_id: t.linkedSubscriptionId ?? null,
+        linked_goal_id: t.linkedGoalId ?? null,
       }));
 
       if (toUpsert.length > 0) {
@@ -584,7 +588,10 @@ function App() {
       const ctx = state.contexts.find(c => c.id === ctxId);
       const acc = ctx?.accounts.find(a => a.id === accId);
       const sub = acc?.subAccounts.find(s => s.id === subId);
-      return sub ? sub.name : '';
+      // Linked payment goals can belong to a different parent account than the
+      // account from which the expense was paid (e.g. Ingresos → iPhone goal).
+      const linkedGoal = sub || ctx?.accounts.flatMap(a => a.subAccounts).find(s => s.id === subId);
+      return linkedGoal ? linkedGoal.name : '';
   }, [state.contexts]);
 
   // --- Date Filter Logic ---
