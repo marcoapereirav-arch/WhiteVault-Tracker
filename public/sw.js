@@ -7,6 +7,7 @@
 // la navegación caía a esa copia antigua, que apuntaba al JS antiguo (también
 // cacheado para siempre), y la app arrancaba en una versión de hace meses sin
 // forma de actualizarse. Si tocas esto, mantén la versión ligada al build.
+// 2026-10-07: fuerza la detección del build nuevo en las PWA abiertas.
 const VERSION = new URL(self.location.href).searchParams.get('v') || 'dev';
 const SHELL_CACHE = `wv-shell-${VERSION}`;
 const RUNTIME_CACHE = `wv-runtime-${VERSION}`;

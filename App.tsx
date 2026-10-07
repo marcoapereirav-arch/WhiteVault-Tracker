@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { AppState, FinancialContext, Transaction, Subscription, Category, Account, SubAccount, GoalEntry } from './types';
 import { INITIAL_STATE, CURRENCIES } from './constants';
 import { Icons } from './components/Icons';
@@ -79,6 +79,11 @@ function App() {
   const [session, setSession] = useState<any>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasFetchedData, setHasFetchedData] = useState(false);
+  const [syncConflict, setSyncConflict] = useState(false);
+  const profileVersionRef = useRef<string | null>(null);
+  const profileSyncInFlightRef = useRef(false);
+  const queuedProfileSyncRef = useRef(false);
+  const latestProfileSyncRef = useRef<(() => Promise<void>) | null>(null);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [isAccountPaused, setIsAccountPaused] = useState(false);
   const [state, setState] = useState<AppState>(INITIAL_STATE);
@@ -247,6 +252,8 @@ function App() {
 
       if (profileRes.data) {
         const p = profileRes.data;
+        profileVersionRef.current = p.updated_at || null;
+        setSyncConflict(false);
         const userCurrency = p.currency || INITIAL_STATE.user.currency;
         const contexts = p.contexts || [];
         const transactions = (txRes.data || []).map((t: any) => ({
@@ -320,7 +327,7 @@ function App() {
         );
         if (objetivoSucio) {
           supabase.from('profiles')
-            .update({ contexts: migrated.contexts, updated_at: new Date().toISOString() })
+            .update({ contexts: migrated.contexts })
             .eq('id', userId)
             .then(({ error }) => { if (error) console.warn('[heal]', error.message); });
         }
@@ -342,10 +349,16 @@ function App() {
     // intentara mutar, tus datos reales quedan intactos.
     if (isDemo) return;
     const uid = session.user.id;
+    if (syncConflict) return;
+    if (profileSyncInFlightRef.current) {
+      queuedProfileSyncRef.current = true;
+      return;
+    }
 
+    profileSyncInFlightRef.current = true;
     try {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: uid,
+      const updatedAt = new Date().toISOString();
+      const profilePatch = {
         name: state.user.name,
         email: state.user.email,
         currency: state.user.currency,
@@ -356,9 +369,21 @@ function App() {
         contexts: state.contexts,
         subscriptions: state.subscriptions,
         categories: state.categories,
-        updated_at: new Date().toISOString()
-      });
+        updated_at: updatedAt,
+      };
+      const expectedVersion = profileVersionRef.current;
+      const profileQuery = expectedVersion
+        ? supabase.from('profiles').update(profilePatch).eq('id', uid).eq('updated_at', expectedVersion)
+        : supabase.from('profiles').upsert({ id: uid, ...profilePatch });
+      const { data: savedProfile, error: profileError } = await profileQuery.select('updated_at').maybeSingle();
       if (profileError) console.error('Sync profiles error:', profileError);
+      if (profileError || !savedProfile) {
+        // A different tab/server update won. Do not let this stale snapshot
+        // overwrite the newer balances or transaction list.
+        setSyncConflict(true);
+        return;
+      }
+      profileVersionRef.current = savedProfile.updated_at;
 
       const { data: existingTxs } = await supabase.from('transactions').select('id').eq('user_id', uid);
       const existingIds = new Set(existingTxs?.map(t => t.id) || []);
@@ -396,8 +421,15 @@ function App() {
       }
     } catch (err) {
       console.error('Sync error:', err);
+    } finally {
+      profileSyncInFlightRef.current = false;
+      if (queuedProfileSyncRef.current) {
+        queuedProfileSyncRef.current = false;
+        Promise.resolve().then(() => latestProfileSyncRef.current?.());
+      }
     }
-  }, [state, isLoaded, session, hasFetchedData, isDemo]);
+  }, [state, isLoaded, session, hasFetchedData, isDemo, syncConflict]);
+  latestProfileSyncRef.current = syncToSupabase;
 
   // Debounced sync on state changes
   useEffect(() => {
@@ -405,6 +437,25 @@ function App() {
     const timeout = setTimeout(syncToSupabase, 500);
     return () => clearTimeout(timeout);
   }, [state, isLoaded, session, hasFetchedData, syncToSupabase]);
+
+  // Detect edits from another tab/device before the user writes over them.
+  // A conflict stops autosync and shows an explicit reload action.
+  useEffect(() => {
+    if (!session || !hasFetchedData || isDemo || !profileVersionRef.current) return;
+    let checking = false;
+    const checkProfileVersion = async () => {
+      if (checking || profileSyncInFlightRef.current || document.visibilityState === 'hidden') return;
+      checking = true;
+      try {
+        const { data, error } = await supabase.from('profiles').select('updated_at').eq('id', session.user.id).maybeSingle();
+        if (!error && data?.updated_at && data.updated_at !== profileVersionRef.current) setSyncConflict(true);
+      } finally {
+        checking = false;
+      }
+    };
+    const timer = window.setInterval(checkProfileVersion, 5000);
+    return () => window.clearInterval(timer);
+  }, [session, hasFetchedData, isDemo]);
 
   // Un Objetivo que llega a 0 restante se marca completado solo y se archiva.
   //
@@ -443,27 +494,30 @@ function App() {
     const handleBeforeUnload = () => {
       if (!isLoaded || !session || !hasFetchedData) return;
       if (isDemo) return; // en Demo no se persiste nada
+      const expectedVersion = profileVersionRef.current;
+      if (!expectedVersion || syncConflict) return;
       const uid = session.user.id;
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/profiles?id=eq.${uid}&updated_at=eq.${encodeURIComponent(expectedVersion)}`;
       fetch(url, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${session.access_token}`,
+          'Prefer': 'return=minimal',
         },
         body: JSON.stringify({
           contexts: state.contexts,
           subscriptions: state.subscriptions,
           categories: state.categories,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         }),
         keepalive: true,
       });
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [state, isLoaded, session, hasFetchedData, isDemo]);
+  }, [state, isLoaded, session, hasFetchedData, isDemo, syncConflict]);
 
   const t = DICTIONARY;
   const currencyCode = state.user.currency;
@@ -1101,6 +1155,7 @@ function App() {
   // Excluded from income/expense metrics — only corrects the balance.
   const handleAdjustment = (data: { contextId: string; accountId: string; subAccountId?: string; currency: string; realBalance: number; notes?: string }) => {
       if (isDemo) return;
+      if (syncConflict) { window.alert('Hay cambios más recientes en el Tracker. Recarga la app antes de registrar movimientos.'); return; }
       const cur = data.currency || currencyCode;
       const ctx = state.contexts.find(c => c.id === data.contextId);
       const acc = ctx?.accounts.find(a => a.id === data.accountId);
@@ -1133,6 +1188,7 @@ function App() {
 
   const handleTransaction = (data: any) => {
       if (isDemo) return;
+      if (syncConflict) { window.alert('Hay cambios más recientes en el Tracker. Recarga la app antes de registrar movimientos.'); return; }
     const cur = data.currency || currencyCode;
     const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
 
@@ -1172,6 +1228,7 @@ function App() {
 
   const handleTransfer = (data: any) => {
       if (isDemo) return;
+      if (syncConflict) { window.alert('Hay cambios más recientes en el Tracker. Recarga la app antes de registrar movimientos.'); return; }
       const cur = data.currency || currencyCode;
       const newTx: Transaction = { id: crypto.randomUUID(), ...data, currency: cur };
       // Saldo aplicado dentro del updater sobre `prev` (mismo motivo que en
@@ -1234,29 +1291,16 @@ function App() {
 
   const handleNewSubscription = (data: any) => {
       if (isDemo) return;
-      const uid = session?.user?.id;
       setState(prev => {
           const newSubs = [...prev.subscriptions, { id: `s_${Date.now()}`, ...data }];
-          // Force immediate sync to BD so quick close doesn't lose the create
-          if (uid) {
-              supabase.from('profiles').update({ subscriptions: newSubs, updated_at: new Date().toISOString() }).eq('id', uid)
-                  .then(({ error }) => { if (error) console.warn('[sync sub create]', error.message); });
-          }
           return { ...prev, subscriptions: newSubs };
       });
   };
 
   const handleUpdateSubscription = (data: any) => {
       if (isDemo) return;
-      const uid = session?.user?.id;
       setState(prev => {
           const newSubs = prev.subscriptions.map(s => s.id === data.id ? { ...s, ...data } : s);
-          // Force immediate sync — the debounced sync would also do it eventually
-          // but quick close (esp. on iOS PWA) could lose changes mid-debounce.
-          if (uid) {
-              supabase.from('profiles').update({ subscriptions: newSubs, updated_at: new Date().toISOString() }).eq('id', uid)
-                  .then(({ error }) => { if (error) console.warn('[sync sub update]', error.message); });
-          }
           return { ...prev, subscriptions: newSubs };
       });
   };
@@ -1764,6 +1808,19 @@ function App() {
             </div>
           }
         />
+
+        {syncConflict && (
+          <div role="alert" className="mx-4 mt-3 flex items-center gap-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm">
+            <span className="flex-1">Hay cambios más recientes guardados. El guardado está pausado para proteger tus saldos.</span>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="shrink-0 rounded-lg bg-amber-900 px-3 py-2 text-xs font-bold text-white"
+            >
+              Recargar
+            </button>
+          </div>
+        )}
 
         {/* Context switcher row (non-dashboard, non-settings views) */}
         {currentView !== 'DASHBOARD' && currentView !== 'SETTINGS' && state.contexts.length > 1 && (
