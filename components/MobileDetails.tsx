@@ -6,7 +6,7 @@ import React from 'react';
 import { AppState, Transaction, Subscription, Category } from '../types';
 import { Icons } from './Icons';
 import { BottomSheet, IconCircle, PressButton, haptic, pressProps} from './Mobile';
-import { formatIntervalLabel, getSubscriptionDueInfo } from '../utils/subscriptions';
+import { formatIntervalLabel, getSubscriptionDueInfo, getSubscriptionPaymentSummary } from '../utils/subscriptions';
 import { isPaymentGoal, goalPaid, goalRemaining, goalProgress } from '../utils/goals';
 
 interface CommonProps {
@@ -284,11 +284,17 @@ export const DashboardSummarySheet: React.FC<CommonProps & {
   totalsByCurrency: Record<string, number>;
   dashboardFilteredTransactions: Transaction[];
   dashboardFilteredSubs: Subscription[];
+  subscriptionContextFilter: string;
+  subscriptionCurrencyFilter: string;
   onTransactionClick: (tx: Transaction) => void;
   onSubscriptionClick: (s: Subscription) => void;
-}> = ({ state, formatCurrency, formatDateTime, type, onClose, totalsByCurrency, dashboardFilteredTransactions, dashboardFilteredSubs, onTransactionClick, onSubscriptionClick }) => {
+}> = ({ state, formatCurrency, formatDateTime, type, onClose, totalsByCurrency, dashboardFilteredTransactions, dashboardFilteredSubs, subscriptionContextFilter, subscriptionCurrencyFilter, onTransactionClick, onSubscriptionClick }) => {
   const open = !!type;
-  const title = type === 'BALANCE' ? 'Balance Total' : type === 'INCOME' ? 'Ingresos del Periodo' : type === 'EXPENSE' ? 'Gastos del Periodo' : type === 'SUBS' ? 'Suscripciones Activas' : type === 'ALL' ? 'Todas las Transacciones' : '';
+  const overdueMode = type === 'SUBS_OVERDUE';
+  const subscriptions = overdueMode ? getSubscriptionPaymentSummary(state.subscriptions, {
+    contextId: subscriptionContextFilter, currency: subscriptionCurrencyFilter, timeZone: state.user.timezone,
+  }).overdue : dashboardFilteredSubs;
+  const title = overdueMode ? 'Suscripciones pendientes' : type === 'BALANCE' ? 'Balance Total' : type === 'INCOME' ? 'Ingresos del Periodo' : type === 'EXPENSE' ? 'Gastos del Periodo' : type === 'SUBS' ? 'Suscripciones Activas' : type === 'ALL' ? 'Todas las Transacciones' : '';
   return (
     <BottomSheet open={open} onClose={onClose} title={title} size="full">
       {type === 'BALANCE' && (
@@ -362,22 +368,24 @@ export const DashboardSummarySheet: React.FC<CommonProps & {
           </div>
         );
       })()}
-      {type === 'SUBS' && (
+      {(type === 'SUBS' || overdueMode) && (
         <div className="space-y-2">
-          {dashboardFilteredSubs.length > 0 ? dashboardFilteredSubs.map((s) => (
+          {subscriptions.length > 0 ? subscriptions.map((s) => (
             <div key={s.id} onClick={() => { onClose(); onSubscriptionClick(s); }} className="flex justify-between items-center p-4 bg-white border border-black/5 rounded-2xl active:bg-stone cursor-pointer">
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <IconCircle tone="gold"><Icons.Subscription className="w-4 h-4" /></IconCircle>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-onyx truncate">{s.name}</div>
                   <div className="text-[11px] text-graphite">
-                    {formatIntervalLabel(s)} · Próx: {s.nextRenewal ? formatDateTime(s.nextRenewal).split(',')[0] : '-'}
+                    {formatIntervalLabel(s)} · {overdueMode
+                      ? (() => { const due = getSubscriptionDueInfo(s.nextRenewal, state.user.timezone); return due ? `${due.label} · Fecha de cobro: ${due.dateLabel}` : '-'; })()
+                      : `Próx: ${s.nextRenewal ? formatDateTime(s.nextRenewal).split(',')[0] : '-'}`}
                   </div>
                 </div>
               </div>
               <span className="text-sm font-display font-bold text-onyx tabular">{formatCurrency(s.amount, s.currency)}</span>
             </div>
-          )) : <div className="text-center text-sm text-graphite py-8">Sin suscripciones en este periodo</div>}
+          )) : <div className="text-center text-sm text-graphite py-8">{overdueMode ? 'Sin suscripciones pendientes' : 'Sin suscripciones en este periodo'}</div>}
         </div>
       )}
     </BottomSheet>

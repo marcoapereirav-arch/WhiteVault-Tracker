@@ -2116,6 +2116,8 @@ function App() {
           totalsByCurrency={totalsByCurrency}
           dashboardFilteredTransactions={dashboardFilteredTransactions}
           dashboardFilteredSubs={dashboardFilteredSubs}
+          subscriptionContextFilter={dashboardContextFilter}
+          subscriptionCurrencyFilter={dashboardCurrencyFilter}
           onTransactionClick={(tx) => setSelectedTransaction(tx)}
           onSubscriptionClick={(s) => { setSelectedSubscription(s); setActiveModal('VIEW_SUBSCRIPTION'); }}
           formatCurrency={formatCurrency}

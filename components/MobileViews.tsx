@@ -196,8 +196,8 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
               );
             })}
             {overdueSubs.length > 5 && (
-              <button type="button" {...pressProps(() => p.onSummaryClick('SUBS'))} className="w-full px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-rose-700 active:bg-rose-50">
-                Ver todas las suscripciones
+              <button type="button" {...pressProps(() => p.onSummaryClick('SUBS_OVERDUE'))} className="w-full px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-rose-700 active:bg-rose-50">
+                Ver todas las pendientes
               </button>
             )}
           </div>
