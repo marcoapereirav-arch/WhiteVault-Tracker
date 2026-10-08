@@ -6,7 +6,7 @@ import React from 'react';
 import { AppState, Transaction, Subscription, Category } from '../types';
 import { Icons } from './Icons';
 import { BottomSheet, IconCircle, PressButton, haptic, pressProps} from './Mobile';
-import { formatIntervalLabel } from '../utils/subscriptions';
+import { formatIntervalLabel, getSubscriptionDueInfo } from '../utils/subscriptions';
 import { isPaymentGoal, goalPaid, goalRemaining, goalProgress } from '../utils/goals';
 
 interface CommonProps {
@@ -112,7 +112,7 @@ export const SubscriptionDetailSheet: React.FC<CommonProps & {
 }> = ({ state, formatCurrency, formatDateTime, getAccountName, getSubAccountName, sub, open, onClose, onEdit, onTxClick }) => {
   if (!sub) return null;
   const ctx = state.contexts.find((c) => c.id === sub.contextId);
-  const days = sub.nextRenewal ? Math.ceil((new Date(sub.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
+  const due = getSubscriptionDueInfo(sub.nextRenewal, state.user.timezone);
   return (
     <BottomSheet open={open} onClose={onClose} title="Suscripción" subtitle={sub.name}>
       <div className="text-center mb-6">
@@ -126,13 +126,13 @@ export const SubscriptionDetailSheet: React.FC<CommonProps & {
         </div>
       </div>
 
-      {days !== null && (
-        <div className={`mb-4 p-4 rounded-2xl border text-center ${days <= 3 ? 'bg-gold/10 border-gold/30' : 'bg-stone border-black/5'}`}>
-          <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">Próximo Cobro</div>
-          <div className="text-base font-display font-bold text-onyx mt-1">
-            {days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`}
+      {due && (
+        <div className={`mb-4 p-4 rounded-2xl border text-center ${due.isOverdue ? 'bg-rose-50 border-rose-200' : due.dayOffset <= 3 ? 'bg-gold/10 border-gold/30' : 'bg-stone border-black/5'}`}>
+          <div className="text-[10px] uppercase tracking-widest text-graphite font-bold">{due.isOverdue ? 'Fecha de cobro' : 'Próximo cobro'}</div>
+          <div className={`text-base font-display font-bold mt-1 ${due.isOverdue ? 'text-rose-700' : 'text-onyx'}`}>
+            {due.label}
           </div>
-          {sub.nextRenewal && <div className="text-xs font-mono text-graphite mt-0.5">{formatDateTime(sub.nextRenewal)}</div>}
+          <div className="text-xs font-mono text-graphite mt-0.5">{due.dateLabel}</div>
         </div>
       )}
 

@@ -1,6 +1,6 @@
 // WhiteVault™ — Subscription helpers.
 
-import { Subscription } from '../types';
+import type { Subscription } from '../types';
 
 // Resolve effective interval — prefers intervalValue+intervalUnit (new flexible
 // flow), falls back to legacy frequency for old subscriptions.
@@ -32,6 +32,56 @@ export const formatIntervalLabel = (sub: Subscription): string => {
     : unit === 'months' ? (value === 1 ? 'mes' : 'meses')
     : (value === 1 ? 'año' : 'años');
   return `Cada ${value} ${noun}`;
+};
+
+// Compare calendar dates in the user's timezone, not elapsed 24-hour periods.
+// Date-only renewals are calendar dates already; do not shift them through UTC.
+export const getSubscriptionDueInfo = (
+  nextRenewal: string | undefined,
+  timeZone = 'Europe/Madrid',
+  now = Date.now(),
+): { dayOffset: number; isOverdue: boolean; label: string; dateLabel: string } | null => {
+  if (!nextRenewal || !Number.isFinite(now)) return null;
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit',
+    });
+  }
+  const calendarParts = (date: Date): number[] => {
+    const parts = formatter.formatToParts(date);
+    return ['year', 'month', 'day'].map((key) => Number(parts.find((p) => p.type === key)?.value));
+  };
+  let renewal: number[];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(nextRenewal)) {
+    renewal = nextRenewal.split('-').map(Number);
+    const check = new Date(Date.UTC(renewal[0], renewal[1] - 1, renewal[2]));
+    if (check.getUTCFullYear() !== renewal[0] || check.getUTCMonth() + 1 !== renewal[1] || check.getUTCDate() !== renewal[2]) return null;
+  } else {
+    const date = new Date(nextRenewal);
+    if (Number.isNaN(date.getTime())) return null;
+    renewal = calendarParts(date);
+  }
+  const today = calendarParts(new Date(now));
+  const dayNumber = ([year, month, day]: number[]) => Date.UTC(year, month - 1, day) / 86_400_000;
+  const dayOffset = dayNumber(renewal) - dayNumber(today);
+  const elapsed = -dayOffset;
+  const label = dayOffset < 0
+    ? `Vencida hace ${elapsed} día${elapsed === 1 ? '' : 's'}`
+    : dayOffset === 0 ? 'Vence hoy'
+    : dayOffset === 1 ? 'Mañana'
+    : `En ${dayOffset} días`;
+  const [year, month, day] = renewal;
+  return {
+    dayOffset,
+    isOverdue: dayOffset < 0,
+    label,
+    dateLabel: `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`,
+  };
 };
 
 // Advance a subscription's nextRenewal to the next billing cycle.

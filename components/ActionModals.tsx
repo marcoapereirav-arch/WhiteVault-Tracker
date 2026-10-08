@@ -5,7 +5,7 @@ import { AppState, Category, FinancialContext, Subscription } from '../types';
 import { CURRENCIES } from '../constants';
 import { BottomSheet, SelectField, SelectFieldOption, PressButton, IconCircle, haptic, pressProps} from './Mobile';
 import { isoToLocalPickerString, nowAsPickerString, localPickerStringToIso, formatDateHuman } from '../utils/datetime';
-import { formatIntervalLabel } from '../utils/subscriptions';
+import { formatIntervalLabel, getSubscriptionDueInfo } from '../utils/subscriptions';
 import { collectGoals, goalRemaining } from '../utils/goals';
 
 // Compact money formatter for select options (no decimals if integer to save space).
@@ -664,7 +664,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                 <div className="space-y-2">
                     {activeSubscriptions.map((s) => {
                         const isSelected = linkedSubscriptionId === s.id;
-                        const days = s.nextRenewal ? Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
+                        const due = getSubscriptionDueInfo(s.nextRenewal, state.user.timezone);
                         return (
                             <button
                                 key={s.id}
@@ -677,7 +677,7 @@ export const TransactionForm: React.FC<TransactionFormPropsExt> = ({ type, state
                                     <div className={`text-sm font-display font-bold truncate ${isSelected ? 'text-white' : 'text-onyx'}`}>{s.name}</div>
                                     <div className={`text-[11px] mt-0.5 ${isSelected ? 'text-graphite' : 'text-graphite'}`}>
                                         {formatIntervalLabel(s)}
-                                        {days !== null && ` · Próx. ${days <= 0 ? 'hoy' : days === 1 ? 'mañana' : `en ${days} días`}`}
+                                        {due && ` · ${due.label} · Fecha de cobro: ${due.dateLabel}`}
                                     </div>
                                 </div>
                                 <div className={`text-sm font-display font-bold tabular ${isSelected ? 'text-gold' : 'text-onyx'}`}>{formatMoney(s.amount, s.currency)}</div>

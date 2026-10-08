@@ -27,7 +27,7 @@ import {
   Skeleton,
   haptic, pressProps } from './Mobile';
 import { balanceEntries } from '../utils/balances';
-import { isSubscriptionOverdue, daysOverdue, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
+import { getSubscriptionDueInfo, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
 import { CURRENCIES } from '../constants';
 import {
   isPushSupported,
@@ -84,25 +84,22 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
   // Upcoming = renewals in the NEXT 7 DAYS (future, not overdue). Independent
   // of the dashboard date-range filter; only the space (context) filter applies.
   const upcoming = useMemo(() => {
-    const now = Date.now();
-    const in7days = now + 7 * 24 * 60 * 60 * 1000;
     return p.state.subscriptions
       .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
-      .filter((s) => s.active && s.nextRenewal && !isSubscriptionOverdue(s))
       .filter((s) => {
-        const t = new Date(s.nextRenewal).getTime();
-        return !isNaN(t) && t >= now && t <= in7days;
+        const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
+        return s.active && due && due.dayOffset >= 0 && due.dayOffset <= 7;
       })
       .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
-  }, [p.state.subscriptions, p.contextFilter]);
+  }, [p.state.subscriptions, p.state.user.timezone, p.contextFilter]);
 
   // Overdue subscriptions across all contexts that match the user's filter
   const overdueSubs = useMemo(
     () => p.state.subscriptions
       .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
-      .filter((s) => isSubscriptionOverdue(s))
+      .filter((s) => s.active && getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone)?.isOverdue)
       .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime()),
-    [p.state.subscriptions, p.contextFilter]
+    [p.state.subscriptions, p.state.user.timezone, p.contextFilter]
   );
 
   const balanceTotal = Object.entries(p.totalsByCurrency);
@@ -179,7 +176,7 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
           </div>
           <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden divide-y divide-rose-100">
             {overdueSubs.slice(0, 5).map((s) => {
-              const days = daysOverdue(s);
+              const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
               return (
                 <button
                   key={s.id}
@@ -191,8 +188,9 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-display font-bold text-onyx truncate">{s.name}</div>
                     <div className="text-[11px] text-rose-700 font-medium">
-                      Vencida {days === 0 ? 'hoy' : days === 1 ? 'hace 1 día' : `hace ${days} días`}
+                      {due?.label}
                     </div>
+                    {due && <div className="text-[10px] text-graphite">Fecha de cobro: {due.dateLabel}</div>}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-sm font-display font-bold text-rose-700 tabular">{p.formatCurrency(s.amount, s.currency)}</div>
@@ -215,13 +213,13 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
               trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" {...pressProps(() => p.onSummaryClick('SUBS'))}>Ver todas</button>}
             >
               {upcoming.map((s) => {
-                const days = Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000);
+                const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
                 return (
                   <ListRow
                     key={s.id}
                     leading={<IconCircle tone="gold"><Icons.Subscription className="w-4 h-4" /></IconCircle>}
                     title={s.name}
-                    subtitle={days <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días · ${p.formatDateTime(s.nextRenewal).split(' ')[0]}`}
+                    subtitle={due ? `${due.label} · Fecha de cobro: ${due.dateLabel}` : 'Sin fecha de cobro'}
                     trailing={
                       <div>
                         <div className="text-sm font-display font-bold text-onyx tabular">{p.formatCurrency(s.amount, s.currency)}</div>
@@ -1058,13 +1056,19 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
       });
   }, [state.subscriptions, contextFilter, currencyFilter, subscriptionStatusFilter]);
 
+  const nextSub = list.find((s) => {
+    const due = getSubscriptionDueInfo(s.nextRenewal, state.user.timezone);
+    return s.active && due && !due.isOverdue;
+  });
+  const nextDue = nextSub ? getSubscriptionDueInfo(nextSub.nextRenewal, state.user.timezone) : null;
+
   // Overdue subscriptions ("por pagar")
   const overdueSubs = useMemo(
     () => state.subscriptions
       .filter((s) => contextFilter === 'ALL' || s.contextId === contextFilter)
-      .filter((s) => isSubscriptionOverdue(s))
+      .filter((s) => s.active && getSubscriptionDueInfo(s.nextRenewal, state.user.timezone)?.isOverdue)
       .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime()),
-    [state.subscriptions, contextFilter]
+    [state.subscriptions, state.user.timezone, contextFilter]
   );
 
   // Monthly total (active only)
@@ -1100,7 +1104,7 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
           </div>
           <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden divide-y divide-rose-100">
             {overdueSubs.map((s) => {
-              const days = daysOverdue(s);
+              const due = getSubscriptionDueInfo(s.nextRenewal, state.user.timezone);
               return (
                 <button
                   key={`overdue-${s.id}`}
@@ -1112,8 +1116,9 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-display font-bold text-onyx truncate">{s.name}</div>
                     <div className="text-[11px] text-rose-700 font-medium">
-                      Vencida {days === 0 ? 'hoy' : days === 1 ? 'hace 1 día' : `hace ${days} días`}
+                      {due?.label}
                     </div>
+                    {due && <div className="text-[10px] text-graphite">Fecha de cobro: {due.dateLabel}</div>}
                   </div>
                   <div className="text-right flex-shrink-0">
                     <div className="text-sm font-display font-bold text-rose-700 tabular">{formatCurrency(s.amount, s.currency)}</div>
@@ -1142,21 +1147,15 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
         <div className="hidden lg:flex bg-white border border-black/5 rounded-2xl p-6 flex-col justify-between">
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-graphite mb-2">Próximo cobro</div>
-            {list[0] ? (
+            {nextSub && nextDue ? (
               <>
-                <div className="text-base font-display font-bold text-onyx truncate">{list[0].name}</div>
-                <div className="text-2xl font-display font-bold text-onyx tabular mt-1">{formatCurrency(list[0].amount, list[0].currency)}</div>
-                {list[0].nextRenewal && (
-                  <div className="text-xs text-graphite mt-1">
-                    {(() => {
-                      const d = Math.ceil((new Date(list[0].nextRenewal).getTime() - Date.now()) / 86_400_000);
-                      return d <= 0 ? 'Hoy' : d === 1 ? 'Mañana' : `En ${d} días`;
-                    })()}
-                  </div>
-                )}
+                <div className="text-base font-display font-bold text-onyx truncate">{nextSub.name}</div>
+                <div className="text-2xl font-display font-bold text-onyx tabular mt-1">{formatCurrency(nextSub.amount, nextSub.currency)}</div>
+                <div className="text-xs text-graphite mt-1">{nextDue.label}</div>
+                <div className="text-xs text-graphite mt-1">Fecha de cobro: {nextDue.dateLabel}</div>
               </>
             ) : (
-              <div className="text-sm text-graphite">Sin suscripciones</div>
+              <div className="text-sm text-graphite">Sin próximos cobros</div>
             )}
           </div>
           <button {...pressProps(onAddSub)} className="mt-4 h-10 px-4 bg-onyx text-white rounded-xl text-[10px] font-display font-bold uppercase tracking-widest hover:bg-graphite transition-colors active:scale-[0.98]">
@@ -1190,7 +1189,7 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
         <div className="px-3 lg:px-8 space-y-3 grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 lg:gap-4 lg:space-y-0">
           {list.map((s) => {
             const ctx = state.contexts.find((c) => c.id === s.contextId);
-            const days = s.nextRenewal ? Math.ceil((new Date(s.nextRenewal).getTime() - Date.now()) / 86_400_000) : null;
+            const due = getSubscriptionDueInfo(s.nextRenewal, state.user.timezone);
             return (
               <div
                 key={s.id}
@@ -1214,10 +1213,13 @@ const MobileSubscriptionsBase: React.FC<SubsProps> = ({ state, contextFilter, se
                 <div className="flex items-end justify-between">
                   <div>
                     <div className="text-xl font-display font-bold text-onyx tabular">{formatCurrency(s.amount, s.currency)}</div>
-                    {s.nextRenewal && (
-                      <div className="text-[11px] text-graphite mt-1 flex items-center gap-1">
-                        <Icons.Calendar className="w-3 h-3" />
-                        {days! <= 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`}
+                    {due && (
+                      <div className="mt-1">
+                        <div className={`text-[11px] flex items-center gap-1 ${due.isOverdue ? 'text-rose-700 font-medium' : 'text-graphite'}`}>
+                          <Icons.Calendar className="w-3 h-3" />
+                          {due.label}
+                        </div>
+                        <div className="text-[10px] text-graphite mt-0.5">Fecha de cobro: {due.dateLabel}</div>
                       </div>
                     )}
                     {s.cardLastFour && <div className="text-[10px] font-mono text-graphite mt-0.5">•••• {s.cardLastFour}</div>}
