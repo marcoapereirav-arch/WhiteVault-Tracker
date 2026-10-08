@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { getSubscriptionDueInfo } from './subscriptions.ts';
+import { getSubscriptionDueInfo, getSubscriptionPaymentSummary } from './subscriptions.ts';
+import type { Subscription } from '../types.ts';
 
 const now = Date.parse('2026-10-08T11:00:00Z');
 
@@ -42,4 +43,35 @@ test('missing/invalid dates do not become today, and invalid timezones use Madri
   assert.equal(getSubscriptionDueInfo('invalid', 'Europe/Madrid', now), null);
   assert.equal(getSubscriptionDueInfo('2026-02-30', 'Europe/Madrid', now), null);
   assert.equal(getSubscriptionDueInfo('2026-10-08', 'invalid/timezone', now)?.label, 'Vence hoy');
+});
+
+const sub = (id: string, amount: number, nextRenewal: string, currency = 'EUR', contextId = 'personal', active = true) =>
+  ({ id, amount, nextRenewal, currency, contextId, active } as Subscription);
+
+test('payment totals separate overdue, today through day seven, and excluded renewals', () => {
+  const summary = getSubscriptionPaymentSummary([
+    sub('past', 9.99, '2026-10-07'), sub('today', 16.99, '2026-10-08'),
+    sub('day7', 9.99, '2026-10-15'), sub('day8', 99, '2026-10-16'),
+    sub('paused', 100, '2026-10-07', 'EUR', 'personal', false),
+    sub('invalid', 100, 'invalid'), sub('usd', 20, '2026-10-10', 'USD'),
+  ], { now });
+  assert.deepEqual(summary.overdue.map(s => s.id), ['past']);
+  assert.deepEqual(summary.upcoming.map(s => s.id), ['today', 'usd', 'day7']);
+  assert.deepEqual(summary.overdueTotals, { EUR: 9.99 });
+  assert.deepEqual(summary.upcomingTotals, { EUR: 26.98, USD: 20 });
+});
+
+test('space and currency filters apply to both lists and totals', () => {
+  const rows = [sub('personal', 20, '2026-10-07'), sub('business', 30, '2026-10-07', 'EUR', 'business'),
+    sub('usd', 40, '2026-10-07', 'USD', 'business'), sub('next', 50, '2026-10-09', 'EUR', 'business')];
+  const summary = getSubscriptionPaymentSummary(rows, { contextId: 'business', currency: 'EUR', now });
+  assert.deepEqual(summary.overdue.map(s => s.id), ['business']);
+  assert.deepEqual(summary.overdueTotals, { EUR: 30 });
+  assert.deepEqual(summary.upcomingTotals, { EUR: 50 });
+});
+
+test('overdue totals include every subscription beyond the five-row dashboard preview', () => {
+  const rows = Array.from({ length: 9 }, (_, i) => sub(String(i), 0.1, '2026-10-01'));
+  assert.deepEqual(getSubscriptionPaymentSummary(rows, { now }).overdueTotals, { EUR: 0.9 });
+  assert.deepEqual(getSubscriptionPaymentSummary([], { now }).upcomingTotals, {});
 });

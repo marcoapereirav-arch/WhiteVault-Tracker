@@ -27,7 +27,7 @@ import {
   Skeleton,
   haptic, pressProps } from './Mobile';
 import { balanceEntries } from '../utils/balances';
-import { getSubscriptionDueInfo, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
+import { getSubscriptionDueInfo, getSubscriptionPaymentSummary, resolveInterval, formatIntervalLabel } from '../utils/subscriptions';
 import { CURRENCIES } from '../constants';
 import {
   isPushSupported,
@@ -81,25 +81,12 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
     [p.dashboardFilteredTransactions]
   );
 
-  // Upcoming = renewals in the NEXT 7 DAYS (future, not overdue). Independent
-  // of the dashboard date-range filter; only the space (context) filter applies.
-  const upcoming = useMemo(() => {
-    return p.state.subscriptions
-      .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
-      .filter((s) => {
-        const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
-        return s.active && due && due.dayOffset >= 0 && due.dayOffset <= 7;
-      })
-      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime());
-  }, [p.state.subscriptions, p.state.user.timezone, p.contextFilter]);
-
-  // Overdue subscriptions across all contexts that match the user's filter
-  const overdueSubs = useMemo(
-    () => p.state.subscriptions
-      .filter((s) => p.contextFilter === 'ALL' || s.contextId === p.contextFilter)
-      .filter((s) => s.active && getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone)?.isOverdue)
-      .sort((a, b) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime()),
-    [p.state.subscriptions, p.state.user.timezone, p.contextFilter]
+  // Calendar-based obligations, independent of the historical date-range filter.
+  const { upcoming, overdue: overdueSubs, upcomingTotals, overdueTotals } = useMemo(
+    () => getSubscriptionPaymentSummary(p.state.subscriptions, {
+      contextId: p.contextFilter, currency: p.currencyFilter, timeZone: p.state.user.timezone,
+    }),
+    [p.state.subscriptions, p.state.user.timezone, p.contextFilter, p.currencyFilter]
   );
 
   const balanceTotal = Object.entries(p.totalsByCurrency);
@@ -175,6 +162,15 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
             <span className="text-[10px] font-bold uppercase tracking-widest text-rose-700">{overdueSubs.length}</span>
           </div>
           <div className="bg-white border-2 border-rose-200 rounded-2xl overflow-hidden divide-y divide-rose-100">
+            <div className="px-4 py-4 bg-rose-50">
+              <div className="text-[10px] font-bold uppercase tracking-widest text-rose-700">Total pendiente vencido</div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                {Object.entries(overdueTotals).map(([currency, amount]) => (
+                  <div key={currency} className="text-2xl font-display font-bold tabular text-rose-700">{p.formatCurrency(amount, currency)}</div>
+                ))}
+              </div>
+              <div className="text-[11px] text-graphite mt-1">Incluye las {overdueSubs.length} suscripciones vencidas</div>
+            </div>
             {overdueSubs.slice(0, 5).map((s) => {
               const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
               return (
@@ -199,6 +195,11 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
                 </button>
               );
             })}
+            {overdueSubs.length > 5 && (
+              <button type="button" {...pressProps(() => p.onSummaryClick('SUBS'))} className="w-full px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-rose-700 active:bg-rose-50">
+                Ver todas las suscripciones
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -212,6 +213,15 @@ const MobileDashboardBase: React.FC<DashboardProps> = (p) => {
               title="Próximas Renovaciones · 7 días"
               trailing={<button className="text-[10px] font-bold uppercase tracking-widest text-graphite hover:text-onyx" {...pressProps(() => p.onSummaryClick('SUBS'))}>Ver todas</button>}
             >
+              <div className="px-4 py-4 bg-gold/10 border-b border-black/5">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-graphite">Total próximos 7 días</div>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                  {Object.entries(upcomingTotals).map(([currency, amount]) => (
+                    <div key={currency} className="text-2xl font-display font-bold tabular text-onyx">{p.formatCurrency(amount, currency)}</div>
+                  ))}
+                </div>
+                <div className="text-[11px] text-graphite mt-1">Incluye hoy · {upcoming.length} suscripciones</div>
+              </div>
               {upcoming.map((s) => {
                 const due = getSubscriptionDueInfo(s.nextRenewal, p.state.user.timezone);
                 return (

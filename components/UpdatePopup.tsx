@@ -12,7 +12,7 @@ import { BrandLoader } from './BrandLoader';
 // REGLA: cada vez que se despliega un cambio, se sube APP_VERSION y se añade
 // su entrada arriba del CHANGELOG. Sin eso el usuario no ve el pop-op de
 // novedades y se queda con la versión vieja en caché. No se despliega sin esto.
-export const APP_VERSION = '2026.10.08';
+export const APP_VERSION = '2026.10.08.1';
 
 interface ChangeEntry {
   version: string;
@@ -23,6 +23,14 @@ interface ChangeEntry {
 // Most recent first. Only the latest entry is shown in the popup, but the
 // list lets us keep history if we ever want a full changelog screen.
 export const CHANGELOG: ChangeEntry[] = [
+  {
+    version: '2026.10.08.1',
+    date: '8 oct 2026',
+    items: [
+      'Inicio muestra el total de suscripciones vencidas pendientes de pago',
+      'Las próximas renovaciones incluyen el total a pagar en los próximos 7 días, con monedas separadas y según tus filtros',
+    ],
+  },
   {
     version: '2026.10.08',
     date: '8 oct 2026',

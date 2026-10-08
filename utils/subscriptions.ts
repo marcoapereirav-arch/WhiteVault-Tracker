@@ -84,6 +84,34 @@ export const getSubscriptionDueInfo = (
   };
 };
 
+// One filtered set feeds both the displayed lists and their currency totals.
+export const getSubscriptionPaymentSummary = (
+  subscriptions: Subscription[],
+  { contextId = 'ALL', currency = 'ALL', timeZone = 'Europe/Madrid', now = Date.now() }:
+    { contextId?: string; currency?: string; timeZone?: string; now?: number } = {},
+) => {
+  const overdue: Subscription[] = [];
+  const upcoming: Subscription[] = [];
+  for (const sub of subscriptions) {
+    if (!sub.active || (contextId !== 'ALL' && sub.contextId !== contextId) ||
+      (currency !== 'ALL' && sub.currency !== currency)) continue;
+    const due = getSubscriptionDueInfo(sub.nextRenewal, timeZone, now);
+    if (!due) continue;
+    if (due.isOverdue) overdue.push(sub);
+    else if (due.dayOffset <= 7) upcoming.push(sub);
+  }
+  const byDate = (a: Subscription, b: Subscription) => new Date(a.nextRenewal).getTime() - new Date(b.nextRenewal).getTime();
+  const totals = (list: Subscription[]) => {
+    const cents: Record<string, number> = {};
+    for (const sub of list) cents[sub.currency] = (cents[sub.currency] ?? 0) + Math.round(sub.amount * 100);
+    return Object.fromEntries(Object.entries(cents).sort(([a], [b]) => a.localeCompare(b)).map(([code, value]) => [code, value / 100]));
+  };
+  return {
+    overdue: overdue.sort(byDate), upcoming: upcoming.sort(byDate),
+    overdueTotals: totals(overdue), upcomingTotals: totals(upcoming),
+  };
+};
+
 // Advance a subscription's nextRenewal to the next billing cycle.
 // Uses UTC arithmetic to avoid timezone day-shift edge cases.
 export const advanceSubscriptionRenewal = (sub: Subscription): Subscription => {
